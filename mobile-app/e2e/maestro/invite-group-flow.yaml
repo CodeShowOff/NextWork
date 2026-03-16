@@ -1,0 +1,8 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Groups
+- assertVisible: Groups
+- tapOn: Search
+- inputText: dev group
+- assertVisible: Groups

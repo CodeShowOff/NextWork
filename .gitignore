@@ -1,0 +1,12 @@
+node_modules/
+.npm/
+.env
+.env.*
+coverage/
+dist/
+build/
+.next/
+.expo/
+.DS_Store
+*.log
+*.tmp

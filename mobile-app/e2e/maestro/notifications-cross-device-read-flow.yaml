@@ -1,0 +1,11 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Notifications
+- assertVisible: Notifications
+# Manual setup step: generate a follow/like/comment/message notification for this user from another account.
+- assertVisible: ${NOTIFICATION_TEXT}
+# Device A marks notification read.
+- tapOn: ${NOTIFICATION_TEXT}
+# Device B remains open on Notifications tab and should update without refresh due to websocket push.
+# Verification on Device B is performed by the same assertion in a second Maestro run on that device.

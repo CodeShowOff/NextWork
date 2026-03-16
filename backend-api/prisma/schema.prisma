@@ -1,0 +1,340 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  refreshTokenHash String? @map("refresh_token_hash")
+  activeOrganizationId String? @db.Uuid @map("active_organization_id")
+  status       String      @default("active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  profile      Profile?
+  posts        Post[]
+  comments     Comment[] @relation("comment_author")
+  deletedComments Comment[] @relation("comment_deleted_by")
+  submittedCommentReports CommentReport[] @relation("comment_reporter")
+  resolvedCommentReports CommentReport[] @relation("comment_report_resolver")
+  sentMessages Message[]   @relation("sent_messages")
+  likes        Like[]
+  followers    Follow[]    @relation("followee_relation")
+  followings   Follow[]    @relation("follower_relation")
+  notificationReceipts Notification[] @relation("notification_user")
+  notificationActors   Notification[] @relation("notification_actor")
+  notificationPreference NotificationPreference?
+  notificationMuteRules NotificationMute[] @relation("notification_mute_owner")
+  mutedByNotificationRules NotificationMute[] @relation("notification_mute_target")
+  conversationParticipants ConversationParticipant[]
+  activeOrganization Organization? @relation("user_active_organization", fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+  organizationMemberships OrganizationMember[]
+  createdOrganizations Organization[] @relation("organization_creator")
+  groupMemberships GroupMember[]
+  createdGroups Group[] @relation("group_creator")
+  generatedInvites InviteLink[] @relation("invite_creator")
+
+  @@map("users")
+}
+
+model Profile {
+  userId      String   @id @db.Uuid @map("user_id")
+  displayName String   @map("display_name")
+  bio         String?
+  avatarUrl   String?  @map("avatar_url")
+  jobTitle    String?  @map("job_title")
+  organizationSize String? @map("organization_size")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([displayName])
+  @@map("profiles")
+}
+
+model Post {
+  id         String    @id @default(uuid()) @db.Uuid
+  authorId   String    @db.Uuid @map("author_id")
+  groupId    String?   @db.Uuid @map("group_id")
+  content    String
+  visibility String    @default("public")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  group    Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  media    PostMedia[]
+  comments Comment[]
+  likes    Like[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([groupId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model PostMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid @map("post_id")
+  mediaUrl  String   @map("media_url")
+  mediaType String   @map("media_type")
+  width     Int?
+  height    Int?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sortOrder])
+  @@map("post_media")
+}
+
+model Comment {
+  id              String    @id @default(uuid()) @db.Uuid
+  postId          String    @db.Uuid @map("post_id")
+  authorId        String    @db.Uuid @map("author_id")
+  parentCommentId String?   @db.Uuid @map("parent_comment_id")
+  deletedById     String?   @db.Uuid @map("deleted_by_id")
+  body            String
+  createdAt       DateTime  @default(now()) @map("created_at")
+  editedAt        DateTime? @map("edited_at")
+  deletedAt       DateTime? @map("deleted_at")
+  moderationState String    @default("active") @map("moderation_state")
+
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User      @relation("comment_author", fields: [authorId], references: [id], onDelete: Cascade)
+  deletedBy     User?     @relation("comment_deleted_by", fields: [deletedById], references: [id], onDelete: SetNull)
+  parentComment Comment?  @relation("comment_replies", fields: [parentCommentId], references: [id])
+  replies       Comment[] @relation("comment_replies")
+  reports       CommentReport[]
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([deletedById])
+  @@map("comments")
+}
+
+model CommentReport {
+  id               String    @id @default(uuid()) @db.Uuid
+  commentId        String    @db.Uuid @map("comment_id")
+  reporterId       String    @db.Uuid @map("reporter_id")
+  reason           String
+  details          String?
+  status           String    @default("open")
+  resolutionAction String?   @map("resolution_action")
+  resolutionNote   String?   @map("resolution_note")
+  resolvedById     String?   @db.Uuid @map("resolved_by_id")
+  resolvedAt       DateTime? @map("resolved_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  comment    Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter   User    @relation("comment_reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User?   @relation("comment_report_resolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([commentId, status, createdAt(sort: Desc)])
+  @@index([reporterId, createdAt(sort: Desc)])
+  @@index([resolvedById])
+  @@map("comment_reports")
+}
+
+model Like {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  postId    String   @db.Uuid @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("likes")
+}
+
+model Follow {
+  followerId String   @db.Uuid @map("follower_id")
+  followeeId String   @db.Uuid @map("followee_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  follower User @relation("follower_relation", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User @relation("followee_relation", fields: [followeeId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followeeId])
+  @@index([followeeId])
+  @@map("follows")
+}
+
+model Conversation {
+  id        String                    @id @default(uuid()) @db.Uuid
+  type      String
+  createdBy String                    @db.Uuid @map("created_by")
+  createdAt DateTime                  @default(now()) @map("created_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  conversationId    String   @db.Uuid @map("conversation_id")
+  userId            String   @db.Uuid @map("user_id")
+  role              String   @default("member")
+  joinedAt          DateTime @default(now()) @map("joined_at")
+  lastReadMessageId String?  @db.Uuid @map("last_read_message_id")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId, conversationId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @db.Uuid @map("conversation_id")
+  senderId       String    @db.Uuid @map("sender_id")
+  body           String
+  messageType    String    @default("text") @map("message_type")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  editedAt       DateTime? @map("edited_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("sent_messages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid @map("user_id")
+  actorId    String?  @db.Uuid @map("actor_id")
+  type       String
+  entityType String   @map("entity_type")
+  entityId   String   @db.Uuid @map("entity_id")
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user  User  @relation("notification_user", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("notification_actor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  userId         String   @id @db.Uuid @map("user_id")
+  likeEnabled    Boolean  @default(true) @map("like_enabled")
+  commentEnabled Boolean  @default(true) @map("comment_enabled")
+  followEnabled  Boolean  @default(true) @map("follow_enabled")
+  messageEnabled Boolean  @default(true) @map("message_enabled")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model NotificationMute {
+  userId      String   @db.Uuid @map("user_id")
+  mutedUserId String   @db.Uuid @map("muted_user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation("notification_mute_owner", fields: [userId], references: [id], onDelete: Cascade)
+  mutedUser User @relation("notification_mute_target", fields: [mutedUserId], references: [id], onDelete: Cascade)
+
+  @@id([userId, mutedUserId])
+  @@index([mutedUserId])
+  @@map("notification_mutes")
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdBy String   @db.Uuid @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdByUser User @relation("organization_creator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members OrganizationMember[]
+  groups Group[]
+  invites InviteLink[]
+  activeUsers User[] @relation("user_active_organization")
+
+  @@index([createdBy])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  organizationId String   @db.Uuid @map("organization_id")
+  userId         String   @db.Uuid @map("user_id")
+  role           String   @default("member")
+  joinedAt       DateTime @default(now()) @map("joined_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Group {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid @map("organization_id")
+  name           String
+  description    String?
+  createdBy      String?   @db.Uuid @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?        @relation("group_creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  members      GroupMember[]
+  posts        Post[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([name])
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId   String   @db.Uuid @map("group_id")
+  userId    String   @db.Uuid @map("user_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+model InviteLink {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid @map("organization_id")
+  token          String    @unique
+  createdBy      String?   @db.Uuid @map("created_by")
+  maxUses        Int?      @map("max_uses")
+  usedCount      Int       @default(0) @map("used_count")
+  expiresAt      DateTime? @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?        @relation("invite_creator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("invite_links")
+}

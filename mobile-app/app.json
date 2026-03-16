@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Workplace",
+    "slug": "workplace",
+    "version": "0.1.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.workplace.app"
+    },
+    "android": {
+      "package": "com.workplace.app"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Feed
+- tapOn: Share an update
+- inputText: Release smoke post
+- tapOn: Post
+- assertVisible: Release smoke post
+- tapOn: Messages
+- assertVisible: Messages
+- tapOn: Notifications
+- assertVisible: Notifications

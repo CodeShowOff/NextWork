@@ -1,0 +1,45 @@
+{
+  "name": "workplace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "mobile-app",
+    "backend-api",
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "ci:backend": "npm run lint --workspace backend-api && npm run typecheck --workspace backend-api && npm run test --workspace backend-api",
+    "ci:mobile": "npm run lint --workspace mobile-app && npm run typecheck --workspace mobile-app && npm run test --workspace mobile-app",
+    "release:gates": "npm run ci:backend && npm run ci:mobile",
+    "test:load": "node ./scripts/load-test.js",
+    "test:security": "node ./scripts/security-test.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "autocannon": "^8.0.0",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.2",
+    "react-native-safe-area-context": "5.6.2",
+    "react-native-screens": "4.23.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0"
+  },
+  "overrides": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.2",
+    "react-native-safe-area-context": "5.6.2",
+    "react-native-screens": "4.23.0"
+  },
+  "dependencies": {
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1"
+  }
+}

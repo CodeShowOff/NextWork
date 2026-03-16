@@ -1,0 +1,81 @@
+name: Workplace CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  backend-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Backend lint
+        run: npm run lint --workspace backend-api
+
+      - name: Backend typecheck
+        run: npm run typecheck --workspace backend-api
+
+      - name: Backend unit and integration tests
+        run: npm run test --workspace backend-api
+
+  mobile-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Mobile lint
+        run: npm run lint --workspace mobile-app
+
+      - name: Mobile typecheck
+        run: npm run typecheck --workspace mobile-app
+
+      - name: Mobile tests
+        run: npm run test --workspace mobile-app
+
+      - name: Verify mobile E2E flow specs
+        run: |
+          test -f mobile-app/e2e/maestro/feed-message-flow.yaml
+          test -f mobile-app/e2e/maestro/invite-group-flow.yaml
+
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
