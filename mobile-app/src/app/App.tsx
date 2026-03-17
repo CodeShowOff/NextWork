@@ -3,6 +3,7 @@ import { Alert, Linking } from 'react-native';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { I18nextProvider, useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthScreen } from '../features/auth/AuthScreen';
@@ -21,11 +22,13 @@ import { switchOrganization } from '../shared/api/organizations.api';
 import { extractInviteToken } from '../shared/linking/invite-linking';
 import { useInviteLinkStore } from '../shared/session/invite-link.store';
 import { useSessionStore } from '../shared/session/session.store';
+import { i18n } from '../shared/i18n/i18n';
 
 const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
 
 function InviteLinkBridge() {
+  const { t } = useTranslation();
   const queryClientBridge = useQueryClient();
   const accessToken = useSessionStore((state) => state.accessToken);
   const pendingInviteToken = useInviteLinkStore((state) => state.pendingInviteToken);
@@ -75,32 +78,60 @@ function InviteLinkBridge() {
         queryClientBridge.invalidateQueries({ queryKey: ['users', 'me'] });
         queryClientBridge.invalidateQueries({ queryKey: ['organizations', 'me'] });
         queryClientBridge.invalidateQueries({ queryKey: ['groups'] });
-        Alert.alert('Invite accepted', 'You have joined the organization and switched context.');
+        Alert.alert(
+          t('app.alerts.inviteAcceptedTitle'),
+          t('app.alerts.inviteAcceptedBody'),
+        );
       })
       .catch((error) => {
-        Alert.alert('Could not accept invite link', (error as Error).message);
+        Alert.alert(t('app.alerts.inviteAcceptFailedTitle'), (error as Error).message);
       });
-  }, [accessToken, clearPendingInviteToken, pendingInviteToken, queryClientBridge]);
+  }, [accessToken, clearPendingInviteToken, pendingInviteToken, queryClientBridge, t]);
 
   return null;
 }
 
 function AuthenticatedTabs() {
+  const { t } = useTranslation();
   const unreadMessages = useMessagesBadgeStore((state) => state.unreadCount);
   const unreadCount = useNotificationBadgeStore((state) => state.unreadCount);
   useMessagesBadgeBridge();
   useNotificationBadgeBridge();
 
   return (
-    <Tab.Navigator>
-      <Tab.Screen name="Feed" component={FeedStack} options={{ headerShown: false }} />
-      <Tab.Screen name="Groups" component={GroupsScreen} />
-      <Tab.Screen name="Search" component={SearchScreen} />
+    <Tab.Navigator initialRouteName="Groups">
+      <Tab.Screen
+        name="Feed"
+        component={FeedStack}
+        options={{
+          headerShown: false,
+          tabBarLabel: t('app.tabs.feed'),
+          title: t('app.tabs.feed'),
+        }}
+      />
+      <Tab.Screen
+        name="Groups"
+        component={GroupsScreen}
+        options={{
+          tabBarLabel: t('app.tabs.groups'),
+          title: t('app.tabs.groups'),
+        }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarLabel: t('app.tabs.search'),
+          title: t('app.tabs.search'),
+        }}
+      />
       <Tab.Screen
         name="Messages"
         component={MessagesStack}
         options={{
           headerShown: false,
+          tabBarLabel: t('app.tabs.messages'),
+          title: t('app.tabs.messages'),
           tabBarBadge: unreadMessages > 0 ? unreadMessages : undefined,
         }}
       />
@@ -108,10 +139,20 @@ function AuthenticatedTabs() {
         name="Notifications"
         component={NotificationsScreen}
         options={{
+          tabBarLabel: t('app.tabs.notifications'),
+          title: t('app.tabs.notifications'),
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
       />
-      <Tab.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStack}
+        options={{
+          headerShown: false,
+          tabBarLabel: t('app.tabs.profile'),
+          title: t('app.tabs.profile'),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -122,10 +163,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <InviteLinkBridge />
-        <NavigationContainer>
-          {accessToken ? <AuthenticatedTabs /> : <AuthScreen />}
-        </NavigationContainer>
+        <I18nextProvider i18n={i18n}>
+          <InviteLinkBridge />
+          <NavigationContainer>
+            {accessToken ? <AuthenticatedTabs /> : <AuthScreen />}
+          </NavigationContainer>
+        </I18nextProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

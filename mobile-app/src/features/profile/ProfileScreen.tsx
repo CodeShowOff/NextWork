@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { getProfile, updateMyProfile } from '../../shared/api/profiles.api';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { useSessionStore } from '../../shared/session/session.store';
 
 export function ProfileScreen() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const clearSession = useSessionStore((state) => state.clearSession);
 
@@ -39,28 +41,36 @@ export function ProfileScreen() {
     mutationFn: updateMyProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles', meQuery.data?.id] });
-      Alert.alert('Saved', 'Your profile was updated.');
+      Alert.alert(t('profile.alerts.savedTitle'), t('profile.alerts.savedBody'));
     },
-    onError: (error) => Alert.alert('Could not update profile', (error as Error).message),
+    onError: (error) => Alert.alert(t('profile.alerts.updateProfileFailed'), (error as Error).message),
   });
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Email: {meQuery.data?.email ?? 'Loading...'}</Text>
+        <Text style={styles.title}>{t('profile.edit.title')}</Text>
+        <Text style={styles.subtitle}>
+          {t('profile.subtitle.email', { email: meQuery.data?.email ?? t('profile.edit.emailLoading') })}
+        </Text>
 
         <TextInput
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="Display name"
+          placeholder={t('profile.placeholders.displayName')}
           style={styles.input}
         />
-        <TextInput value={bio} onChangeText={setBio} placeholder="Bio" style={styles.input} multiline />
+        <TextInput
+          value={bio}
+          onChangeText={setBio}
+          placeholder={t('profile.placeholders.bio')}
+          style={styles.input}
+          multiline
+        />
         <TextInput
           value={avatarUrl}
           onChangeText={setAvatarUrl}
-          placeholder="Avatar URL"
+          placeholder={t('profile.placeholders.avatarUrl')}
           style={styles.input}
           autoCapitalize="none"
         />
@@ -75,7 +85,7 @@ export function ProfileScreen() {
             });
           }}
         >
-          <Text style={styles.primaryButtonText}>Save profile</Text>
+          <Text style={styles.primaryButtonText}>{t('profile.buttons.saveProfile')}</Text>
         </Pressable>
 
         <Pressable
@@ -84,7 +94,7 @@ export function ProfileScreen() {
             clearSession();
           }}
         >
-          <Text style={styles.logoutButtonText}>Sign out</Text>
+          <Text style={styles.logoutButtonText}>{t('profile.buttons.signOut')}</Text>
         </Pressable>
       </View>
     </SafeAreaView>

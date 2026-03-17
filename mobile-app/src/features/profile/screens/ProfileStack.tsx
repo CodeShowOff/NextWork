@@ -1,5 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 
 import { FollowListScreen } from './FollowListScreen';
 import { MyProfileScreen } from './MyProfileScreen';
@@ -20,10 +21,12 @@ export type ProfileStackParamList = {
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
 export function ProfileStack() {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator>
-      <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ title: 'Profile' }} />
-      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ title: t('app.tabs.profile') }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: t('app.tabs.profile') }} />
       <Stack.Screen
         name="FollowList"
         component={FollowListScreen}

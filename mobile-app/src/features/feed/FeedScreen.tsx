@@ -16,6 +16,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 
 import { createPost, FeedPost, listFeed, PaginatedFeed } from '../../shared/api/feed.api';
 import { listGroups } from '../../shared/api/groups.api';
@@ -56,6 +57,7 @@ function inferContentType(fileName: string | undefined, mimeType: string | null)
 type Props = NativeStackScreenProps<FeedStackParamList, 'FeedHome'>;
 
 export function FeedScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [composerText, setComposerText] = useState('');
   const [composerImage, setComposerImage] = useState<ComposerImage | null>(null);
@@ -112,7 +114,7 @@ export function FeedScreen({ navigation }: Props) {
     mutationFn: async () => {
       const content = composerText.trim();
       if (!content) {
-        throw new Error('Write something before posting.');
+        throw new Error(t('feed.alerts.writeBeforePosting'));
       }
 
       let mediaPayload:
@@ -175,14 +177,14 @@ export function FeedScreen({ navigation }: Props) {
       );
     },
     onError: (error) => {
-      Alert.alert('Could not create post', (error as Error).message);
+      Alert.alert(t('feed.alerts.createPostFailedTitle'), (error as Error).message);
     },
   });
 
   async function pickComposerImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Allow photo access to attach images.');
+      Alert.alert(t('feed.alerts.permissionRequiredTitle'), t('feed.alerts.permissionRequiredBody'));
       return;
     }
 
@@ -257,7 +259,7 @@ export function FeedScreen({ navigation }: Props) {
     },
     onError: (error, _postId, context) => {
       if (!context) {
-        Alert.alert('Could not update like', (error as Error).message);
+        Alert.alert(t('feed.alerts.updateLikeFailedTitle'), (error as Error).message);
         return;
       }
 
@@ -278,7 +280,7 @@ export function FeedScreen({ navigation }: Props) {
         }));
       }
 
-      Alert.alert('Could not update like', (error as Error).message);
+      Alert.alert(t('feed.alerts.updateLikeFailedTitle'), (error as Error).message);
     },
   });
 
@@ -293,7 +295,7 @@ export function FeedScreen({ navigation }: Props) {
         <TextInput
           value={composerText}
           onChangeText={setComposerText}
-          placeholder="Share an update"
+          placeholder={t('feed.composer.placeholder')}
           style={styles.composerInput}
           multiline
         />
@@ -301,13 +303,13 @@ export function FeedScreen({ navigation }: Props) {
           <View style={styles.composerImageContainer}>
             <Image source={{ uri: composerImage.uri }} style={styles.composerImagePreview} />
             <Pressable style={styles.removeImageButton} onPress={() => setComposerImage(null)}>
-              <Text style={styles.removeImageButtonText}>Remove image</Text>
+              <Text style={styles.removeImageButtonText}>{t('feed.composer.removeImage')}</Text>
             </Pressable>
           </View>
         ) : null}
         <View style={styles.composerActionsRow}>
           <Pressable style={styles.secondaryButton} onPress={pickComposerImage}>
-            <Text style={styles.secondaryButtonText}>Attach image</Text>
+            <Text style={styles.secondaryButtonText}>{t('feed.composer.attachImage')}</Text>
           </Pressable>
         <Pressable
           style={styles.postButton}
@@ -316,7 +318,9 @@ export function FeedScreen({ navigation }: Props) {
           }}
           disabled={createPostMutation.isPending}
         >
-          <Text style={styles.postButtonText}>{createPostMutation.isPending ? 'Posting...' : 'Post'}</Text>
+          <Text style={styles.postButtonText}>
+            {createPostMutation.isPending ? t('feed.composer.posting') : t('feed.composer.post')}
+          </Text>
         </Pressable>
         </View>
       </View>
@@ -331,13 +335,13 @@ export function FeedScreen({ navigation }: Props) {
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
             <View style={styles.groupTargetSection}>
-              <Text style={styles.groupTargetLabel}>Post target</Text>
+              <Text style={styles.groupTargetLabel}>{t('feed.targeting.label')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupChipsRow}>
                 <Pressable
                   style={[styles.groupChip, !selectedGroupId ? styles.groupChipActive : null]}
                   onPress={() => setSelectedGroupId('')}
                 >
-                  <Text style={styles.groupChipText}>Global</Text>
+                  <Text style={styles.groupChipText}>{t('feed.targeting.global')}</Text>
                 </Pressable>
                 {(groupsQuery.data?.items ?? []).map((group) => (
                   <Pressable
@@ -362,9 +366,13 @@ export function FeedScreen({ navigation }: Props) {
               </Pressable>
               <Text style={styles.timestamp}>{new Date(item.createdAt).toLocaleString()}</Text>
               {item.groupId ? (
-                <Text style={styles.groupBadgeText}>Group: {groupNameById[item.groupId] ?? 'Unknown group'}</Text>
+                <Text style={styles.groupBadgeText}>
+                  {t('feed.targeting.groupLabel', {
+                    groupName: groupNameById[item.groupId] ?? t('feed.targeting.unknownGroup'),
+                  })}
+                </Text>
               ) : (
-                <Text style={styles.groupBadgeText}>Global post</Text>
+                <Text style={styles.groupBadgeText}>{t('feed.targeting.globalPost')}</Text>
               )}
               <Text style={styles.content}>{item.content}</Text>
               {item.media.length ? (
@@ -375,7 +383,10 @@ export function FeedScreen({ navigation }: Props) {
                 </ScrollView>
               ) : null}
               <Text style={styles.stats}>
-                {item.stats.likeCount} likes · {item.stats.commentCount} comments
+                {t('feed.stats', {
+                  likes: item.stats.likeCount,
+                  comments: item.stats.commentCount,
+                })}
               </Text>
               <View style={styles.actionsRow}>
                 <Pressable
@@ -384,7 +395,7 @@ export function FeedScreen({ navigation }: Props) {
                   disabled={toggleLikeMutation.isPending}
                 >
                   <Text style={styles.actionButtonText}>
-                    {likedByMeMap[item.id] ? 'Unlike' : 'Like'}
+                    {likedByMeMap[item.id] ? t('feed.actions.unlike') : t('feed.actions.like')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -395,7 +406,7 @@ export function FeedScreen({ navigation }: Props) {
                     })
                   }
                 >
-                  <Text style={styles.commentButtonText}>Comments</Text>
+                  <Text style={styles.commentButtonText}>{t('feed.actions.comments')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -422,7 +433,7 @@ export function FeedScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <View style={styles.centerState}>
-              <Text style={styles.emptyText}>No posts in your feed yet.</Text>
+              <Text style={styles.emptyText}>{t('feed.empty.noPosts')}</Text>
             </View>
           }
         />

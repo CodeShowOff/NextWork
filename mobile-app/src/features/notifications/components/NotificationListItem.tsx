@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { NotificationItem } from '../types';
 
@@ -9,24 +10,26 @@ interface Props {
   onLongPress?: () => void;
 }
 
-function buildMessage(item: NotificationItem): string {
-  const actor = item.actor?.displayName ?? 'Someone';
+function buildMessage(item: NotificationItem, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const actor = item.actor?.displayName ?? t('notifications.item.unknownActor');
 
   switch (item.type) {
     case 'follow':
-      return `${actor} started following you`;
+      return t('notifications.item.follow', { actor });
     case 'like':
-      return `${actor} liked your post`;
+      return t('notifications.item.like', { actor });
     case 'comment':
-      return `${actor} commented on your post`;
+      return t('notifications.item.comment', { actor });
     case 'message':
-      return `${actor} sent you a message`;
+      return t('notifications.item.message', { actor });
     default:
-      return `${actor} sent a notification`;
+      return t('notifications.item.fallback', { actor });
   }
 }
 
 export function NotificationListItem({ item, onPress, onLongPress }: Props) {
+  const { t } = useTranslation();
+
   return (
     <Pressable
       style={[styles.root, !item.isRead ? styles.unread : null]}
@@ -35,11 +38,11 @@ export function NotificationListItem({ item, onPress, onLongPress }: Props) {
       delayLongPress={350}
     >
       <View style={styles.row}>
-        <Text style={styles.message}>{buildMessage(item)}</Text>
+        <Text style={styles.message}>{buildMessage(item, t)}</Text>
         {!item.isRead ? <View style={styles.dot} /> : null}
       </View>
       <Text style={styles.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
-      {item.actor ? <Text style={styles.hint}>Long press to mute this actor</Text> : null}
+      {item.actor ? <Text style={styles.hint}>{t('notifications.item.muteHint')}</Text> : null}
     </Pressable>
   );
 }

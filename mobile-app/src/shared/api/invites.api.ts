@@ -3,6 +3,7 @@ import { requestJson } from './http';
 export interface InviteSummary {
   id: string;
   token: string;
+  inviteUrl: string;
   organization: {
     id: string;
     name: string;

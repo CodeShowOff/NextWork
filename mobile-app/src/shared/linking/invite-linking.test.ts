@@ -13,6 +13,14 @@ describe('extractInviteToken', () => {
     expect(extractInviteToken('workplace://invite/my-token')).toBe('my-token');
   });
 
+  it('extracts token from custom host invite URL', () => {
+    expect(extractInviteToken('workplace://invite/abc123')).toBe('abc123');
+  });
+
+  it('extracts token from https path invite URL', () => {
+    expect(extractInviteToken('https://workplace.app/invite/abc123')).toBe('abc123');
+  });
+
   it('returns null for invalid URLs', () => {
     expect(extractInviteToken('not a url')).toBeNull();
   });

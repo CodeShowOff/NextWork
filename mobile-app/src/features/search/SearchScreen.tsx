@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { FeedPost } from '../../shared/api/feed.api';
 import { searchAll } from '../../shared/api/search.api';
 
 export function SearchScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -50,7 +52,7 @@ export function SearchScreen() {
 
   const renderSearchHint = () => {
     if (!debouncedQuery) {
-      return <Text style={styles.hintText}>Search users, groups, and posts.</Text>;
+      return <Text style={styles.hintText}>{t('search.hint')}</Text>;
     }
 
     if (searchQuery.isLoading) {
@@ -58,11 +60,11 @@ export function SearchScreen() {
     }
 
     if (searchQuery.isError) {
-      return <Text style={styles.errorText}>Could not run search right now.</Text>;
+      return <Text style={styles.errorText}>{t('search.error')}</Text>;
     }
 
     if (!hasResults) {
-      return <Text style={styles.hintText}>No matches found for "{debouncedQuery}".</Text>;
+      return <Text style={styles.hintText}>{t('search.noMatches', { query: debouncedQuery })}</Text>;
     }
 
     return null;
@@ -71,11 +73,11 @@ export function SearchScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
+        <Text style={styles.title}>{t('search.title')}</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search people, groups, posts"
+          placeholder={t('search.placeholder')}
           style={styles.input}
           autoCapitalize="none"
           autoCorrect={false}
@@ -87,7 +89,7 @@ export function SearchScreen() {
 
         {searchQuery.data?.users.length ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Users</Text>
+            <Text style={styles.sectionTitle}>{t('search.sections.users')}</Text>
             {searchQuery.data.users.map((user) => (
               <Pressable
                 key={user.id}
@@ -108,7 +110,7 @@ export function SearchScreen() {
 
         {searchQuery.data?.groups.length ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Groups</Text>
+            <Text style={styles.sectionTitle}>{t('search.sections.groups')}</Text>
             {searchQuery.data.groups.map((group) => (
               <Pressable
                 key={group.id}
@@ -132,7 +134,7 @@ export function SearchScreen() {
 
         {searchQuery.data?.posts.length ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Posts</Text>
+            <Text style={styles.sectionTitle}>{t('search.sections.posts')}</Text>
             {searchQuery.data.posts.map((post) => (
               <Pressable
                 key={post.id}

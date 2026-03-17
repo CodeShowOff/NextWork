@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -31,11 +32,19 @@ export class AuthService {
       throw new ConflictException('Email already in use');
     }
 
+    const resolvedDisplayName = payload.fullName?.trim() || payload.displayName?.trim();
+    if (!resolvedDisplayName) {
+      throw new BadRequestException('Display name or full name is required');
+    }
+
     const passwordHash = await bcrypt.hash(payload.password, 12);
     const user = await this.usersService.createUser({
       email: payload.email,
       passwordHash,
-      displayName: payload.displayName,
+      displayName: resolvedDisplayName,
+      organizationName: payload.organizationName?.trim(),
+      organizationSize: payload.organizationSize?.trim(),
+      jobTitle: payload.jobTitle?.trim(),
     });
 
     return this.issueTokens(user.id, user.email);

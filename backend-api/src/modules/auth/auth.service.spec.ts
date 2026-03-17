@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
@@ -77,6 +77,53 @@ describe('AuthService', () => {
       refreshToken: 'refresh-token',
     });
     expect(usersServiceMock.updateRefreshTokenHash).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses fullName for displayName alignment during signup', async () => {
+    (usersServiceMock.findByEmail as jest.Mock).mockResolvedValue(null);
+    (usersServiceMock.createUser as jest.Mock).mockResolvedValue({
+      id: 'u-signup',
+      email: 'new@example.com',
+    });
+    (jwtServiceMock.signAsync as jest.Mock)
+      .mockResolvedValueOnce('access-token')
+      .mockResolvedValueOnce('refresh-token');
+    (usersServiceMock.updateRefreshTokenHash as jest.Mock).mockResolvedValue({});
+
+    const result = await authService.signUp({
+      email: 'new@example.com',
+      password: 'password123',
+      displayName: 'Legacy Name',
+      fullName: 'Aligned Full Name',
+      organizationName: 'Acme Org',
+      organizationSize: '11-50',
+      jobTitle: 'Engineer',
+    });
+
+    expect(result).toEqual({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+    });
+    expect(usersServiceMock.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayName: 'Aligned Full Name',
+        organizationName: 'Acme Org',
+        organizationSize: '11-50',
+        jobTitle: 'Engineer',
+      }),
+    );
+  });
+
+  it('throws BadRequestException when both fullName and displayName are missing', async () => {
+    (usersServiceMock.findByEmail as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      authService.signUp({
+        email: 'no-name@example.com',
+        password: 'password123',
+        displayName: '   ',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('throws UnauthorizedException on invalid login password', async () => {

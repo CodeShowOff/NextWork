@@ -5,6 +5,8 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
 import { CreateGroupDto } from './dto/create-group.dto';
+import { InitializeStarterGroupsDto } from './dto/initialize-starter-groups.dto';
+import { StarterGroupsQueryDto } from './dto/starter-groups-query.dto';
 import { GroupsService } from './groups.service';
 
 class ListGroupsQueryDto {
@@ -30,6 +32,16 @@ export class GroupsController {
   @Post(':groupId/join')
   joinGroup(@CurrentUser() user: JwtPayload, @Param('groupId') groupId: string) {
     return this.groupsService.joinGroup(user.sub, groupId);
+  }
+
+  @Get('onboarding/defaults')
+  starterGroupsConfig(@CurrentUser() user: JwtPayload, @Query() query: StarterGroupsQueryDto) {
+    return this.groupsService.getStarterGroupsConfig(user.sub, query.organizationId);
+  }
+
+  @Post('onboarding/initialize')
+  initializeStarterGroups(@CurrentUser() user: JwtPayload, @Body() payload: InitializeStarterGroupsDto) {
+    return this.groupsService.initializeStarterGroups(user.sub, payload);
   }
 
   @Get(':groupId/members')

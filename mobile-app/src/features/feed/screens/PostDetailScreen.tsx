@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { InfiniteData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { CommentItem, PaginatedComments, createComment, deleteComment, listComments } from '../../../shared/api/comments.api';
 import { FeedPost, PaginatedFeed } from '../../../shared/api/feed.api';
@@ -65,6 +66,7 @@ function removeCommentFromPages(
 }
 
 export function PostDetailScreen({ route }: Props) {
+  const { t } = useTranslation();
   const { post } = route.params;
   const queryClient = useQueryClient();
   const currentUserId = useSessionStore((state) => state.userId);
@@ -106,7 +108,7 @@ export function PostDetailScreen({ route }: Props) {
       );
     },
     onError: (error) => {
-      Alert.alert('Could not update like', (error as Error).message);
+      Alert.alert(t('feed.alerts.updateLikeFailedTitle'), (error as Error).message);
     },
   });
 
@@ -133,7 +135,7 @@ export function PostDetailScreen({ route }: Props) {
       );
     },
     onError: (error) => {
-      Alert.alert('Could not create comment', (error as Error).message);
+      Alert.alert(t('feed.detail.alerts.createCommentFailed'), (error as Error).message);
     },
   });
 
@@ -159,7 +161,7 @@ export function PostDetailScreen({ route }: Props) {
       );
     },
     onError: (error) => {
-      Alert.alert('Could not delete comment', (error as Error).message);
+      Alert.alert(t('feed.detail.alerts.deleteCommentFailed'), (error as Error).message);
     },
   });
 
@@ -187,9 +189,11 @@ export function PostDetailScreen({ route }: Props) {
             onPress={() => likeMutation.mutate()}
             disabled={likeMutation.isPending}
           >
-            <Text style={styles.actionButtonText}>{likedByMe ? 'Unlike' : 'Like'} ({likeCount})</Text>
+            <Text style={styles.actionButtonText}>
+              {likedByMe ? t('feed.actions.unlike') : t('feed.actions.like')} ({likeCount})
+            </Text>
           </Pressable>
-          <Text style={styles.commentCountLabel}>{commentCount} comments</Text>
+          <Text style={styles.commentCountLabel}>{t('feed.detail.commentCount', { count: commentCount })}</Text>
         </View>
       </View>
 
@@ -213,7 +217,7 @@ export function PostDetailScreen({ route }: Props) {
                 onPress={() => setReplyingTo(item)}
                 disabled={createCommentMutation.isPending}
               >
-                <Text style={styles.replyLinkText}>Reply</Text>
+                <Text style={styles.replyLinkText}>{t('feed.detail.actions.reply')}</Text>
               </Pressable>
               {item.author.id === currentUserId ? (
                 <Pressable
@@ -221,7 +225,7 @@ export function PostDetailScreen({ route }: Props) {
                   onPress={() => deleteCommentMutation.mutate(item.id)}
                   disabled={deleteCommentMutation.isPending}
                 >
-                  <Text style={styles.deleteLinkText}>Delete</Text>
+                  <Text style={styles.deleteLinkText}>{t('feed.detail.actions.delete')}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -237,23 +241,27 @@ export function PostDetailScreen({ route }: Props) {
               <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
             ) : null
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>No comments yet.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
         />
       )}
 
       <View style={styles.commentComposer}>
         {replyingTo ? (
           <View style={styles.replyContextRow}>
-            <Text style={styles.replyContextText}>Replying to {replyingTo.author.displayName}</Text>
+            <Text style={styles.replyContextText}>{t('feed.detail.replyingTo', { name: replyingTo.author.displayName })}</Text>
             <Pressable style={styles.replyCancelButton} onPress={() => setReplyingTo(null)}>
-              <Text style={styles.replyCancelText}>Cancel</Text>
+              <Text style={styles.replyCancelText}>{t('common.actions.cancel')}</Text>
             </Pressable>
           </View>
         ) : null}
         <TextInput
           value={commentText}
           onChangeText={setCommentText}
-          placeholder={replyingTo ? `Reply to ${replyingTo.author.displayName}` : 'Write a comment'}
+          placeholder={
+            replyingTo
+              ? t('feed.detail.replyToPlaceholder', { name: replyingTo.author.displayName })
+              : t('feed.detail.writeCommentPlaceholder')
+          }
           style={styles.commentInput}
           multiline
         />
@@ -272,7 +280,7 @@ export function PostDetailScreen({ route }: Props) {
           }}
           disabled={createCommentMutation.isPending}
         >
-          <Text style={styles.sendButtonText}>Send</Text>
+          <Text style={styles.sendButtonText}>{t('feed.detail.actions.send')}</Text>
         </Pressable>
       </View>
     </SafeAreaView>

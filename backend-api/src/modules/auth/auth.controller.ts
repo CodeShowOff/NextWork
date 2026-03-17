@@ -16,6 +16,7 @@ export class AuthController {
   @Post('signup')
   @RateLimit(20, 60)
   signUp(@Body() payload: SignUpDto): Promise<AuthTokens> {
+    // Sign-up accepts enriched onboarding fields through SignUpDto.
     return this.authService.signUp(payload);
   }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 
 import { FeedPost } from '../../../shared/api/feed.api';
 import { FollowListScreen } from '../../profile/screens/FollowListScreen';
@@ -25,11 +26,13 @@ export type FeedStackParamList = {
 const Stack = createNativeStackNavigator<FeedStackParamList>();
 
 export function FeedStack() {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator>
-      <Stack.Screen name="FeedHome" component={FeedScreen} options={{ title: 'Feed' }} />
-      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: 'Post' }} />
-      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen name="FeedHome" component={FeedScreen} options={{ title: t('app.tabs.feed') }} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: t('app.stack.post') }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: t('app.tabs.profile') }} />
       <Stack.Screen
         name="FollowList"
         component={FollowListScreen}

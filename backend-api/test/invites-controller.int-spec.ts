@@ -13,6 +13,7 @@ describe('InvitesController Integration', () => {
     createInviteLink: jest.fn().mockResolvedValue({
       id: 'i1',
       token: 'abc123',
+      inviteUrl: 'workplace://invite/abc123',
       organization: {
         id: 'org-1',
         name: 'Team Alpha',
@@ -79,9 +80,15 @@ describe('InvitesController Integration', () => {
       expiresInHours: 24,
     };
 
-    await request(app.getHttpServer()).post('/invites').send(payload).expect(201);
+    const response = await request(app.getHttpServer()).post('/invites').send(payload).expect(201);
 
     expect(invitesServiceMock.createInviteLink).toHaveBeenCalledWith('u1', payload);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        token: 'abc123',
+        inviteUrl: 'workplace://invite/abc123',
+      }),
+    );
   });
 
   it('GET /invites/:token returns invite details', async () => {
@@ -91,8 +98,13 @@ describe('InvitesController Integration', () => {
   });
 
   it('POST /invites/:token/accept accepts an invite', async () => {
-    await request(app.getHttpServer()).post('/invites/abc123/accept').expect(201);
+    const response = await request(app.getHttpServer()).post('/invites/abc123/accept').expect(201);
 
     expect(invitesServiceMock.acceptInvite).toHaveBeenCalledWith('u1', 'abc123');
+    expect(response.body).toEqual({
+      status: 'ok',
+      organizationId: 'org-1',
+      alreadyMember: false,
+    });
   });
 });

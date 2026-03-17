@@ -2,6 +2,7 @@
   "expo": {
     "name": "Workplace",
     "slug": "workplace",
+    "scheme": "workplace",
     "version": "0.1.0",
     "assetBundlePatterns": [
       "**/*"

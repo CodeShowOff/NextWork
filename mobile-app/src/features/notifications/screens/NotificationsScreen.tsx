@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 import { NotificationListItem } from '../components/NotificationListItem';
 import {
@@ -32,6 +33,7 @@ import { PaginatedFeed } from '../../../shared/api/feed.api';
 import { resolveNotificationNavigationAction } from '../navigation/notification-navigation';
 
 export function NotificationsScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const notificationsQuery = useNotifications();
@@ -97,7 +99,10 @@ export function NotificationsScreen() {
     rootNavigation.navigate('Feed', action.params);
     if (action.needsFeedRefresh) {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      Alert.alert(action.warningMessage ?? 'Post unavailable', 'Refreshing feed to locate this post.');
+      Alert.alert(
+        action.warningMessage ?? t('notifications.alerts.postUnavailableTitle'),
+        t('notifications.alerts.postUnavailableBody'),
+      );
     }
   };
 
@@ -112,7 +117,7 @@ export function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={styles.title}>{t('notifications.title')}</Text>
         <Pressable
           style={styles.markAllButton}
           onPress={() => {
@@ -121,21 +126,21 @@ export function NotificationsScreen() {
             });
           }}
         >
-          <Text style={styles.markAllText}>Mark all read</Text>
+          <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.preferencesCard}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
+        <Text style={styles.sectionTitle}>{t('notifications.preferences.title')}</Text>
         {preferencesQuery.isLoading ? (
           <ActivityIndicator size="small" color="#16A34A" />
         ) : (
           <>
             {[
-              { key: 'likeEnabled', label: 'Likes' },
-              { key: 'commentEnabled', label: 'Comments' },
-              { key: 'followEnabled', label: 'Follows' },
-              { key: 'messageEnabled', label: 'Messages' },
+              { key: 'likeEnabled', label: t('notifications.preferences.likes') },
+              { key: 'commentEnabled', label: t('notifications.preferences.comments') },
+              { key: 'followEnabled', label: t('notifications.preferences.follows') },
+              { key: 'messageEnabled', label: t('notifications.preferences.messages') },
             ].map((entry) => {
               const enabled = Boolean(
                 preferencesQuery.data?.[entry.key as keyof NonNullable<typeof preferencesQuery.data>],
@@ -160,9 +165,9 @@ export function NotificationsScreen() {
       </View>
 
       <View style={styles.preferencesCard}>
-        <Text style={styles.sectionTitle}>Muted actors</Text>
+        <Text style={styles.sectionTitle}>{t('notifications.mutedActors.title')}</Text>
         {(mutedUsersQuery.data?.items ?? []).length === 0 ? (
-          <Text style={styles.emptyMutedText}>No muted actors.</Text>
+          <Text style={styles.emptyMutedText}>{t('notifications.mutedActors.empty')}</Text>
         ) : (
           <View style={styles.mutedUsersWrap}>
             {(mutedUsersQuery.data?.items ?? []).map((mutedUser) => (
@@ -202,12 +207,12 @@ export function NotificationsScreen() {
               }
 
               Alert.alert(
-                'Mute notifications',
-                `Mute notifications from ${item.actor.displayName}?`,
+                t('notifications.alerts.muteTitle'),
+                t('notifications.alerts.muteBody', { name: item.actor.displayName }),
                 [
-                  { text: 'Cancel', style: 'cancel' },
+                  { text: t('common.actions.cancel'), style: 'cancel' },
                   {
-                    text: 'Mute',
+                    text: t('common.actions.mute'),
                     style: 'destructive',
                     onPress: () => {
                       muteMutation.mutate(actorId);
@@ -231,7 +236,7 @@ export function NotificationsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.centerState}>
-            <Text style={styles.emptyText}>No notifications yet.</Text>
+            <Text style={styles.emptyText}>{t('notifications.list.empty')}</Text>
           </View>
         }
       />

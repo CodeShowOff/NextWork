@@ -53,6 +53,28 @@ describe('AuthController Integration', () => {
       refreshToken: 'refresh-token',
     });
     expect(authServiceMock.signUp).toHaveBeenCalledTimes(1);
+    expect(authServiceMock.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'new@example.com',
+        displayName: 'New User',
+      }),
+    );
+  });
+
+  it('POST /auth/signup accepts enriched onboarding fields', async () => {
+    const payload = {
+      email: 'onboard@example.com',
+      password: 'password123',
+      fullName: 'Onboard User',
+      displayName: 'Onboard User',
+      organizationName: 'Acme Org',
+      organizationSize: '11-50',
+      jobTitle: 'Engineer',
+    };
+
+    await request(app.getHttpServer()).post('/auth/signup').send(payload).expect(201);
+
+    expect(authServiceMock.signUp).toHaveBeenCalledWith(expect.objectContaining(payload));
   });
 
   it('POST /auth/refresh delegates to service', async () => {

@@ -39,9 +39,13 @@ npm install
 From monorepo root:
 
 ```bash
-npm run dev --workspace mobile-app
-npm run android --workspace mobile-app
+npm run dev:android --workspace mobile-app
+npm run android:connect --workspace mobile-app
+npm run android:debug --workspace mobile-app
 ```
+
+`android:debug` requires Metro. If Metro is not running or port 8081 is not bridged to the device,
+the app shows `Unable to load script`.
 
 ## Build installable Android APK
 
@@ -51,16 +55,51 @@ From monorepo root:
 npm run android:apk --workspace mobile-app
 ```
 
-Or local Gradle debug APK:
+Local debug APK (requires Metro while running):
 
 ```bash
-cd mobile-app/android
-./gradlew assembleDebug
+npm run android:apk:debug --workspace mobile-app
 ```
 
 Generated APK path:
 
 `android/app/build/outputs/apk/debug/app-debug.apk`
+
+Local release APK (standalone, JS bundle embedded):
+
+```bash
+npm run android:apk:release --workspace mobile-app
+```
+
+Generated APK path:
+
+`android/app/build/outputs/apk/release/app-release.apk`
+
+## Troubleshooting: "Unable to load script"
+
+1. Start Metro for dev client:
+
+```bash
+npm run dev:android --workspace mobile-app
+```
+
+2. Bridge device port to Metro:
+
+```bash
+npm run android:connect --workspace mobile-app
+```
+
+3. Reinstall and launch debug build:
+
+```bash
+npm run android:debug --workspace mobile-app
+```
+
+4. If you need an APK that runs without Metro, build and install release APK instead:
+
+```bash
+npm run android:apk:release --workspace mobile-app
+```
 
 ## Build installable iOS app (from Windows)
 

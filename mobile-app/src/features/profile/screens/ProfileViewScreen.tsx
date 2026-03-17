@@ -11,11 +11,16 @@ import {
   View,
 } from 'react-native';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { getRelationship, followUser, unfollowUser } from '../../../shared/api/follows.api';
 import { PostItem, listMyPosts, listUserPosts } from '../../../shared/api/posts.api';
 import { getProfile, updateMyProfile } from '../../../shared/api/profiles.api';
 import { getCurrentUser } from '../../../shared/api/users.api';
+import { featureFlags } from '../../../shared/config/runtime';
+import { localeLabels, SupportedLocale, supportedLocales } from '../../../shared/i18n/resources';
+import { useLocaleStore } from '../../../shared/i18n/locale.store';
+import { useInviteLinkStore } from '../../../shared/session/invite-link.store';
 import { useSessionStore } from '../../../shared/session/session.store';
 import { toggleFollowRelationshipOptimistic } from '../follow-relationship-cache';
 
@@ -31,8 +36,12 @@ interface Props {
 }
 
 export function ProfileViewScreen({ navigation, userId }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const clearSession = useSessionStore((state) => state.clearSession);
+  const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
+  const locale = useLocaleStore((state) => state.locale);
+  const setLocale = useLocaleStore((state) => state.setLocale);
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -87,9 +96,9 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     mutationFn: updateMyProfile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles', meQuery.data?.id] });
-      Alert.alert('Saved', 'Your profile was updated.');
+      Alert.alert(t('profile.alerts.savedTitle'), t('profile.alerts.savedBody'));
     },
-    onError: (error) => Alert.alert('Could not update profile', (error as Error).message),
+    onError: (error) => Alert.alert(t('profile.alerts.updateProfileFailed'), (error as Error).message),
   });
 
   const followMutation = useMutation({
@@ -136,7 +145,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         queryClient.setQueryData(['follows', 'relationship', profileUserId], context.previousRelationship);
       }
 
-      Alert.alert('Could not update follow status', (error as Error).message);
+      Alert.alert(t('profile.alerts.updateFollowFailed'), (error as Error).message);
     },
   });
 
@@ -146,10 +155,10 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
   const followersCount = relationshipQuery.data?.followersCount ?? 0;
   const followingCount = relationshipQuery.data?.followingCount ?? 0;
   const relationshipLabel = isOwnProfile
-    ? 'This is you'
+    ? t('profile.relationship.self')
     : relationshipQuery.data?.isFollowing
-      ? 'Following'
-      : 'Not following';
+      ? t('profile.relationship.following')
+      : t('profile.relationship.notFollowing');
 
   if (loadingProfile) {
     return (
@@ -162,11 +171,29 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>{isOwnProfile ? 'My Profile' : 'Profile'}</Text>
-        <Text style={styles.subtitle}>Email: {isOwnProfile ? meQuery.data?.email : 'Hidden'}</Text>
+        <Text style={styles.title}>{isOwnProfile ? t('profile.title.mine') : t('profile.title.other')}</Text>
+        <Text style={styles.subtitle}>
+          {t('profile.subtitle.email', {
+            email: isOwnProfile ? meQuery.data?.email : t('profile.subtitle.hidden'),
+          })}
+        </Text>
         <View style={styles.relationshipBadge}>
           <Text style={styles.relationshipBadgeText}>{relationshipLabel}</Text>
         </View>
+
+        {isOwnProfile && featureFlags.i18n ? (
+          <View style={styles.localeRow}>
+            {supportedLocales.map((item) => (
+              <Pressable
+                key={item}
+                style={[styles.localeChip, locale === item ? styles.localeChipActive : null]}
+                onPress={() => setLocale(item as SupportedLocale)}
+              >
+                <Text style={styles.localeChipText}>{localeLabels[item]}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.metricsRow}>
           <Pressable
@@ -179,12 +206,12 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
               navigation.navigate('FollowList', {
                 userId: profileUserId,
                 mode: 'followers',
-                title: 'Followers',
+                title: t('profile.metrics.followers'),
               });
             }}
           >
             <Text style={styles.metricValue}>{followersCount}</Text>
-            <Text style={styles.metricLabel}>Followers</Text>
+            <Text style={styles.metricLabel}>{t('profile.metrics.followers')}</Text>
           </Pressable>
           <Pressable
             style={styles.metricButton}
@@ -196,30 +223,30 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
               navigation.navigate('FollowList', {
                 userId: profileUserId,
                 mode: 'following',
-                title: 'Following',
+                title: t('profile.metrics.following'),
               });
             }}
           >
             <Text style={styles.metricValue}>{followingCount}</Text>
-            <Text style={styles.metricLabel}>Following</Text>
+            <Text style={styles.metricLabel}>{t('profile.metrics.following')}</Text>
           </Pressable>
           <View style={styles.metricButton}>
             <Text style={styles.metricValue}>{posts.length}</Text>
-            <Text style={styles.metricLabel}>Posts</Text>
+            <Text style={styles.metricLabel}>{t('profile.metrics.posts')}</Text>
           </View>
         </View>
 
         <TextInput
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="Display name"
+          placeholder={t('profile.placeholders.displayName')}
           style={styles.input}
           editable={isOwnProfile}
         />
         <TextInput
           value={bio}
           onChangeText={setBio}
-          placeholder="Bio"
+          placeholder={t('profile.placeholders.bio')}
           style={styles.input}
           multiline
           editable={isOwnProfile}
@@ -227,7 +254,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         <TextInput
           value={avatarUrl}
           onChangeText={setAvatarUrl}
-          placeholder="Avatar URL"
+          placeholder={t('profile.placeholders.avatarUrl')}
           style={styles.input}
           autoCapitalize="none"
           editable={isOwnProfile}
@@ -235,14 +262,14 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         <TextInput
           value={jobTitle}
           onChangeText={setJobTitle}
-          placeholder="Job title"
+          placeholder={t('profile.placeholders.jobTitle')}
           style={styles.input}
           editable={isOwnProfile}
         />
         <TextInput
           value={organizationSize}
           onChangeText={setOrganizationSize}
-          placeholder="Organization size"
+          placeholder={t('profile.placeholders.organizationSize')}
           style={styles.input}
           editable={isOwnProfile}
         />
@@ -260,7 +287,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
               });
             }}
           >
-            <Text style={styles.primaryButtonText}>Save profile</Text>
+            <Text style={styles.primaryButtonText}>{t('profile.buttons.saveProfile')}</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -271,7 +298,9 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
             disabled={followMutation.isPending}
           >
             <Text style={styles.primaryButtonText}>
-              {relationshipQuery.data?.isFollowing ? 'Unfollow' : 'Follow'}
+              {relationshipQuery.data?.isFollowing
+                ? t('profile.buttons.unfollow')
+                : t('profile.buttons.follow')}
             </Text>
           </Pressable>
         )}
@@ -280,10 +309,11 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
           <Pressable
             style={styles.logoutButton}
             onPress={() => {
+              clearPendingInviteToken();
               clearSession();
             }}
           >
-            <Text style={styles.logoutButtonText}>Sign out</Text>
+            <Text style={styles.logoutButtonText}>{t('profile.buttons.signOut')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -302,7 +332,10 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
               <Text style={styles.postTime}>{new Date(item.createdAt).toLocaleString()}</Text>
               <Text style={styles.postContent}>{item.content}</Text>
               <Text style={styles.postStats}>
-                {item.stats.likeCount} likes · {item.stats.commentCount} comments
+                {t('profile.postStats', {
+                  likes: item.stats.likeCount,
+                  comments: item.stats.commentCount,
+                })}
               </Text>
             </View>
           )}
@@ -317,7 +350,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
               <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
             ) : null
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>No posts yet.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('profile.emptyPosts')}</Text>}
         />
       )}
     </SafeAreaView>
@@ -366,6 +399,28 @@ const styles = StyleSheet.create({
     color: '#166534',
     fontSize: 12,
     fontWeight: '700',
+  },
+  localeRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  localeChip: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  localeChipActive: {
+    borderColor: '#0B6E4F',
+    backgroundColor: '#DCFCE7',
+  },
+  localeChipText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
   },
   metricsRow: {
     marginTop: 10,

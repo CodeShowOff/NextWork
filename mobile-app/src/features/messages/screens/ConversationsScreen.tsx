@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Conversation } from '../types';
 import { useConversations, upsertConversation } from '../hooks/useConversations';
@@ -23,6 +24,7 @@ import { MessagesStackParamList } from './MessagesStack';
 type Props = NativeStackScreenProps<MessagesStackParamList, 'Conversations'>;
 
 export function ConversationsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [directUserId, setDirectUserId] = useState('');
   const [sessionUserId, setSessionUserId] = useState('');
@@ -58,7 +60,7 @@ export function ConversationsScreen({ navigation }: Props) {
       });
     },
     onError: (error) => {
-      Alert.alert('Could not create conversation', (error as Error).message);
+      Alert.alert(t('messages.alerts.createConversationFailed'), (error as Error).message);
     },
   });
 
@@ -66,21 +68,21 @@ export function ConversationsScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.sessionCard}>
-          <Text style={styles.sessionTitle}>Messaging setup</Text>
+          <Text style={styles.sessionTitle}>{t('messages.setup.title')}</Text>
           <Text style={styles.helperText}>
-            Enter your access token and user ID from backend auth endpoints to start messaging.
+            {t('messages.setup.helper')}
           </Text>
           <TextInput
             value={sessionUserId}
             onChangeText={setSessionUserId}
-            placeholder="User ID"
+            placeholder={t('messages.setup.placeholders.userId')}
             style={styles.input}
             autoCapitalize="none"
           />
           <TextInput
             value={sessionToken}
             onChangeText={setSessionToken}
-            placeholder="Access token"
+            placeholder={t('messages.setup.placeholders.accessToken')}
             style={[styles.input, styles.tokenInput]}
             autoCapitalize="none"
             multiline
@@ -88,14 +90,14 @@ export function ConversationsScreen({ navigation }: Props) {
           <TextInput
             value={apiBaseUrl}
             onChangeText={setApiBaseUrl}
-            placeholder="API base URL (optional)"
+            placeholder={t('messages.setup.placeholders.apiBaseUrl')}
             style={styles.input}
             autoCapitalize="none"
           />
           <TextInput
             value={realtimeBaseUrl}
             onChangeText={setRealtimeBaseUrl}
-            placeholder="Realtime URL (optional)"
+            placeholder={t('messages.setup.placeholders.realtimeUrl')}
             style={styles.input}
             autoCapitalize="none"
           />
@@ -103,7 +105,10 @@ export function ConversationsScreen({ navigation }: Props) {
             style={styles.primaryButton}
             onPress={() => {
               if (!sessionUserId.trim() || !sessionToken.trim()) {
-                Alert.alert('Missing fields', 'User ID and access token are required.');
+                Alert.alert(
+                  t('messages.alerts.missingFieldsTitle'),
+                  t('messages.alerts.missingFieldsBody'),
+                );
                 return;
               }
 
@@ -115,7 +120,7 @@ export function ConversationsScreen({ navigation }: Props) {
               });
             }}
           >
-            <Text style={styles.primaryButtonText}>Save session</Text>
+            <Text style={styles.primaryButtonText}>{t('messages.setup.saveSession')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -129,7 +134,7 @@ export function ConversationsScreen({ navigation }: Props) {
           <TextInput
             value={directUserId}
             onChangeText={setDirectUserId}
-            placeholder="Start direct chat with user ID"
+            placeholder={t('messages.toolbar.directPlaceholder')}
             autoCapitalize="none"
             style={[styles.input, styles.composeInput]}
           />
@@ -144,7 +149,7 @@ export function ConversationsScreen({ navigation }: Props) {
               createDirectMutation.mutate(target);
             }}
           >
-            <Text style={styles.primaryButtonText}>Start</Text>
+            <Text style={styles.primaryButtonText}>{t('messages.toolbar.start')}</Text>
           </Pressable>
         </View>
         <Pressable
@@ -152,7 +157,7 @@ export function ConversationsScreen({ navigation }: Props) {
             clearSession();
           }}
         >
-          <Text style={styles.secondaryLink}>Sign out</Text>
+          <Text style={styles.secondaryLink}>{t('messages.toolbar.signOut')}</Text>
         </Pressable>
       </View>
 
@@ -183,7 +188,7 @@ export function ConversationsScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <View style={styles.centerState}>
-              <Text style={styles.helperText}>No conversations yet. Start one above.</Text>
+              <Text style={styles.helperText}>{t('messages.list.empty')}</Text>
             </View>
           }
         />

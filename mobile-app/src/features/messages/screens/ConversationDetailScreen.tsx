@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 
 import { Message } from '../types';
 import { MessageBubble } from '../components/MessageBubble';
@@ -14,6 +15,7 @@ import { getMessagesSocket } from '../../../shared/realtime/messages.socket';
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ConversationDetail'>;
 
 export function ConversationDetailScreen({ route }: Props) {
+  const { t } = useTranslation();
   const { conversationId } = route.params;
   const currentUserId = useSessionStore((state) => state.userId);
   const messagesQuery = useMessages(conversationId);
@@ -40,13 +42,13 @@ export function ConversationDetailScreen({ route }: Props) {
       return '';
     }
 
-    const names = othersTyping.map((userId) => senderNames[userId] ?? 'Someone');
+    const names = othersTyping.map((userId) => senderNames[userId] ?? t('messages.detail.unknownActor'));
     if (names.length === 1) {
-      return `${names[0]} is typing...`;
+      return t('messages.detail.typingSingle', { name: names[0] });
     }
 
-    return `${names.slice(0, 2).join(' and ')} are typing...`;
-  }, [currentUserId, messagesQuery.typingUserIds, senderNames]);
+    return t('messages.detail.typingMultiple', { names: names.slice(0, 2).join(' and ') });
+  }, [currentUserId, messagesQuery.typingUserIds, senderNames, t]);
 
   if (messagesQuery.isLoading) {
     return (
@@ -88,7 +90,7 @@ export function ConversationDetailScreen({ route }: Props) {
             <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
           ) : null
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No messages yet. Say hi.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
       />
       {typingLabel ? <Text style={styles.typingText}>{typingLabel}</Text> : null}
       <MessageComposer

@@ -20,6 +20,22 @@ describe('GroupsController Integration', () => {
     }),
     joinGroup: jest.fn().mockResolvedValue({ status: 'ok' }),
     listMembers: jest.fn().mockResolvedValue({ groupId: 'g1', items: [] }),
+    getStarterGroupsConfig: jest.fn().mockResolvedValue({
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      onboardingCompleted: false,
+      initializedAt: null,
+      skipped: false,
+      selectedKeys: [],
+      catalog: [],
+    }),
+    initializeStarterGroups: jest.fn().mockResolvedValue({
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      onboardingCompleted: true,
+      alreadyInitialized: false,
+      skipped: false,
+      createdGroupIds: [],
+      selectedKeys: [],
+    }),
   };
 
   const authGuardMock = {
@@ -83,5 +99,30 @@ describe('GroupsController Integration', () => {
     await request(app.getHttpServer()).get('/groups/g1/members').expect(200);
 
     expect(groupsServiceMock.listMembers).toHaveBeenCalledWith('u1', 'g1');
+  });
+
+  it('GET /groups/onboarding/defaults returns starter group config', async () => {
+    await request(app.getHttpServer())
+      .get('/groups/onboarding/defaults?organizationId=89ce5ff7-bc2a-4df8-b56b-b8e92f93e928')
+      .expect(200);
+
+    expect(groupsServiceMock.getStarterGroupsConfig).toHaveBeenCalledWith(
+      'u1',
+      '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+    );
+  });
+
+  it('POST /groups/onboarding/initialize initializes starter groups', async () => {
+    const payload = {
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      selectedKeys: ['general', 'project-updates'],
+    };
+
+    await request(app.getHttpServer())
+      .post('/groups/onboarding/initialize')
+      .send(payload)
+      .expect(201);
+
+    expect(groupsServiceMock.initializeStarterGroups).toHaveBeenCalledWith('u1', payload);
   });
 });

@@ -26,20 +26,6 @@ export class OrganizationsRepository {
             role: 'owner',
           },
         },
-        groups: {
-          create: [
-            {
-              name: 'General',
-              description: 'Default space for team discussions.',
-              createdBy: params.ownerUserId,
-            },
-            {
-              name: 'Announcements',
-              description: 'Important updates for everyone.',
-              createdBy: params.ownerUserId,
-            },
-          ],
-        },
       },
     });
   }

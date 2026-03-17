@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Conversation } from '../types';
 import { useSessionStore } from '../../../shared/session/session.store';
@@ -10,11 +11,12 @@ interface Props {
 }
 
 export function ConversationListItem({ conversation, onPress }: Props) {
+  const { t } = useTranslation();
   const currentUserId = useSessionStore((state) => state.userId);
   const title =
     conversation.type === 'direct'
       ? conversation.participants.find((participant) => participant.userId !== currentUserId)?.displayName ??
-        'Direct chat'
+        t('messages.list.directChatFallback')
       : conversation.participants.map((participant) => participant.displayName).join(', ');
 
   return (
@@ -28,7 +30,7 @@ export function ConversationListItem({ conversation, onPress }: Props) {
         ) : null}
       </View>
       <Text numberOfLines={1} style={styles.preview}>
-        {conversation.lastMessage?.body ?? 'No messages yet'}
+        {conversation.lastMessage?.body ?? t('messages.list.noMessagesYet')}
       </Text>
     </Pressable>
   );

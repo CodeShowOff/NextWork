@@ -8,9 +8,24 @@ import { InvitesRepository } from './invites.repository';
 export class InvitesService {
   constructor(private readonly invitesRepository: InvitesRepository) {}
 
+  private buildInviteUrl(token: string): string {
+    const configuredBase = process.env.INVITE_LINK_BASE_URL?.trim();
+    if (!configuredBase) {
+      return `workplace://invite/${token}`;
+    }
+
+    if (configuredBase.includes('{token}')) {
+      return configuredBase.replace('{token}', token);
+    }
+
+    const normalizedBase = configuredBase.replace(/\/+$/, '');
+    return `${normalizedBase}/${token}`;
+  }
+
   async createInviteLink(userId: string, payload: CreateInviteLinkDto): Promise<{
     id: string;
     token: string;
+    inviteUrl: string;
     organization: {
       id: string;
       name: string;
@@ -47,6 +62,7 @@ export class InvitesService {
     return {
       id: invite.id,
       token: invite.token,
+      inviteUrl: this.buildInviteUrl(invite.token),
       organization: invite.organization,
       maxUses: invite.maxUses,
       usedCount: invite.usedCount,

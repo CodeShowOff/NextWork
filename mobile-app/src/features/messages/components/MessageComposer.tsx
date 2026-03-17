@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   isSending: boolean;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,12 +66,12 @@ export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
       <TextInput
         value={value}
         onChangeText={handleChangeText}
-        placeholder="Type a message"
+        placeholder={t('messages.composer.placeholder')}
         style={styles.input}
         multiline
       />
       <Pressable style={[styles.button, isSending ? styles.disabledButton : null]} onPress={submit}>
-        <Text style={styles.buttonText}>{isSending ? '...' : 'Send'}</Text>
+        <Text style={styles.buttonText}>{isSending ? t('messages.composer.sending') : t('messages.composer.send')}</Text>
       </Pressable>
     </View>
   );

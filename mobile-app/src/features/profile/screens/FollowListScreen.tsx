@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { FollowUserItem, listFollowers, listFollowing } from '../../../shared/api/follows.api';
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
 const pageSize = 20;
 
 export function FollowListScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const { userId, mode } = route.params;
 
   const query = useInfiniteQuery({
@@ -66,7 +68,7 @@ export function FollowListScreen({ navigation, route }: Props) {
             <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
           ) : null
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No users found.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>{t('profile.followList.empty')}</Text>}
       />
     </SafeAreaView>
   );

@@ -18,18 +18,20 @@ export class UsersService {
     email: string;
     passwordHash: string;
     displayName: string;
+    organizationName?: string;
+    organizationSize?: string;
+    jobTitle?: string;
   }): Promise<UserRecord> {
     const normalizedEmail = params.email.toLowerCase();
 
-    return this.usersRepository.create({
+    return this.usersRepository.createWithOnboarding({
       email: normalizedEmail,
       passwordHash: params.passwordHash,
-      profile: {
-        create: {
-          displayName: params.displayName,
-        },
-      },
-    }) as unknown as Promise<UserRecord>;
+      displayName: params.displayName,
+      organizationName: params.organizationName,
+      organizationSize: params.organizationSize,
+      jobTitle: params.jobTitle,
+    });
   }
 
   updateRefreshTokenHash(userId: string, refreshTokenHash: string | null): Promise<void> {
