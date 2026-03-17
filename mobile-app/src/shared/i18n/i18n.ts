@@ -4,16 +4,32 @@ import { initReactI18next } from 'react-i18next';
 
 import { resources, supportedLocales, SupportedLocale } from './resources';
 
+const fallbackLocale: SupportedLocale = 'en';
+
+function resolveSupportedLocale(raw: string | null | undefined): SupportedLocale | null {
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.toLowerCase();
+  const exact = supportedLocales.find((locale) => locale.toLowerCase() === normalized);
+  if (exact) {
+    return exact;
+  }
+
+  const base = normalized.split('-')[0];
+  const baseMatch = supportedLocales.find((locale) => locale.toLowerCase() === base);
+  return baseMatch ?? null;
+}
+
 function resolveDeviceLocale(): SupportedLocale {
   const locales = getLocales();
   const first = locales[0];
-  const tag = first?.languageTag?.toLowerCase() ?? '';
-
-  if (tag.startsWith('en')) {
-    return 'en';
-  }
-
-  return 'en';
+  return (
+    resolveSupportedLocale(first?.languageTag) ??
+    resolveSupportedLocale(first?.languageCode) ??
+    fallbackLocale
+  );
 }
 
 export function isSupportedLocale(value: string): value is SupportedLocale {
@@ -25,7 +41,7 @@ const initialLocale = resolveDeviceLocale();
 void i18next.use(initReactI18next).init({
   resources,
   lng: initialLocale,
-  fallbackLng: 'en',
+  fallbackLng: fallbackLocale,
   interpolation: {
     escapeValue: false,
   },

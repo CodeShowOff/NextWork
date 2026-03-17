@@ -21,6 +21,9 @@ function buildFeed(likeCount: number, commentCount = 0): { pageParams: unknown[]
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
             media: [],
+            taggedUserIds: [],
+            hashtags: [],
+            poll: null,
             author: {
               id: 'u1',
               displayName: 'User',

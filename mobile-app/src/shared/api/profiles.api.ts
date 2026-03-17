@@ -9,6 +9,16 @@ export interface Profile {
   organizationSize: string | null;
   createdAt: string;
   updatedAt: string;
+  counters: {
+    posts: number;
+    followers: number;
+    following: number;
+    groupsFollowed: number;
+    skillsEntries: number;
+  };
+  relationship: {
+    isFollowing: boolean;
+  };
 }
 
 export function getProfile(userId: string) {

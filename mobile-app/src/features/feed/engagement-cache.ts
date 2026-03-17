@@ -103,3 +103,76 @@ export function adjustCommentCountInFeed(
     })),
   };
 }
+
+export function updatePostInFeed(
+  current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined,
+  params: {
+    postId: string;
+    content: string;
+    updatedAt: string;
+  },
+): { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined {
+  if (!current) {
+    return current;
+  }
+
+  return {
+    ...current,
+    pages: current.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) =>
+        item.id === params.postId
+          ? {
+              ...item,
+              content: params.content,
+              updatedAt: params.updatedAt,
+            }
+          : item,
+      ),
+    })),
+  };
+}
+
+export function removePostFromFeed(
+  current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined,
+  postId: string,
+): { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined {
+  if (!current) {
+    return current;
+  }
+
+  return {
+    ...current,
+    pages: current.pages.map((page) => ({
+      ...page,
+      items: page.items.filter((item) => item.id !== postId),
+    })),
+  };
+}
+
+export function reconcilePollInFeed(
+  current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined,
+  params: {
+    postId: string;
+    poll: PaginatedFeed['items'][number]['poll'];
+  },
+): { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined {
+  if (!current) {
+    return current;
+  }
+
+  return {
+    ...current,
+    pages: current.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) =>
+        item.id === params.postId
+          ? {
+              ...item,
+              poll: params.poll,
+            }
+          : item,
+      ),
+    })),
+  };
+}

@@ -11,6 +11,11 @@ model User {
   email        String      @unique
   passwordHash String      @map("password_hash")
   refreshTokenHash String? @map("refresh_token_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  emailVerificationTokenHash String? @map("email_verification_token_hash")
+  emailVerificationTokenExpiresAt DateTime? @map("email_verification_token_expires_at")
+  passwordResetTokenHash String? @map("password_reset_token_hash")
+  passwordResetTokenExpiresAt DateTime? @map("password_reset_token_expires_at")
   activeOrganizationId String? @db.Uuid @map("active_organization_id")
   status       String      @default("active")
   createdAt    DateTime    @default(now()) @map("created_at")
@@ -294,6 +299,9 @@ model Group {
   organizationId String    @db.Uuid @map("organization_id")
   name           String
   description    String?
+  groupType      String    @default("Teams & Projects") @map("group_type")
+  groupPrivacy   String    @default("Open") @map("group_privacy")
+  photoUrl       String?   @map("photo_url")
   createdBy      String?   @db.Uuid @map("created_by")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")

@@ -6,6 +6,8 @@ This folder contains key release smoke flows for production readiness.
 
 - maestro/feed-message-flow.yaml: feed create + messaging + notifications navigation
 - maestro/invite-group-flow.yaml: groups/search baseline flow
+- maestro/auth-recovery-flow.yaml: forgot/reset/verify journey entrypoints for auth recovery
+- maestro/post-lifecycle-flow.yaml: post create/edit/delete lifecycle smoke flow
 - maestro/messaging-offline-reconnect-flow.yaml: verifies offline message persistence and delivery after reconnect (manual dual-user setup)
 - maestro/notifications-cross-device-read-flow.yaml: verifies read-state/badge synchronization across devices (manual dual-device setup)
 
@@ -19,6 +21,8 @@ This folder contains key release smoke flows for production readiness.
 ```bash
 maestro test mobile-app/e2e/maestro/feed-message-flow.yaml
 maestro test mobile-app/e2e/maestro/invite-group-flow.yaml
+maestro test mobile-app/e2e/maestro/auth-recovery-flow.yaml
+maestro test mobile-app/e2e/maestro/post-lifecycle-flow.yaml
 maestro test mobile-app/e2e/maestro/messaging-offline-reconnect-flow.yaml
 maestro test mobile-app/e2e/maestro/notifications-cross-device-read-flow.yaml
 ```

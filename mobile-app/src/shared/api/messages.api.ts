@@ -10,6 +10,10 @@ export function listConversations(params: { limit: number; before?: string }) {
   return requestJson<PaginatedResponse<Conversation>>(`/messages/conversations?${search.toString()}`);
 }
 
+export function getUnreadMessagesCount() {
+  return requestJson<{ unreadCount: number }>('/messages/unread-count');
+}
+
 export function listMessages(conversationId: string, params: { limit: number; before?: string }) {
   const search = new URLSearchParams({ limit: String(params.limit) });
   if (params.before) {
@@ -31,6 +35,13 @@ export function createConversation(payload: { type: 'direct' | 'group'; particip
 export function sendMessage(conversationId: string, payload: { body: string; messageType?: string }) {
   return requestJson<Message>(`/messages/conversations/${conversationId}/messages`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateMessage(conversationId: string, messageId: string, payload: { body: string }) {
+  return requestJson<Message>(`/messages/conversations/${conversationId}/messages/${messageId}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }

@@ -25,6 +25,20 @@ export function markNotificationRead(notificationId: string) {
   });
 }
 
+export function openNotification(notificationId: string) {
+  return requestJson<{
+    status: 'ok';
+    readApplied: boolean;
+    action: {
+      target: 'messages' | 'profile' | 'feed';
+      entityType: string;
+      entityId: string;
+    };
+  }>(`/notifications/${notificationId}/open`, {
+    method: 'POST',
+  });
+}
+
 export function markAllNotificationsRead() {
   return requestJson<{ status: 'ok'; updated: number }>('/notifications/read-all', {
     method: 'POST',
@@ -55,6 +69,24 @@ export function muteNotificationUser(userId: string) {
 export function unmuteNotificationUser(userId: string) {
   return requestJson<{ status: 'ok' }>(`/notifications/muted-users/${userId}`, {
     method: 'DELETE',
+  });
+}
+
+export function sendThanksProfileAction(payload: {
+  targetUserId: string;
+  messageTemplate?: string;
+  notificationType?: 'thanks' | 'thanks-note';
+}) {
+  return requestJson<{
+    status: 'ok';
+    delivered: boolean;
+    muted: boolean;
+    notificationId: string | null;
+    conversationId: string | null;
+    messageId: string | null;
+  }>('/notifications/profile-actions/thanks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

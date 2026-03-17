@@ -16,7 +16,10 @@
     "ci:mobile": "npm run lint --workspace mobile-app && npm run typecheck --workspace mobile-app && npm run test --workspace mobile-app",
     "release:gates": "npm run ci:backend && npm run ci:mobile",
     "test:load": "node ./scripts/load-test.js",
-    "test:security": "node ./scripts/security-test.js"
+    "test:security": "node ./scripts/security-test.js",
+    "test:abuse": "node ./scripts/abuse-test.js",
+    "test:e2e:verify": "node ./scripts/e2e-verify.js",
+    "release:phase9": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

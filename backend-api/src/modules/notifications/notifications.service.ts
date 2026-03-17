@@ -1,8 +1,15 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { CacheService } from '../../common/cache/cache.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { SendThanksDto } from './dto/send-thanks.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { NotificationsRepository } from './notifications.repository';
 
@@ -51,8 +58,18 @@ interface NotificationReadEvent {
   readAll?: boolean;
 }
 
+interface SendThanksResult {
+  status: 'ok';
+  delivered: boolean;
+  muted: boolean;
+  notificationId: string | null;
+  conversationId: string | null;
+  messageId: string | null;
+}
+
 @Injectable()
 export class NotificationsService {
+  private readonly thanksCooldownMinutes = 60;
   private readonly notificationCreatedChannel = 'notifications:new';
   private readonly notificationReadChannel = 'notifications:read';
 
@@ -164,6 +181,53 @@ export class NotificationsService {
     return { status: 'ok' };
   }
 
+  async openNotification(
+    userId: string,
+    notificationId: string,
+  ): Promise<{
+    status: 'ok';
+    readApplied: boolean;
+    action: {
+      target: 'messages' | 'profile' | 'feed';
+      entityType: string;
+      entityId: string;
+    };
+  }> {
+    const notification = await this.notificationsRepository.findById(notificationId);
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    if (notification.userId !== userId) {
+      throw new ForbiddenException('Not allowed to open this notification');
+    }
+
+    let readApplied = false;
+    if (!notification.isRead) {
+      await this.notificationsRepository.markRead(notificationId);
+      readApplied = true;
+
+      const event: NotificationReadEvent = {
+        userId,
+        notificationId,
+      };
+      await this.redisService
+        .getClient()
+        .publish(this.notificationReadChannel, JSON.stringify(event));
+      await this.cacheService.deleteByKey(`notifications:unread:${userId}`);
+    }
+
+    return {
+      status: 'ok',
+      readApplied,
+      action: {
+        target: this.resolveOpenTarget(notification.entityType),
+        entityType: notification.entityType,
+        entityId: notification.entityId,
+      },
+    };
+  }
+
   async markAllRead(userId: string): Promise<{ status: 'ok'; updated: number }> {
     const updated = await this.notificationsRepository.markAllRead(userId);
 
@@ -251,6 +315,79 @@ export class NotificationsService {
     return { status: 'ok' };
   }
 
+  async sendThanks(senderId: string, payload: SendThanksDto): Promise<SendThanksResult> {
+    if (senderId === payload.targetUserId) {
+      throw new BadRequestException('Cannot send thanks to yourself');
+    }
+
+    const targetExists = await this.notificationsRepository.userExists(payload.targetUserId);
+    if (!targetExists) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const spamSince = new Date(Date.now() - this.thanksCooldownMinutes * 60_000);
+    const hasRecentThanks = await this.notificationsRepository.hasRecentThanks({
+      actorId: senderId,
+      userId: payload.targetUserId,
+      since: spamSince,
+    });
+
+    if (hasRecentThanks) {
+      throw new ConflictException('Thanks already sent recently. Try again later.');
+    }
+
+    const muted = await this.notificationsRepository.isMuted(payload.targetUserId, senderId);
+    const messageTemplate = payload.messageTemplate?.trim();
+    const notificationType = payload.notificationType ?? (messageTemplate ? 'thanks-note' : 'thanks');
+
+    let conversationId: string | null = null;
+    let messageId: string | null = null;
+
+    if (!muted && messageTemplate) {
+      conversationId = await this.notificationsRepository.findOrCreateDirectConversationBetweenUsers(
+        senderId,
+        payload.targetUserId,
+      );
+
+      const message = await this.notificationsRepository.createDirectMessage({
+        conversationId,
+        senderId,
+        body: messageTemplate,
+        messageType: 'thanks',
+      });
+
+      messageId = message.id;
+    }
+
+    if (muted) {
+      return {
+        status: 'ok',
+        delivered: false,
+        muted: true,
+        notificationId: null,
+        conversationId,
+        messageId,
+      };
+    }
+
+    const created = await this.createNotification({
+      userId: payload.targetUserId,
+      actorId: senderId,
+      type: notificationType,
+      entityType: 'user',
+      entityId: senderId,
+    });
+
+    return {
+      status: 'ok',
+      delivered: Boolean(created),
+      muted: false,
+      notificationId: created?.id ?? null,
+      conversationId,
+      messageId,
+    };
+  }
+
   private isTypeEnabled(
     type: string,
     preferences: {
@@ -272,6 +409,18 @@ export class NotificationsService {
       default:
         return true;
     }
+  }
+
+  private resolveOpenTarget(entityType: string): 'messages' | 'profile' | 'feed' {
+    if (entityType === 'conversation') {
+      return 'messages';
+    }
+
+    if (entityType === 'user') {
+      return 'profile';
+    }
+
+    return 'feed';
   }
 
   private toView(row: {

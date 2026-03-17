@@ -19,6 +19,14 @@ describe('GroupsController Integration', () => {
       memberCount: 1,
     }),
     joinGroup: jest.fn().mockResolvedValue({ status: 'ok' }),
+    updateGroup: jest.fn().mockResolvedValue({
+      id: 'g1',
+      name: 'General Updated',
+      description: 'Updated description',
+      createdAt: '2026-03-16T00:00:00.000Z',
+      memberCount: 1,
+    }),
+    deleteGroup: jest.fn().mockResolvedValue({ status: 'ok' }),
     listMembers: jest.fn().mockResolvedValue({ groupId: 'g1', items: [] }),
     getStarterGroupsConfig: jest.fn().mockResolvedValue({
       organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
@@ -93,6 +101,27 @@ describe('GroupsController Integration', () => {
     await request(app.getHttpServer()).post('/groups/g1/join').expect(201);
 
     expect(groupsServiceMock.joinGroup).toHaveBeenCalledWith('u1', 'g1');
+  });
+
+  it('PATCH /groups/:id updates group metadata', async () => {
+    const payload = {
+      name: 'General Updated',
+      description: 'Updated description',
+    };
+
+    await request(app.getHttpServer()).patch('/groups/g1').send(payload).expect(200);
+
+    expect(groupsServiceMock.updateGroup).toHaveBeenCalledWith('u1', 'g1', payload);
+  });
+
+  it('DELETE /groups/:id deletes a group with policy payload', async () => {
+    const payload = {
+      postHandlingPolicy: 'detach',
+    };
+
+    await request(app.getHttpServer()).delete('/groups/g1').send(payload).expect(200);
+
+    expect(groupsServiceMock.deleteGroup).toHaveBeenCalledWith('u1', 'g1', payload);
   });
 
   it('GET /groups/:id/members returns members', async () => {

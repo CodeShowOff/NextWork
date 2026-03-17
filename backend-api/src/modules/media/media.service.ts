@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
@@ -20,9 +20,35 @@ const CONTENT_TYPE_TO_EXTENSION: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+const EXTENSIONS_BY_CONTENT_TYPE: Record<string, string[]> = {
+  'image/jpeg': ['jpg', 'jpeg'],
+  'image/png': ['png'],
+  'image/webp': ['webp'],
+};
+
+function extractFileExtension(fileName: string): string | null {
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot <= 0 || lastDot === fileName.length - 1) {
+    return null;
+  }
+
+  return fileName.slice(lastDot + 1).toLowerCase();
+}
+
 @Injectable()
 export class MediaService {
   createUploadContract(userId: string, payload: CreateUploadUrlDto): UploadContractResponse {
+    const normalizedFileName = payload.fileName.trim();
+    if (!/^[A-Za-z0-9._-]{1,120}$/.test(normalizedFileName) || normalizedFileName.includes('..')) {
+      throw new BadRequestException('Invalid filename. Use 1-120 chars: letters, numbers, dot, underscore, dash.');
+    }
+
+    const extensionFromName = extractFileExtension(normalizedFileName);
+    const allowedExtensions = EXTENSIONS_BY_CONTENT_TYPE[payload.contentType] ?? [];
+    if (extensionFromName && !allowedExtensions.includes(extensionFromName)) {
+      throw new BadRequestException('File extension does not match declared content type.');
+    }
+
     const extension = CONTENT_TYPE_TO_EXTENSION[payload.contentType] ?? 'bin';
     const objectKey = `uploads/${userId}/${randomUUID()}.${extension}`;
 

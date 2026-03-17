@@ -31,6 +31,26 @@ Progressive rollout phases:
 - Increase to 25%, 50%, 100% only when metrics remain healthy.
 - Auto-pause and rollback on sustained threshold breach.
 
+## Phase 9 Rollout Schedule
+
+1. Internal: 5% for 2 hours, then 25% for 22 hours.
+2. Beta: 25% for 12 hours, then 50% for 36 hours.
+3. Production: 50% for 12 hours, then 100% when all gates remain green.
+
+## Monitoring Thresholds (Hold or Roll Back if Breached)
+
+- API error rate > 1% for 10 consecutive minutes.
+- p95 latency budget breach on feed/search/messages for 3 consecutive windows.
+- Crash-free sessions < 99.5% for 30 minutes.
+- Notification delivery lag > 60 seconds sustained for 10 minutes.
+
+## Rollback Triggers
+
+- Any Sev1 incident.
+- Two Sev2 incidents within a 4-hour window.
+- Abuse checks fail to enforce expected rate-limit behavior.
+- Media upload validation failures observed in production logs.
+
 ## Go/No-Go Inputs
 
 - CI evidence

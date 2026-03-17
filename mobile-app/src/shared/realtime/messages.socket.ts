@@ -11,6 +11,8 @@ import {
 type RealtimeHandlers = {
   onNewMessage?: (message: Message) => void;
   onConversationMessage?: (event: ConversationMessageEvent) => void;
+  onConversationMessageEdited?: (event: ConversationMessageEvent) => void;
+  onMessageEdited?: (message: Message) => void;
   onRead?: (event: MessageReadEvent) => void;
   onTypingStart?: (event: TypingEvent) => void;
   onTypingStop?: (event: TypingEvent) => void;
@@ -38,6 +40,14 @@ export function connectMessagesSocket(handlers: RealtimeHandlers): Socket {
 
   if (handlers.onConversationMessage) {
     socket.on('conversation.message', handlers.onConversationMessage);
+  }
+
+  if (handlers.onConversationMessageEdited) {
+    socket.on('conversation.message_edited', handlers.onConversationMessageEdited);
+  }
+
+  if (handlers.onMessageEdited) {
+    socket.on('message.edited', handlers.onMessageEdited);
   }
 
   if (handlers.onRead) {

@@ -15,6 +15,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { SendThanksDto } from './dto/send-thanks.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import {
   NotificationPreferencesView,
@@ -46,6 +47,22 @@ export class NotificationsController {
     @Param('notificationId') notificationId: string,
   ): Promise<{ status: 'ok' }> {
     return this.notificationsService.markRead(user.sub, notificationId);
+  }
+
+  @Post(':notificationId/open')
+  openNotification(
+    @CurrentUser() user: JwtPayload,
+    @Param('notificationId') notificationId: string,
+  ): Promise<{
+    status: 'ok';
+    readApplied: boolean;
+    action: {
+      target: 'messages' | 'profile' | 'feed';
+      entityType: string;
+      entityId: string;
+    };
+  }> {
+    return this.notificationsService.openNotification(user.sub, notificationId);
   }
 
   @Post('read-all')
@@ -85,5 +102,20 @@ export class NotificationsController {
     @Param('mutedUserId', new ParseUUIDPipe({ version: '4' })) mutedUserId: string,
   ): Promise<{ status: 'ok' }> {
     return this.notificationsService.unmuteActor(user.sub, mutedUserId);
+  }
+
+  @Post('profile-actions/thanks')
+  sendThanks(
+    @CurrentUser() user: JwtPayload,
+    @Body() payload: SendThanksDto,
+  ): Promise<{
+    status: 'ok';
+    delivered: boolean;
+    muted: boolean;
+    notificationId: string | null;
+    conversationId: string | null;
+    messageId: string | null;
+  }> {
+    return this.notificationsService.sendThanks(user.sub, payload);
   }
 }

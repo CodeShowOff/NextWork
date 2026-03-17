@@ -26,6 +26,7 @@ import {
   getNotificationPreferences,
   listMutedNotificationUsers,
   muteNotificationUser,
+  openNotification,
   unmuteNotificationUser,
   updateNotificationPreferences,
 } from '../../../shared/api/notifications.api';
@@ -76,6 +77,10 @@ export function NotificationsScreen() {
     () => notificationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [notificationsQuery.data],
   );
+  const mutedActorIdSet = useMemo(
+    () => new Set((mutedUsersQuery.data?.items ?? []).map((item) => item.userId)),
+    [mutedUsersQuery.data?.items],
+  );
 
   const routeToEntity = (item: NotificationItem) => {
     const rootNavigation = navigation as any;
@@ -125,6 +130,8 @@ export function NotificationsScreen() {
               // Keep UI responsive; list will sync again on next refresh.
             });
           }}
+          accessibilityRole="button"
+          accessibilityLabel={t('notifications.markAllRead')}
         >
           <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
         </Pressable>
@@ -156,6 +163,8 @@ export function NotificationsScreen() {
                     }}
                     thumbColor="#FFFFFF"
                     trackColor={{ true: '#16A34A', false: '#94A3B8' }}
+                    accessibilityLabel={entry.label}
+                    accessibilityRole="switch"
                   />
                 </View>
               );
@@ -177,6 +186,8 @@ export function NotificationsScreen() {
                 onPress={() => {
                   unmuteMutation.mutate(mutedUser.userId);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('notifications.actions.unmute')} ${mutedUser.displayName}`}
               >
                 <Text style={styles.mutedChipText}>{mutedUser.displayName} ×</Text>
               </Pressable>
@@ -191,14 +202,40 @@ export function NotificationsScreen() {
         renderItem={({ item }) => (
           <NotificationListItem
             item={item}
+            isActorMuted={Boolean(item.actorId && mutedActorIdSet.has(item.actorId))}
             onPress={async () => {
-              if (!item.isRead) {
-                await markRead(item.id).catch(() => {
-                  // Keep UI responsive; list will sync again on next refresh.
-                });
+              const opened = await openNotification(item.id).catch(async () => {
+                if (!item.isRead) {
+                  await markRead(item.id).catch(() => {
+                    // Keep UI responsive; list will sync again on next refresh.
+                  });
+                }
+
+                return null;
+              });
+
+              if (!opened) {
+                routeToEntity(item);
+                return;
               }
 
-              routeToEntity(item);
+              if (opened.action.target === 'messages') {
+                (navigation as any).navigate('Messages', {
+                  screen: 'ConversationDetail',
+                  params: { conversationId: opened.action.entityId },
+                });
+                return;
+              }
+
+              if (opened.action.target === 'profile') {
+                (navigation as any).navigate('Profile', {
+                  screen: 'UserProfile',
+                  params: { userId: opened.action.entityId },
+                });
+                return;
+              }
+
+              routeToEntity({ ...item, entityType: opened.action.entityType, entityId: opened.action.entityId });
             }}
             onLongPress={() => {
               const actorId = item.actorId;
@@ -206,16 +243,24 @@ export function NotificationsScreen() {
                 return;
               }
 
+              const isMuted = mutedActorIdSet.has(actorId);
+
               Alert.alert(
-                t('notifications.alerts.muteTitle'),
-                t('notifications.alerts.muteBody', { name: item.actor.displayName }),
+                isMuted ? t('notifications.alerts.unmuteTitle') : t('notifications.alerts.muteTitle'),
+                isMuted
+                  ? t('notifications.alerts.unmuteBody', { name: item.actor.displayName })
+                  : t('notifications.alerts.muteBody', { name: item.actor.displayName }),
                 [
                   { text: t('common.actions.cancel'), style: 'cancel' },
                   {
-                    text: t('common.actions.mute'),
+                    text: isMuted ? t('notifications.actions.unmute') : t('common.actions.mute'),
                     style: 'destructive',
                     onPress: () => {
-                      muteMutation.mutate(actorId);
+                      if (isMuted) {
+                        unmuteMutation.mutate(actorId);
+                      } else {
+                        muteMutation.mutate(actorId);
+                      }
                     },
                   },
                 ],

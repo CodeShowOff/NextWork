@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Pressable,
   SafeAreaView,
   Share,
@@ -25,13 +26,18 @@ import {
   listGroupMembers,
   listGroups,
   StarterGroupCatalogItem,
+  updateGroup,
+  deleteGroup,
 } from '../../shared/api/groups.api';
 import { createInviteLink, getInviteByToken, acceptInvite } from '../../shared/api/invites.api';
 import {
+  deactivateOrganization,
+  deleteOrganization,
   listMyOrganizations,
   onboardOrganization,
   OrganizationMembership,
   switchOrganization,
+  updateOrganization,
 } from '../../shared/api/organizations.api';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { featureFlags } from '../../shared/config/runtime';
@@ -41,6 +47,26 @@ type GroupsRouteParams = {
   focusGroupId?: string;
   organizationId?: string;
 };
+
+const mandatoryStarterGroupKey = 'general';
+
+type GroupSortFilterOption =
+  | 'recentlyVisited'
+  | 'name'
+  | 'favorites'
+  | 'top'
+  | 'latestActivity';
+
+const groupSortFilterOptions: GroupSortFilterOption[] = [
+  'recentlyVisited',
+  'name',
+  'favorites',
+  'top',
+  'latestActivity',
+];
+
+const groupTypeOptions = ['Teams & Projects', 'Discussions', 'Announcements', 'Social & More'];
+const groupPrivacyOptions = ['Open', 'Closed', 'Secret'];
 
 export function GroupsScreen() {
   const { t } = useTranslation();
@@ -58,8 +84,33 @@ export function GroupsScreen() {
   const [selectedStarterKeys, setSelectedStarterKeys] = useState<string[]>([]);
   const [inlineError, setInlineError] = useState('');
   const [postOnboardingInviteOrganizationId, setPostOnboardingInviteOrganizationId] = useState('');
+  const [organizationEditName, setOrganizationEditName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState('');
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [editingGroupDescription, setEditingGroupDescription] = useState('');
+  const [editingGroupType, setEditingGroupType] = useState(groupTypeOptions[0]);
+  const [editingGroupPrivacy, setEditingGroupPrivacy] = useState(groupPrivacyOptions[0]);
+  const [editingGroupPhotoUrl, setEditingGroupPhotoUrl] = useState('');
+  const [createGroupType, setCreateGroupType] = useState(groupTypeOptions[0]);
+  const [createGroupPrivacy, setCreateGroupPrivacy] = useState(groupPrivacyOptions[0]);
+  const [createGroupPhotoUrl, setCreateGroupPhotoUrl] = useState('');
+  const [groupSortFilter, setGroupSortFilter] = useState<GroupSortFilterOption>('recentlyVisited');
+  const [favoriteGroupIds, setFavoriteGroupIds] = useState<string[]>([]);
+  const [visitedGroupIds, setVisitedGroupIds] = useState<string[]>([]);
+  const [lastActivityByGroupId, setLastActivityByGroupId] = useState<Record<string, number>>({});
 
   const routeParams = (route.params ?? {}) as GroupsRouteParams;
+
+  const markGroupVisited = (groupId: string) => {
+    setVisitedGroupIds((current) => [groupId, ...current.filter((id) => id !== groupId)]);
+  };
+
+  const markGroupActivity = (groupId: string) => {
+    setLastActivityByGroupId((current) => ({
+      ...current,
+      [groupId]: Date.now(),
+    }));
+  };
 
   const pendingInviteToken = useInviteLinkStore((state) => state.pendingInviteToken);
   const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
@@ -88,6 +139,8 @@ export function GroupsScreen() {
     return organizations.find((item) => item.organizationId === activeId) ?? organizations[0];
   }, [meQuery.data?.activeOrganizationId, organizations]);
   const activeOrganizationId = activeOrganization?.organization.id;
+  const canManageActiveOrganization =
+    activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin';
 
   const groupsQuery = useQuery({
     queryKey: ['groups', activeOrganizationId],
@@ -141,7 +194,9 @@ export function GroupsScreen() {
     onMutate: () => {
       setInlineError('');
     },
-    onSuccess: () => {
+    onSuccess: (_result, groupId) => {
+      markGroupVisited(groupId);
+      markGroupActivity(groupId);
       queryClient.invalidateQueries({ queryKey: ['groups', activeOrganizationId] });
       if (membersGroupId) {
         queryClient.invalidateQueries({ queryKey: ['groups', 'members', membersGroupId] });
@@ -161,12 +216,21 @@ export function GroupsScreen() {
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: (payload: { organizationId: string; name: string }) => createGroup(payload),
+    mutationFn: (payload: {
+      organizationId: string;
+      name: string;
+      groupType: string;
+      groupPrivacy: string;
+      photoUrl?: string;
+    }) => createGroup(payload),
     onMutate: () => {
       setInlineError('');
     },
     onSuccess: () => {
       setGroupName('');
+      setCreateGroupType(groupTypeOptions[0]);
+      setCreateGroupPrivacy(groupPrivacyOptions[0]);
+      setCreateGroupPhotoUrl('');
       queryClient.invalidateQueries({ queryKey: ['groups', activeOrganizationId] });
     },
     onError: (error) => {
@@ -187,6 +251,118 @@ export function GroupsScreen() {
     onError: (error) => {
       setInlineError((error as Error).message);
       Alert.alert(t('groups.alerts.createInviteFailed'), (error as Error).message);
+    },
+  });
+
+  const updateOrganizationMutation = useMutation({
+    mutationFn: (payload: { organizationId: string; name: string }) =>
+      updateOrganization(payload.organizationId, { name: payload.name }),
+    onMutate: () => {
+      setInlineError('');
+    },
+    onSuccess: () => {
+      setOrganizationEditName('');
+      queryClient.invalidateQueries({ queryKey: ['organizations', 'me'] });
+      Alert.alert(t('groups.alerts.updateOrganizationSuccessTitle'), t('groups.alerts.updateOrganizationSuccessBody'));
+    },
+    onError: (error) => {
+      setInlineError((error as Error).message);
+      Alert.alert(t('groups.alerts.updateOrganizationFailed'), (error as Error).message);
+    },
+  });
+
+  const deactivateOrganizationMutation = useMutation({
+    mutationFn: (organizationId: string) => deactivateOrganization(organizationId),
+    onMutate: () => {
+      setInlineError('');
+    },
+    onSuccess: () => {
+      setMembersGroupId('');
+      queryClient.invalidateQueries({ queryKey: ['users', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['organizations', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      Alert.alert(t('groups.alerts.deactivateOrganizationSuccessTitle'), t('groups.alerts.deactivateOrganizationSuccessBody'));
+    },
+    onError: (error) => {
+      setInlineError((error as Error).message);
+      Alert.alert(t('groups.alerts.deactivateOrganizationFailed'), (error as Error).message);
+    },
+  });
+
+  const deleteOrganizationMutation = useMutation({
+    mutationFn: (organizationId: string) => deleteOrganization(organizationId),
+    onMutate: () => {
+      setInlineError('');
+    },
+    onSuccess: () => {
+      setMembersGroupId('');
+      queryClient.invalidateQueries({ queryKey: ['users', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['organizations', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      Alert.alert(t('groups.alerts.deleteOrganizationSuccessTitle'), t('groups.alerts.deleteOrganizationSuccessBody'));
+    },
+    onError: (error) => {
+      setInlineError((error as Error).message);
+      Alert.alert(t('groups.alerts.deleteOrganizationFailed'), (error as Error).message);
+    },
+  });
+
+  const updateGroupMutation = useMutation({
+    mutationFn: (payload: {
+      groupId: string;
+      name: string;
+      description: string;
+      groupType: string;
+      groupPrivacy: string;
+      photoUrl?: string;
+    }) =>
+      updateGroup(payload.groupId, {
+        name: payload.name,
+        description: payload.description,
+        groupType: payload.groupType,
+        groupPrivacy: payload.groupPrivacy,
+        photoUrl: payload.photoUrl,
+      }),
+    onMutate: () => {
+      setInlineError('');
+    },
+    onSuccess: () => {
+      setEditingGroupId('');
+      setEditingGroupName('');
+      setEditingGroupDescription('');
+      setEditingGroupType(groupTypeOptions[0]);
+      setEditingGroupPrivacy(groupPrivacyOptions[0]);
+      setEditingGroupPhotoUrl('');
+      queryClient.invalidateQueries({ queryKey: ['groups', activeOrganizationId] });
+      Alert.alert(t('groups.alerts.updateGroupSuccessTitle'), t('groups.alerts.updateGroupSuccessBody'));
+    },
+    onError: (error) => {
+      setInlineError((error as Error).message);
+      Alert.alert(t('groups.alerts.updateGroupFailed'), (error as Error).message);
+    },
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: (payload: { groupId: string; postPolicy: 'detach' | 'remove' }) =>
+      deleteGroup(payload.groupId, { postPolicy: payload.postPolicy }),
+    onMutate: () => {
+      setInlineError('');
+    },
+    onSuccess: () => {
+      setEditingGroupId('');
+      setEditingGroupName('');
+      setEditingGroupDescription('');
+      setEditingGroupType(groupTypeOptions[0]);
+      setEditingGroupPrivacy(groupPrivacyOptions[0]);
+      setEditingGroupPhotoUrl('');
+      setMembersGroupId('');
+      queryClient.invalidateQueries({ queryKey: ['groups', activeOrganizationId] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      Alert.alert(t('groups.alerts.deleteGroupSuccessTitle'), t('groups.alerts.deleteGroupSuccessBody'));
+    },
+    onError: (error) => {
+      setInlineError((error as Error).message);
+      Alert.alert(t('groups.alerts.deleteGroupFailed'), (error as Error).message);
     },
   });
 
@@ -318,12 +494,28 @@ export function GroupsScreen() {
       return;
     }
 
-    setSelectedStarterKeys(
+    const initialKeys =
       starterGroupsConfigQuery.data.selectedKeys.length > 0
         ? starterGroupsConfigQuery.data.selectedKeys
-        : starterGroupsConfigQuery.data.catalog.map((item) => item.key),
-    );
+        : starterGroupsConfigQuery.data.catalog.map((item) => item.key);
+
+    setSelectedStarterKeys(initialKeys.filter((key) => key !== mandatoryStarterGroupKey));
   }, [selectedStarterKeys.length, starterGroupsConfigQuery.data]);
+
+  useEffect(() => {
+    if (!activeOrganization?.organization.name) {
+      return;
+    }
+
+    setOrganizationEditName(activeOrganization.organization.name);
+  }, [activeOrganization?.organization.name]);
+
+  useEffect(() => {
+    setGroupSortFilter('recentlyVisited');
+    setFavoriteGroupIds([]);
+    setVisitedGroupIds([]);
+    setLastActivityByGroupId({});
+  }, [activeOrganizationId]);
 
   const onboardingRequired =
     featureFlags.onboardingV2 &&
@@ -340,6 +532,70 @@ export function GroupsScreen() {
     initializeStarterGroupsMutation.isPending ||
     createInviteMutation.isPending ||
     switchMutation.isPending;
+
+  const isAdminActionLoading =
+    updateOrganizationMutation.isPending ||
+    deactivateOrganizationMutation.isPending ||
+    deleteOrganizationMutation.isPending ||
+    updateGroupMutation.isPending ||
+    deleteGroupMutation.isPending;
+
+  const sortedAndFilteredGroups = useMemo(() => {
+    const groups = groupsQuery.data?.items ?? [];
+    const favoriteSet = new Set(favoriteGroupIds);
+    const visitedIndex = new Map(visitedGroupIds.map((id, index) => [id, index]));
+
+    const fallbackNewestFirst = (left: Group, right: Group) => {
+      const leftTime = new Date(left.createdAt).getTime();
+      const rightTime = new Date(right.createdAt).getTime();
+      return rightTime - leftTime;
+    };
+
+    if (groupSortFilter === 'favorites') {
+      return groups
+        .filter((group) => favoriteSet.has(group.id))
+        .sort((left, right) => left.name.localeCompare(right.name));
+    }
+
+    if (groupSortFilter === 'name') {
+      return [...groups].sort((left, right) => left.name.localeCompare(right.name));
+    }
+
+    if (groupSortFilter === 'top') {
+      return [...groups].sort((left, right) => {
+        if (right.memberCount !== left.memberCount) {
+          return right.memberCount - left.memberCount;
+        }
+        return left.name.localeCompare(right.name);
+      });
+    }
+
+    if (groupSortFilter === 'latestActivity') {
+      return [...groups].sort((left, right) => {
+        const rightActivity = lastActivityByGroupId[right.id] ?? 0;
+        const leftActivity = lastActivityByGroupId[left.id] ?? 0;
+        if (rightActivity !== leftActivity) {
+          return rightActivity - leftActivity;
+        }
+        return fallbackNewestFirst(left, right);
+      });
+    }
+
+    return [...groups].sort((left, right) => {
+      const leftVisited = visitedIndex.get(left.id);
+      const rightVisited = visitedIndex.get(right.id);
+      if (leftVisited !== undefined && rightVisited !== undefined) {
+        return leftVisited - rightVisited;
+      }
+      if (leftVisited !== undefined) {
+        return -1;
+      }
+      if (rightVisited !== undefined) {
+        return 1;
+      }
+      return fallbackNewestFirst(left, right);
+    });
+  }, [favoriteGroupIds, groupSortFilter, groupsQuery.data?.items, lastActivityByGroupId, visitedGroupIds]);
 
   if (organizationsQuery.isLoading) {
     return (
@@ -428,13 +684,19 @@ export function GroupsScreen() {
           <Text style={styles.subtitle}>{t('groups.subtitle.chooseStarterGroups')}</Text>
 
           {catalog.map((item: StarterGroupCatalogItem) => {
-            const checked = selectedStarterKeys.includes(item.key);
+            const isMandatory = item.key === mandatoryStarterGroupKey;
+            const checked = isMandatory || selectedStarterKeys.includes(item.key);
 
             return (
               <Pressable
                 key={item.key}
                 style={[styles.starterGroupRow, checked ? styles.starterGroupRowChecked : null]}
+                disabled={isMandatory}
                 onPress={() => {
+                  if (isMandatory) {
+                    return;
+                  }
+
                   setSelectedStarterKeys((current) =>
                     current.includes(item.key)
                       ? current.filter((key) => key !== item.key)
@@ -442,9 +704,15 @@ export function GroupsScreen() {
                   );
                 }}
               >
-                <View style={[styles.checkbox, checked ? styles.checkboxChecked : null]}>
-                  {checked ? <Text style={styles.checkboxCheck}>{t('groups.labels.checkboxChecked')}</Text> : null}
-                </View>
+                {isMandatory ? (
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredBadgeText}>{t('groups.labels.required')}</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.checkbox, checked ? styles.checkboxChecked : null]}>
+                    {checked ? <Text style={styles.checkboxCheck}>{t('groups.labels.checkboxChecked')}</Text> : null}
+                  </View>
+                )}
                 <View style={styles.starterGroupTextColumn}>
                   <Text style={styles.starterGroupTitle}>{item.name}</Text>
                   <Text style={styles.starterGroupDescription}>{item.description}</Text>
@@ -463,7 +731,7 @@ export function GroupsScreen() {
 
                 initializeStarterGroupsMutation.mutate({
                   organizationId: activeOrganizationId,
-                  selectedKeys: [],
+                  selectedKeys: [mandatoryStarterGroupKey],
                   skipped: true,
                 });
               }}
@@ -482,7 +750,7 @@ export function GroupsScreen() {
 
                 initializeStarterGroupsMutation.mutate({
                   organizationId: activeOrganizationId,
-                  selectedKeys: selectedStarterKeys,
+                  selectedKeys: [...selectedStarterKeys, mandatoryStarterGroupKey],
                 });
               }}
               disabled={initializeStarterGroupsMutation.isPending}
@@ -565,6 +833,90 @@ export function GroupsScreen() {
         <Text style={styles.subtitle}>
           {t('groups.subtitle.membersCount', { count: activeOrganization?.organization.memberCount ?? 0 })}
         </Text>
+        <Text style={styles.subtitle}>{t('groups.labels.organizationRole', { role: activeOrganization?.role ?? 'member' })}</Text>
+
+        {canManageActiveOrganization ? (
+          <View style={styles.adminPanel}>
+            <Text style={styles.adminPanelTitle}>{t('groups.title.organizationAdmin')}</Text>
+            <TextInput
+              value={organizationEditName}
+              onChangeText={setOrganizationEditName}
+              placeholder={t('groups.placeholders.organizationName')}
+              style={styles.input}
+            />
+            <View style={styles.adminActionsRow}>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => {
+                  if (!activeOrganizationId) {
+                    return;
+                  }
+
+                  const nextName = organizationEditName.trim();
+                  if (!nextName) {
+                    return;
+                  }
+
+                  updateOrganizationMutation.mutate({
+                    organizationId: activeOrganizationId,
+                    name: nextName,
+                  });
+                }}
+                disabled={isAdminActionLoading}
+              >
+                <Text style={styles.secondaryButtonText}>{t('groups.buttons.saveOrganization')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.warningButton}
+                onPress={() => {
+                  if (!activeOrganizationId) {
+                    return;
+                  }
+
+                  Alert.alert(
+                    t('groups.alerts.deactivateOrganizationConfirmTitle'),
+                    t('groups.alerts.deactivateOrganizationConfirmBody'),
+                    [
+                      { text: t('common.actions.cancel'), style: 'cancel' },
+                      {
+                        text: t('groups.buttons.deactivateOrganization'),
+                        style: 'destructive',
+                        onPress: () => deactivateOrganizationMutation.mutate(activeOrganizationId),
+                      },
+                    ],
+                  );
+                }}
+                disabled={isAdminActionLoading}
+              >
+                <Text style={styles.warningButtonText}>{t('groups.buttons.deactivateOrganization')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.dangerButton}
+                onPress={() => {
+                  if (!activeOrganizationId) {
+                    return;
+                  }
+
+                  Alert.alert(
+                    t('groups.alerts.deleteOrganizationConfirmTitle'),
+                    t('groups.alerts.deleteOrganizationConfirmBody'),
+                    [
+                      { text: t('common.actions.cancel'), style: 'cancel' },
+                      {
+                        text: t('groups.buttons.deleteOrganization'),
+                        style: 'destructive',
+                        onPress: () => deleteOrganizationMutation.mutate(activeOrganizationId),
+                      },
+                    ],
+                  );
+                }}
+                disabled={isAdminActionLoading}
+              >
+                <Text style={styles.dangerButtonText}>{t('groups.buttons.deleteOrganization')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         <FlatList<OrganizationMembership>
           horizontal
@@ -641,11 +993,99 @@ export function GroupsScreen() {
             createGroupMutation.mutate({
               organizationId: activeOrganizationId,
               name,
+              groupType: createGroupType,
+              groupPrivacy: createGroupPrivacy,
+              photoUrl: createGroupPhotoUrl.trim() || undefined,
             });
           }}
         >
           <Text style={styles.primaryButtonText}>{t('groups.buttons.create')}</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.groupMetadataComposerCard}>
+        <Text style={styles.metadataLabel}>{t('groups.labels.groupType')}</Text>
+        <View style={styles.metadataOptionsRow}>
+          {groupTypeOptions.map((typeOption) => (
+            <Pressable
+              key={typeOption}
+              style={[
+                styles.metadataOptionChip,
+                createGroupType === typeOption ? styles.metadataOptionChipActive : null,
+              ]}
+              onPress={() => setCreateGroupType(typeOption)}
+            >
+              <Text
+                style={[
+                  styles.metadataOptionText,
+                  createGroupType === typeOption ? styles.metadataOptionTextActive : null,
+                ]}
+              >
+                {typeOption}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.metadataLabel}>{t('groups.labels.groupPrivacy')}</Text>
+        <View style={styles.metadataOptionsRow}>
+          {groupPrivacyOptions.map((privacyOption) => (
+            <Pressable
+              key={privacyOption}
+              style={[
+                styles.metadataOptionChip,
+                createGroupPrivacy === privacyOption ? styles.metadataOptionChipActive : null,
+              ]}
+              onPress={() => setCreateGroupPrivacy(privacyOption)}
+            >
+              <Text
+                style={[
+                  styles.metadataOptionText,
+                  createGroupPrivacy === privacyOption ? styles.metadataOptionTextActive : null,
+                ]}
+              >
+                {privacyOption}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <TextInput
+          value={createGroupPhotoUrl}
+          onChangeText={setCreateGroupPhotoUrl}
+          placeholder={t('groups.placeholders.groupPhotoUrl')}
+          style={styles.input}
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.groupListHeaderRow}>
+        <Text style={styles.groupListTitle}>{t('groups.title.yourGroups')}</Text>
+        <FlatList<GroupSortFilterOption>
+          horizontal
+          data={groupSortFilterOptions}
+          keyExtractor={(item) => item}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.groupFilterRow}
+          renderItem={({ item }) => (
+            <Pressable
+              style={[
+                styles.groupFilterChip,
+                item === groupSortFilter ? styles.groupFilterChipActive : null,
+              ]}
+              onPress={() => setGroupSortFilter(item)}
+            >
+              <Text
+                style={[
+                  styles.groupFilterChipText,
+                  item === groupSortFilter ? styles.groupFilterChipTextActive : null,
+                ]}
+              >
+                {t(`groups.filters.${item}`)}
+              </Text>
+            </Pressable>
+          )}
+        />
       </View>
 
       {groupsQuery.isLoading ? (
@@ -654,14 +1094,51 @@ export function GroupsScreen() {
         </View>
       ) : (
         <FlatList<Group>
-          data={groupsQuery.data?.items ?? []}
+          data={sortedAndFilteredGroups}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.groupCard}>
-              <Text style={styles.groupTitle}>{item.name}</Text>
+              <View style={styles.groupIdentityRow}>
+                {item.photoUrl ? (
+                  <Image source={{ uri: item.photoUrl }} style={styles.groupPhoto} />
+                ) : (
+                  <View style={styles.groupPhotoPlaceholder}>
+                    <Text style={styles.groupPhotoPlaceholderText}>{item.name.slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.groupIdentityTextColumn}>
+                  <Text style={styles.groupTitle}>{item.name}</Text>
+                  <Text style={styles.groupMetaSecondary}>{`${item.groupPrivacy} • ${item.groupType}`}</Text>
+                </View>
+              </View>
               {item.description ? <Text style={styles.groupDescription}>{item.description}</Text> : null}
               <Text style={styles.groupMeta}>{t('groups.labels.memberCount', { count: item.memberCount })}</Text>
               <View style={styles.groupActionsRow}>
+                <Pressable
+                  style={[
+                    styles.secondaryButton,
+                    favoriteGroupIds.includes(item.id) ? styles.favoriteButtonActive : null,
+                  ]}
+                  onPress={() => {
+                    setFavoriteGroupIds((current) =>
+                      current.includes(item.id)
+                        ? current.filter((groupId) => groupId !== item.id)
+                        : [...current, item.id],
+                    );
+                    markGroupActivity(item.id);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.secondaryButtonText,
+                      favoriteGroupIds.includes(item.id) ? styles.favoriteButtonTextActive : null,
+                    ]}
+                  >
+                    {favoriteGroupIds.includes(item.id)
+                      ? t('groups.buttons.unfavorite')
+                      : t('groups.buttons.favorite')}
+                  </Text>
+                </Pressable>
                 <Pressable
                   style={styles.secondaryButton}
                   onPress={() => {
@@ -674,6 +1151,8 @@ export function GroupsScreen() {
                 <Pressable
                   style={styles.secondaryButton}
                   onPress={() => {
+                    markGroupVisited(item.id);
+                    markGroupActivity(item.id);
                     setMembersGroupId((current) => (current === item.id ? '' : item.id));
                   }}
                 >
@@ -683,7 +1162,165 @@ export function GroupsScreen() {
                       : t('groups.buttons.viewMembers')}
                   </Text>
                 </Pressable>
+                {canManageActiveOrganization ? (
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => {
+                      markGroupVisited(item.id);
+                      markGroupActivity(item.id);
+                      setEditingGroupId((current) => {
+                        if (current === item.id) {
+                          setEditingGroupName('');
+                          setEditingGroupDescription('');
+                          setEditingGroupType(groupTypeOptions[0]);
+                          setEditingGroupPrivacy(groupPrivacyOptions[0]);
+                          setEditingGroupPhotoUrl('');
+                          return '';
+                        }
+
+                        setEditingGroupName(item.name);
+                        setEditingGroupDescription(item.description ?? '');
+                        setEditingGroupType(item.groupType);
+                        setEditingGroupPrivacy(item.groupPrivacy);
+                        setEditingGroupPhotoUrl(item.photoUrl ?? '');
+                        return item.id;
+                      });
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>{t('groups.buttons.editGroup')}</Text>
+                  </Pressable>
+                ) : null}
               </View>
+
+              {canManageActiveOrganization && editingGroupId === item.id ? (
+                <View style={styles.adminPanel}>
+                  <Text style={styles.adminPanelTitle}>{t('groups.title.groupAdmin')}</Text>
+                  <TextInput
+                    value={editingGroupName}
+                    onChangeText={setEditingGroupName}
+                    placeholder={t('groups.placeholders.groupName')}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    value={editingGroupDescription}
+                    onChangeText={setEditingGroupDescription}
+                    placeholder={t('groups.placeholders.groupDescription')}
+                    style={styles.input}
+                  />
+                  <Text style={styles.metadataLabel}>{t('groups.labels.groupType')}</Text>
+                  <View style={styles.metadataOptionsRow}>
+                    {groupTypeOptions.map((typeOption) => (
+                      <Pressable
+                        key={typeOption}
+                        style={[
+                          styles.metadataOptionChip,
+                          editingGroupType === typeOption ? styles.metadataOptionChipActive : null,
+                        ]}
+                        onPress={() => setEditingGroupType(typeOption)}
+                      >
+                        <Text
+                          style={[
+                            styles.metadataOptionText,
+                            editingGroupType === typeOption ? styles.metadataOptionTextActive : null,
+                          ]}
+                        >
+                          {typeOption}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.metadataLabel}>{t('groups.labels.groupPrivacy')}</Text>
+                  <View style={styles.metadataOptionsRow}>
+                    {groupPrivacyOptions.map((privacyOption) => (
+                      <Pressable
+                        key={privacyOption}
+                        style={[
+                          styles.metadataOptionChip,
+                          editingGroupPrivacy === privacyOption ? styles.metadataOptionChipActive : null,
+                        ]}
+                        onPress={() => setEditingGroupPrivacy(privacyOption)}
+                      >
+                        <Text
+                          style={[
+                            styles.metadataOptionText,
+                            editingGroupPrivacy === privacyOption ? styles.metadataOptionTextActive : null,
+                          ]}
+                        >
+                          {privacyOption}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={editingGroupPhotoUrl}
+                    onChangeText={setEditingGroupPhotoUrl}
+                    placeholder={t('groups.placeholders.groupPhotoUrl')}
+                    style={styles.input}
+                    autoCapitalize="none"
+                  />
+                  <View style={styles.adminActionsRow}>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        const nextName = editingGroupName.trim();
+                        if (!nextName) {
+                          return;
+                        }
+
+                        updateGroupMutation.mutate({
+                          groupId: item.id,
+                          name: nextName,
+                          description: editingGroupDescription,
+                          groupType: editingGroupType,
+                          groupPrivacy: editingGroupPrivacy,
+                          photoUrl: editingGroupPhotoUrl.trim() || undefined,
+                        });
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.secondaryButtonText}>{t('common.actions.save')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        setEditingGroupId('');
+                        setEditingGroupName('');
+                        setEditingGroupDescription('');
+                        setEditingGroupType(groupTypeOptions[0]);
+                        setEditingGroupPrivacy(groupPrivacyOptions[0]);
+                        setEditingGroupPhotoUrl('');
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.secondaryButtonText}>{t('common.actions.cancel')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.dangerButton}
+                      onPress={() => {
+                        Alert.alert(
+                          t('groups.alerts.deleteGroupConfirmTitle'),
+                          t('groups.alerts.deleteGroupConfirmBody'),
+                          [
+                            { text: t('common.actions.cancel'), style: 'cancel' },
+                            {
+                              text: t('groups.buttons.deleteGroup'),
+                              style: 'destructive',
+                              onPress: () =>
+                                deleteGroupMutation.mutate({
+                                  groupId: item.id,
+                                  postPolicy: 'detach',
+                                }),
+                            },
+                          ],
+                        );
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.dangerButtonText}>{t('groups.buttons.deleteGroup')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
 
               {membersGroupId === item.id ? (
                 <View style={styles.membersPanel}>
@@ -713,7 +1350,11 @@ export function GroupsScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.centerState}>
-              <Text style={styles.subtitle}>{t('groups.subtitle.noGroups')}</Text>
+              <Text style={styles.subtitle}>
+                {groupSortFilter === 'favorites'
+                  ? t('groups.subtitle.noFavoriteGroups')
+                  : t('groups.subtitle.noGroups')}
+              </Text>
             </View>
           }
         />
@@ -805,6 +1446,34 @@ const styles = StyleSheet.create({
     color: '#0B6E4F',
     fontWeight: '700',
   },
+  warningButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#B45309',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFBEB',
+  },
+  warningButtonText: {
+    color: '#B45309',
+    fontWeight: '700',
+  },
+  dangerButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF2F2',
+  },
+  dangerButtonText: {
+    color: '#B91C1C',
+    fontWeight: '700',
+  },
   tokenText: {
     marginTop: 8,
     color: '#1E293B',
@@ -859,6 +1528,97 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 0,
   },
+  groupMetadataComposerCard: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    marginBottom: 8,
+  },
+  metadataLabel: {
+    marginTop: 10,
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  metadataOptionsRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metadataOptionChip: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  metadataOptionChipActive: {
+    borderColor: '#0B6E4F',
+    backgroundColor: '#DCFCE7',
+  },
+  metadataOptionText: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metadataOptionTextActive: {
+    color: '#166534',
+  },
+  groupListHeaderRow: {
+    marginBottom: 8,
+  },
+  groupListTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  groupFilterRow: {
+    marginTop: 8,
+    paddingRight: 8,
+  },
+  groupFilterChip: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  groupFilterChipActive: {
+    borderColor: '#0B6E4F',
+    backgroundColor: '#DCFCE7',
+  },
+  groupFilterChipText: {
+    color: '#334155',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  groupFilterChipTextActive: {
+    color: '#166534',
+  },
+  adminPanel: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  adminPanelTitle: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  adminActionsRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   groupCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -871,6 +1631,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  groupIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  groupIdentityTextColumn: {
+    flex: 1,
+  },
+  groupPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
+  },
+  groupPhotoPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupPhotoPlaceholderText: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  groupMetaSecondary: {
+    marginTop: 4,
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '600',
   },
   groupDescription: {
     marginTop: 6,
@@ -885,6 +1678,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: 'row',
     gap: 8,
+  },
+  favoriteButtonActive: {
+    borderColor: '#D97706',
+    backgroundColor: '#FFF7ED',
+  },
+  favoriteButtonTextActive: {
+    color: '#B45309',
   },
   membersPanel: {
     marginTop: 10,
@@ -943,6 +1743,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 11,
+  },
+  requiredBadge: {
+    borderWidth: 1,
+    borderColor: '#0B6E4F',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 1,
+  },
+  requiredBadgeText: {
+    color: '#166534',
+    fontSize: 10,
+    fontWeight: '700',
   },
   starterGroupTextColumn: {
     flex: 1,

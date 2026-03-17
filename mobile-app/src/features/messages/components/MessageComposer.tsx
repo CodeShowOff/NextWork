@@ -69,8 +69,14 @@ export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
         placeholder={t('messages.composer.placeholder')}
         style={styles.input}
         multiline
+        accessibilityLabel={t('messages.composer.placeholder')}
       />
-      <Pressable style={[styles.button, isSending ? styles.disabledButton : null]} onPress={submit}>
+      <Pressable
+        style={[styles.button, isSending ? styles.disabledButton : null]}
+        onPress={submit}
+        accessibilityRole="button"
+        accessibilityLabel={t('messages.composer.send')}
+      >
         <Text style={styles.buttonText}>{isSending ? t('messages.composer.sending') : t('messages.composer.send')}</Text>
       </Pressable>
     </View>

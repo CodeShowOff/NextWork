@@ -1,0 +1,31 @@
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+
+import { GROUP_PRIVACY_OPTIONS, GROUP_TYPE_OPTIONS } from '../groups.constants';
+
+export class UpdateGroupDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...GROUP_TYPE_OPTIONS])
+  groupType?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...GROUP_PRIVACY_OPTIONS])
+  groupPrivacy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  photoUrl?: string;
+}

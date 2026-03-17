@@ -47,6 +47,23 @@ describe('NotificationsController Integration', () => {
     }),
     muteActor: jest.fn().mockResolvedValue({ status: 'ok' }),
     unmuteActor: jest.fn().mockResolvedValue({ status: 'ok' }),
+    sendThanks: jest.fn().mockResolvedValue({
+      status: 'ok',
+      delivered: true,
+      muted: false,
+      notificationId: 'n-thanks-1',
+      conversationId: null,
+      messageId: null,
+    }),
+    openNotification: jest.fn().mockResolvedValue({
+      status: 'ok',
+      readApplied: true,
+      action: {
+        target: 'messages',
+        entityType: 'conversation',
+        entityId: 'c1',
+      },
+    }),
   };
 
   const authGuardMock = {
@@ -145,5 +162,29 @@ describe('NotificationsController Integration', () => {
     await request(app.getHttpServer()).delete(`/notifications/muted-users/${mutedUserId}`).expect(200);
 
     expect(notificationsServiceMock.unmuteActor).toHaveBeenCalledWith('u1', mutedUserId);
+  });
+
+  it('POST /notifications/profile-actions/thanks sends thanks action', async () => {
+    const payload = {
+      targetUserId: '9f2f3161-26bc-4f6a-a57d-a4eb9f9ad99f',
+      notificationType: 'thanks',
+      messageTemplate: 'Thanks for helping with onboarding.',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/notifications/profile-actions/thanks')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body.status).toBe('ok');
+    expect(notificationsServiceMock.sendThanks).toHaveBeenCalledWith('u1', payload);
+  });
+
+  it('POST /notifications/:id/open returns canonical deeplink action', async () => {
+    const response = await request(app.getHttpServer()).post('/notifications/n-open-1/open').expect(201);
+
+    expect(response.body.status).toBe('ok');
+    expect(response.body.action.target).toBe('messages');
+    expect(notificationsServiceMock.openNotification).toHaveBeenCalledWith('u1', 'n-open-1');
   });
 });

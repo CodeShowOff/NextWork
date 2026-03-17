@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 
 import { BackgroundJobsService } from '../../common/reliability/background-jobs.service';
 import { MediaService } from '../media/media.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostsRepository } from './posts.repository';
 import { PostsService } from './posts.service';
@@ -27,10 +28,27 @@ describe('PostsService media URL validation', () => {
     isPublicMediaUrlAllowed: jest.fn(),
   } as unknown as jest.Mocked<MediaService>;
 
+  const notificationsServiceMock: jest.Mocked<NotificationsService> = {
+    createNotification: jest.fn(),
+    listForUser: jest.fn(),
+    getUnreadCount: jest.fn(),
+    markRead: jest.fn(),
+    markAllRead: jest.fn(),
+    getNotificationCreatedChannel: jest.fn(),
+    getNotificationReadChannel: jest.fn(),
+    getPreferences: jest.fn(),
+    updatePreferences: jest.fn(),
+    listMutedActors: jest.fn(),
+    muteActor: jest.fn(),
+    unmuteActor: jest.fn(),
+    sendThanks: jest.fn(),
+  } as unknown as jest.Mocked<NotificationsService>;
+
   const service = new PostsService(
     postsRepositoryMock,
     backgroundJobsServiceMock,
     mediaServiceMock,
+    notificationsServiceMock,
   );
 
   beforeEach(() => {

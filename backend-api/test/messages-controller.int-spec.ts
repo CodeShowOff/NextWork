@@ -36,6 +36,7 @@ describe('MessagesController Integration', () => {
       items: [],
       nextCursor: null,
     }),
+    getUnreadCount: jest.fn().mockResolvedValue({ unreadCount: 3 }),
     listMessages: jest.fn().mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -55,6 +56,20 @@ describe('MessagesController Integration', () => {
       },
     }),
     markConversationRead: jest.fn().mockResolvedValue(undefined),
+    updateMessage: jest.fn().mockResolvedValue({
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u1',
+      body: 'Edited hello',
+      messageType: 'text',
+      createdAt: '2026-03-16T00:00:00.000Z',
+      editedAt: '2026-03-16T00:01:00.000Z',
+      sender: {
+        id: 'u1',
+        displayName: 'User One',
+        avatarUrl: null,
+      },
+    }),
   };
 
   const authGuardMock = {
@@ -116,6 +131,13 @@ describe('MessagesController Integration', () => {
     });
   });
 
+  it('GET /messages/unread-count returns aggregate count', async () => {
+    const response = await request(app.getHttpServer()).get('/messages/unread-count').expect(200);
+
+    expect(response.body.unreadCount).toBe(3);
+    expect(messagesServiceMock.getUnreadCount).toHaveBeenCalledWith('u1');
+  });
+
   it('GET /messages/conversations/:id/messages delegates request', async () => {
     await request(app.getHttpServer())
       .get('/messages/conversations/c1/messages?before=2026-03-16T01:00:00.000Z')
@@ -151,5 +173,19 @@ describe('MessagesController Integration', () => {
       'c1',
       '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
     );
+  });
+
+  it('PATCH /messages/conversations/:id/messages/:messageId updates a message', async () => {
+    const payload = {
+      body: 'Edited hello',
+    };
+
+    const response = await request(app.getHttpServer())
+      .patch('/messages/conversations/c1/messages/m1')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body.editedAt).toBe('2026-03-16T00:01:00.000Z');
+    expect(messagesServiceMock.updateMessage).toHaveBeenCalledWith('u1', 'c1', 'm1', payload);
   });
 });

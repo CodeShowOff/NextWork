@@ -11,6 +11,7 @@ describe('ProfilesService', () => {
     findByUserId: jest.fn(),
     updateByUserId: jest.fn(),
     countPostsByUserId: jest.fn(),
+    countGroupsFollowedByUserId: jest.fn(),
     getFollowCounts: jest.fn(),
     isFollowing: jest.fn(),
   } as unknown as ProfilesRepository;
@@ -48,6 +49,7 @@ describe('ProfilesService', () => {
       updatedAt: new Date('2026-03-16T00:00:00.000Z'),
     });
     (profilesRepositoryMock.countPostsByUserId as jest.Mock).mockResolvedValue(7);
+    (profilesRepositoryMock.countGroupsFollowedByUserId as jest.Mock).mockResolvedValue(4);
     (profilesRepositoryMock.getFollowCounts as jest.Mock).mockResolvedValue([11, 5]);
     (profilesRepositoryMock.isFollowing as jest.Mock).mockResolvedValue(true);
 
@@ -56,6 +58,8 @@ describe('ProfilesService', () => {
     expect(result.counters.posts).toBe(7);
     expect(result.counters.followers).toBe(11);
     expect(result.counters.following).toBe(5);
+    expect(result.counters.groupsFollowed).toBe(4);
+    expect(result.counters.skillsEntries).toBe(0);
     expect(result.relationship.isFollowing).toBe(true);
   });
 

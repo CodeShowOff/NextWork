@@ -90,6 +90,28 @@ function applyReadEvent(
   return mergeConversation(data, updatedConversation);
 }
 
+function applyEditedMessageEvent(
+  data: InfiniteData<PaginatedResponse<Conversation>> | undefined,
+  event: ConversationMessageEvent,
+): InfiniteData<PaginatedResponse<Conversation>> | undefined {
+  if (!data) {
+    return data;
+  }
+
+  const all = data.pages.flatMap((page) => page.items);
+  const target = all.find((conversation) => conversation.id === event.conversationId);
+  if (!target || !target.lastMessage || target.lastMessage.id !== event.message.id) {
+    return data;
+  }
+
+  const updatedConversation: Conversation = {
+    ...target,
+    lastMessage: event.message,
+  };
+
+  return mergeConversation(data, updatedConversation);
+}
+
 export function useConversations() {
   const queryClient = useQueryClient();
   const currentUserId = useSessionStore((state) => state.userId);
@@ -109,13 +131,22 @@ export function useConversations() {
         );
       };
 
+    const onConversationMessageEdited = (event: ConversationMessageEvent) => {
+      queryClient.setQueryData<InfiniteData<PaginatedResponse<Conversation>>>(
+        messagesKeys.conversations(),
+        (current) => applyEditedMessageEvent(current, event),
+      );
+    };
+
     const socket = connectMessagesSocket({
       onConversationMessage,
+      onConversationMessageEdited,
       onRead,
     });
 
     return () => {
       socket.off('conversation.message', onConversationMessage);
+      socket.off('conversation.message_edited', onConversationMessageEdited);
       socket.off('message.read', onRead);
       socket.off('conversation.read', onRead);
     };

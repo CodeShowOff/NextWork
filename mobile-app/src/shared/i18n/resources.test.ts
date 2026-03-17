@@ -63,4 +63,21 @@ describe('i18n resources', () => {
     const pseudoTitle = i18n.t('app.tabs.notifications');
     expect(pseudoTitle).toContain('Expanded');
   });
+
+  it('includes real non-English locales for release localization checks', async () => {
+    const i18n = i18next.createInstance();
+    await i18n.init({
+      resources,
+      lng: 'es',
+      fallbackLng: 'en',
+      interpolation: {
+        escapeValue: false,
+      },
+    });
+
+    expect(i18n.t('app.tabs.feed')).toBe('Inicio');
+
+    await i18n.changeLanguage('fr');
+    expect(i18n.t('app.tabs.feed')).toBe('Fil');
+  });
 });

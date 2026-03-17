@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
@@ -9,6 +9,7 @@ import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import {
   ConversationView,
   MessageView,
@@ -41,6 +42,11 @@ export class MessagesController {
     return this.messagesService.listConversations(user.sub, query);
   }
 
+  @Get('unread-count')
+  getUnreadCount(@CurrentUser() user: JwtPayload): Promise<{ unreadCount: number }> {
+    return this.messagesService.getUnreadCount(user.sub);
+  }
+
   @Get('conversations/:conversationId/messages')
   listMessages(
     @CurrentUser() user: JwtPayload,
@@ -68,6 +74,16 @@ export class MessagesController {
     }
 
     return this.messagesService.sendMessage(user.sub, conversationId, payload);
+  }
+
+  @Patch('conversations/:conversationId/messages/:messageId')
+  updateMessage(
+    @CurrentUser() user: JwtPayload,
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
+    @Body() payload: UpdateMessageDto,
+  ): Promise<MessageView> {
+    return this.messagesService.updateMessage(user.sub, conversationId, messageId, payload);
   }
 
   @Post('conversations/:conversationId/read')

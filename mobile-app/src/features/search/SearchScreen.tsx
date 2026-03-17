@@ -21,6 +21,16 @@ export function SearchScreen() {
   const navigation = useNavigation();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [usersNextCursor, setUsersNextCursor] = useState<string | null>(null);
+  const [groupsNextCursor, setGroupsNextCursor] = useState<string | null>(null);
+  const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
+  const [requestedUsersCursor, setRequestedUsersCursor] = useState<string | null>(null);
+  const [requestedGroupsCursor, setRequestedGroupsCursor] = useState<string | null>(null);
+  const [requestedPostsCursor, setRequestedPostsCursor] = useState<string | null>(null);
+  const [activeScope, setActiveScope] = useState<'all' | 'users' | 'groups' | 'posts'>('all');
+  const [users, setUsers] = useState<Awaited<ReturnType<typeof searchAll>>['users']>([]);
+  const [groups, setGroups] = useState<Awaited<ReturnType<typeof searchAll>>['groups']>([]);
+  const [posts, setPosts] = useState<Awaited<ReturnType<typeof searchAll>>['posts']>([]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -32,30 +42,99 @@ export function SearchScreen() {
     };
   }, [query]);
 
+  useEffect(() => {
+    setUsersNextCursor(null);
+    setGroupsNextCursor(null);
+    setPostsNextCursor(null);
+    setRequestedUsersCursor(null);
+    setRequestedGroupsCursor(null);
+    setRequestedPostsCursor(null);
+    setActiveScope('all');
+    setUsers([]);
+    setGroups([]);
+    setPosts([]);
+  }, [debouncedQuery]);
+
   const searchQuery = useQuery({
-    queryKey: ['search', debouncedQuery],
-    queryFn: () => searchAll({ query: debouncedQuery, limit: 10 }),
+    queryKey: [
+      'search',
+      debouncedQuery,
+      requestedUsersCursor,
+      requestedGroupsCursor,
+      requestedPostsCursor,
+      activeScope,
+    ],
+    queryFn: () =>
+      searchAll({
+        query: debouncedQuery,
+        limit: 10,
+        usersCursor:
+          activeScope === 'all' || activeScope === 'users' ? requestedUsersCursor ?? undefined : undefined,
+        groupsCursor:
+          activeScope === 'all' || activeScope === 'groups' ? requestedGroupsCursor ?? undefined : undefined,
+        postsCursor:
+          activeScope === 'all' || activeScope === 'posts' ? requestedPostsCursor ?? undefined : undefined,
+        scope: activeScope,
+      }),
     enabled: debouncedQuery.length > 0,
   });
 
-  const hasResults = useMemo(() => {
+  useEffect(() => {
     if (!searchQuery.data) {
+      return;
+    }
+
+    const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {
+      const existing = new Set(current.map((item) => item.id));
+      return [...current, ...incoming.filter((item) => !existing.has(item.id))];
+    };
+
+    if (activeScope === 'all' || activeScope === 'users') {
+      setUsers((current) =>
+        activeScope === 'all' && requestedUsersCursor === null
+          ? searchQuery.data.users
+          : mergeById(current, searchQuery.data.users),
+      );
+      setUsersNextCursor(searchQuery.data.pageInfo.usersNextCursor);
+    }
+    if (activeScope === 'all' || activeScope === 'groups') {
+      setGroups((current) =>
+        activeScope === 'all' && requestedGroupsCursor === null
+          ? searchQuery.data.groups
+          : mergeById(current, searchQuery.data.groups),
+      );
+      setGroupsNextCursor(searchQuery.data.pageInfo.groupsNextCursor);
+    }
+    if (activeScope === 'all' || activeScope === 'posts') {
+      setPosts((current) =>
+        activeScope === 'all' && requestedPostsCursor === null
+          ? searchQuery.data.posts
+          : mergeById(current, searchQuery.data.posts),
+      );
+      setPostsNextCursor(searchQuery.data.pageInfo.postsNextCursor);
+    }
+  }, [
+    activeScope,
+    requestedGroupsCursor,
+    requestedPostsCursor,
+    requestedUsersCursor,
+    searchQuery.data,
+  ]);
+
+  const hasResults = useMemo(() => {
+    if (!debouncedQuery) {
       return false;
     }
 
-    return (
-      searchQuery.data.users.length > 0 ||
-      searchQuery.data.groups.length > 0 ||
-      searchQuery.data.posts.length > 0
-    );
-  }, [searchQuery.data]);
+    return users.length > 0 || groups.length > 0 || posts.length > 0;
+  }, [debouncedQuery, groups.length, posts.length, users.length]);
 
   const renderSearchHint = () => {
     if (!debouncedQuery) {
       return <Text style={styles.hintText}>{t('search.hint')}</Text>;
     }
 
-    if (searchQuery.isLoading) {
+    if (searchQuery.isLoading && !hasResults) {
       return <ActivityIndicator size="small" color="#0B6E4F" />;
     }
 
@@ -87,10 +166,10 @@ export function SearchScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {renderSearchHint()}
 
-        {searchQuery.data?.users.length ? (
+        {users.length ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('search.sections.users')}</Text>
-            {searchQuery.data.users.map((user) => (
+            {users.map((user) => (
               <Pressable
                 key={user.id}
                 style={styles.itemCard}
@@ -105,13 +184,25 @@ export function SearchScreen() {
                 <Text style={styles.itemMeta}>{user.email}</Text>
               </Pressable>
             ))}
+            {usersNextCursor ? (
+              <Pressable
+                style={styles.loadMoreButton}
+                onPress={() => {
+                  setActiveScope('users');
+                  setRequestedUsersCursor(usersNextCursor);
+                }}
+                disabled={searchQuery.isFetching}
+              >
+                <Text style={styles.loadMoreText}>{t('search.actions.loadMoreUsers')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
-        {searchQuery.data?.groups.length ? (
+        {groups.length ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('search.sections.groups')}</Text>
-            {searchQuery.data.groups.map((group) => (
+            {groups.map((group) => (
               <Pressable
                 key={group.id}
                 style={styles.itemCard}
@@ -129,13 +220,25 @@ export function SearchScreen() {
                 {group.description ? <Text style={styles.itemMeta}>{group.description}</Text> : null}
               </Pressable>
             ))}
+            {groupsNextCursor ? (
+              <Pressable
+                style={styles.loadMoreButton}
+                onPress={() => {
+                  setActiveScope('groups');
+                  setRequestedGroupsCursor(groupsNextCursor);
+                }}
+                disabled={searchQuery.isFetching}
+              >
+                <Text style={styles.loadMoreText}>{t('search.actions.loadMoreGroups')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
-        {searchQuery.data?.posts.length ? (
+        {posts.length ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('search.sections.posts')}</Text>
-            {searchQuery.data.posts.map((post) => (
+            {posts.map((post) => (
               <Pressable
                 key={post.id}
                 style={styles.itemCard}
@@ -149,6 +252,9 @@ export function SearchScreen() {
                     createdAt: post.createdAt,
                     updatedAt: post.createdAt,
                     media: [],
+                    taggedUserIds: [],
+                    hashtags: [],
+                    poll: null,
                     author: post.author,
                     stats: {
                       likeCount: 0,
@@ -168,6 +274,18 @@ export function SearchScreen() {
                 </Text>
               </Pressable>
             ))}
+            {postsNextCursor ? (
+              <Pressable
+                style={styles.loadMoreButton}
+                onPress={() => {
+                  setActiveScope('posts');
+                  setRequestedPostsCursor(postsNextCursor);
+                }}
+                disabled={searchQuery.isFetching}
+              >
+                <Text style={styles.loadMoreText}>{t('search.actions.loadMorePosts')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>
@@ -238,5 +356,20 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     textAlign: 'center',
     marginTop: 12,
+  },
+  loadMoreButton: {
+    borderWidth: 1,
+    borderColor: '#0B6E4F',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  loadMoreText: {
+    color: '#0B6E4F',
+    fontWeight: '700',
+    fontSize: 12,
   },
 });

@@ -12,6 +12,9 @@ describe('MessagesService', () => {
   const messagesRepositoryMock = {
     assertParticipant: jest.fn(),
     createMessage: jest.fn(),
+    updateMessageBody: jest.fn(),
+    findMessageForConversation: jest.fn(),
+    countUnreadMessagesForUser: jest.fn(),
     listParticipantIds: jest.fn(),
     listMessagesForConversation: jest.fn(),
   } as unknown as MessagesRepository;
@@ -116,5 +119,53 @@ describe('MessagesService', () => {
     await expect(service.listMessages('u3', 'c1', { limit: 20 })).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('allows sender to edit message and publishes edited event', async () => {
+    (messagesRepositoryMock.assertParticipant as jest.Mock).mockResolvedValue(true);
+    (messagesRepositoryMock.findMessageForConversation as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u1',
+      body: 'Old body',
+      createdAt: new Date('2026-03-16T01:00:00.000Z'),
+      editedAt: null,
+    });
+    (messagesRepositoryMock.updateMessageBody as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u1',
+      body: 'New body',
+      messageType: 'text',
+      createdAt: new Date('2026-03-16T01:00:00.000Z'),
+      editedAt: new Date('2026-03-16T01:10:00.000Z'),
+      sender: {
+        id: 'u1',
+        profile: {
+          displayName: 'User One',
+          avatarUrl: null,
+        },
+      },
+    });
+    (messagesRepositoryMock.listParticipantIds as jest.Mock).mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+    ]);
+
+    const result = await service.updateMessage('u1', 'c1', 'm1', { body: 'New body' });
+
+    expect(result.body).toBe('New body');
+    expect(redisPublishMock).toHaveBeenCalledWith(
+      service.getEditChannelName(),
+      expect.stringContaining('"conversationId":"c1"'),
+    );
+  });
+
+  it('returns aggregate unread count for badge sync', async () => {
+    (messagesRepositoryMock.countUnreadMessagesForUser as jest.Mock).mockResolvedValue(9);
+
+    const result = await service.getUnreadCount('u1');
+
+    expect(result).toEqual({ unreadCount: 9 });
   });
 });

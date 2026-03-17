@@ -6,9 +6,13 @@ import { GroupsService } from './groups.service';
 describe('GroupsService starter onboarding', () => {
   const groupsRepositoryMock: Partial<Record<keyof GroupsRepository, jest.Mock>> = {
     findOrganizationMembership: jest.fn(),
+    findOrganizationMembershipWithRole: jest.fn(),
     getOnboardingAudit: jest.fn(),
     ensureStarterGroup: jest.fn(),
     upsertOnboardingAudit: jest.fn(),
+    findGroupById: jest.fn(),
+    updateGroup: jest.fn(),
+    deleteGroupWithPostPolicy: jest.fn(),
   };
 
   const service = new GroupsService(groupsRepositoryMock as unknown as GroupsRepository);
@@ -22,6 +26,23 @@ describe('GroupsService starter onboarding', () => {
       name,
     }));
     groupsRepositoryMock.upsertOnboardingAudit?.mockResolvedValue(undefined);
+    groupsRepositoryMock.findGroupById?.mockResolvedValue({
+      id: 'g1',
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      name: 'General',
+    });
+    groupsRepositoryMock.findOrganizationMembershipWithRole?.mockResolvedValue({ role: 'owner' });
+    groupsRepositoryMock.updateGroup?.mockResolvedValue({
+      id: 'g1',
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      name: 'Renamed',
+      description: 'Updated',
+      groupType: 'Discussions',
+      groupPrivacy: 'Closed',
+      photoUrl: 'https://example.com/group.jpg',
+      updatedAt: new Date('2026-03-17T00:00:00.000Z'),
+    });
+    groupsRepositoryMock.deleteGroupWithPostPolicy?.mockResolvedValue({ affectedPosts: 3 });
   });
 
   it('initializes selected starter groups for subset selection', async () => {
@@ -59,7 +80,7 @@ describe('GroupsService starter onboarding', () => {
     expect(groupsRepositoryMock.ensureStarterGroup).toHaveBeenCalledTimes(5);
   });
 
-  it('supports skip onboarding without creating groups', async () => {
+  it('supports skip onboarding while still creating General', async () => {
     const result = await service.initializeStarterGroups('u1', {
       organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
       selectedKeys: [],
@@ -67,8 +88,20 @@ describe('GroupsService starter onboarding', () => {
     });
 
     expect(result.skipped).toBe(true);
-    expect(result.createdGroupIds).toEqual([]);
-    expect(groupsRepositoryMock.ensureStarterGroup).not.toHaveBeenCalled();
+    expect(result.selectedKeys).toEqual(['general']);
+    expect(result.createdGroupIds).toHaveLength(1);
+    expect(groupsRepositoryMock.ensureStarterGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it('always includes General when selection omits it', async () => {
+    const result = await service.initializeStarterGroups('u1', {
+      organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
+      selectedKeys: ['project-updates'],
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(result.selectedKeys).toEqual(['project-updates', 'general']);
+    expect(groupsRepositoryMock.ensureStarterGroup).toHaveBeenCalledTimes(2);
   });
 
   it('returns alreadyInitialized on retries and does not create duplicates', async () => {
@@ -111,5 +144,51 @@ describe('GroupsService starter onboarding', () => {
     expect(result.organizationId).toBe('89ce5ff7-bc2a-4df8-b56b-b8e92f93e928');
     expect(result.onboardingCompleted).toBe(false);
     expect(result.catalog.length).toBeGreaterThan(0);
+  });
+
+  it('allows owner/admin to update group metadata', async () => {
+    const result = await service.updateGroup('u1', 'g1', {
+      name: 'Renamed',
+      description: 'Updated',
+      groupType: 'Discussions',
+      groupPrivacy: 'Closed',
+      photoUrl: 'https://example.com/group.jpg',
+    });
+
+    expect(result.name).toBe('Renamed');
+    expect(result.groupType).toBe('Discussions');
+    expect(result.groupPrivacy).toBe('Closed');
+    expect(result.photoUrl).toBe('https://example.com/group.jpg');
+    expect(groupsRepositoryMock.updateGroup).toHaveBeenCalledWith('g1', {
+      name: 'Renamed',
+      description: 'Updated',
+      groupType: 'Discussions',
+      groupPrivacy: 'Closed',
+      photoUrl: 'https://example.com/group.jpg',
+    });
+  });
+
+  it('rejects group update for non-admin members', async () => {
+    groupsRepositoryMock.findOrganizationMembershipWithRole?.mockResolvedValue({ role: 'member' });
+
+    await expect(
+      service.updateGroup('u1', 'g1', {
+        name: 'Renamed',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('deletes group with detach post policy by default', async () => {
+    const result = await service.deleteGroup('u1', 'g1');
+
+    expect(result.postPolicy).toBe('detach');
+    expect(groupsRepositoryMock.deleteGroupWithPostPolicy).toHaveBeenCalledWith('g1', 'detach');
+  });
+
+  it('supports remove post policy when deleting group', async () => {
+    const result = await service.deleteGroup('u1', 'g1', { postPolicy: 'remove' });
+
+    expect(result.postPolicy).toBe('remove');
+    expect(groupsRepositoryMock.deleteGroupWithPostPolicy).toHaveBeenCalledWith('g1', 'remove');
   });
 });

@@ -42,6 +42,23 @@ function pushMessage(
   };
 }
 
+function applyEditedMessage(
+  data: InfiniteData<PaginatedResponse<Message>> | undefined,
+  message: Message,
+): InfiniteData<PaginatedResponse<Message>> | undefined {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    pageParams: data.pageParams,
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) => (item.id === message.id ? { ...item, ...message } : item)),
+    })),
+  };
+}
+
 export function useMessages(conversationId: string) {
   const queryClient = useQueryClient();
   const currentUserId = useSessionStore((state) => state.userId);
@@ -96,6 +113,17 @@ export function useMessages(conversationId: string) {
       }
     };
 
+    const onMessageEdited = (message: Message) => {
+      if (message.conversationId !== conversationId) {
+        return;
+      }
+
+      queryClient.setQueryData<InfiniteData<PaginatedResponse<Message>>>(
+        messagesKeys.conversationMessages(conversationId),
+        (current) => applyEditedMessage(current, message),
+      );
+    };
+
     const onTypingStart = (event: { conversationId: string; userId: string }) => {
       if (event.conversationId !== conversationId || event.userId === currentUserId) {
         return;
@@ -113,6 +141,7 @@ export function useMessages(conversationId: string) {
     };
 
     socket.on('message.new', onNewMessage);
+    socket.on('message.edited', onMessageEdited);
     socket.on('message.read', onRead);
     socket.on('conversation.read', onRead);
     socket.on('typing.start', onTypingStart);
@@ -121,6 +150,7 @@ export function useMessages(conversationId: string) {
     return () => {
       socket.emit('leave_conversation', { conversationId });
       socket.off('message.new', onNewMessage);
+      socket.off('message.edited', onMessageEdited);
       socket.off('message.read', onRead);
       socket.off('conversation.read', onRead);
       socket.off('typing.start', onTypingStart);

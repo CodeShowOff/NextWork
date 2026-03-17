@@ -18,6 +18,8 @@ export interface ProfileView {
     posts: number;
     followers: number;
     following: number;
+    groupsFollowed: number;
+    skillsEntries: number;
   };
   relationship: {
     isFollowing: boolean;
@@ -29,6 +31,8 @@ interface ProfileSummary {
   postCount: number;
   followersCount: number;
   followingCount: number;
+  groupsFollowedCount: number;
+  skillsEntriesCount: number;
 }
 
 @Injectable()
@@ -55,6 +59,8 @@ export class ProfilesService {
         posts: summary.postCount,
         followers: summary.followersCount,
         following: summary.followingCount,
+        groupsFollowed: summary.groupsFollowedCount,
+        skillsEntries: summary.skillsEntriesCount,
       },
       relationship: {
         isFollowing,
@@ -92,9 +98,10 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found');
     }
 
-    const [postCount, [followersCount, followingCount]] = await Promise.all([
+    const [postCount, [followersCount, followingCount], groupsFollowedCount] = await Promise.all([
       this.profilesRepository.countPostsByUserId(userId),
       this.profilesRepository.getFollowCounts(userId),
+      this.profilesRepository.countGroupsFollowedByUserId(userId),
     ]);
 
     const summary: ProfileSummary = {
@@ -102,6 +109,8 @@ export class ProfilesService {
       postCount,
       followersCount,
       followingCount,
+      groupsFollowedCount,
+      skillsEntriesCount: 0,
     };
 
     await this.cacheService.setJson(cacheKey, summary, 120);

@@ -16,16 +16,41 @@ export class GroupsRepository {
     return this.prisma as PrismaService & Record<string, any>;
   }
 
-  listGroups(organizationId: string): Promise<
+  private get groupModel(): any {
+    return this.orm.group as any;
+  }
+
+  private async ensureGroupMetadataColumns(): Promise<void> {
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE groups ADD COLUMN IF NOT EXISTS group_type TEXT NOT NULL DEFAULT 'Teams & Projects'`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE groups ADD COLUMN IF NOT EXISTS group_privacy TEXT NOT NULL DEFAULT 'Open'`,
+    );
+    await this.prisma.$executeRawUnsafe(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_url TEXT`);
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE groups SET group_type = 'Teams & Projects' WHERE group_type IS NULL`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE groups SET group_privacy = 'Open' WHERE group_privacy IS NULL`,
+    );
+  }
+
+  async listGroups(organizationId: string): Promise<
     Array<{
       id: string;
       name: string;
       description: string | null;
+      groupType: string;
+      groupPrivacy: string;
+      photoUrl: string | null;
       createdAt: Date;
       _count: { members: number };
     }>
   > {
-    return this.orm.group.findMany({
+    await this.ensureGroupMetadataColumns();
+
+    return this.groupModel.findMany({
       where: {
         organizationId,
       },
@@ -36,6 +61,9 @@ export class GroupsRepository {
         id: true,
         name: true,
         description: true,
+        groupType: true,
+        groupPrivacy: true,
+        photoUrl: true,
         createdAt: true,
         _count: {
           select: {
@@ -51,12 +79,19 @@ export class GroupsRepository {
     createdBy: string;
     name: string;
     description?: string;
+    groupType: string;
+    groupPrivacy: string;
+    photoUrl?: string;
   }) {
-    return this.orm.group.create({
+    return this.ensureGroupMetadataColumns().then(() =>
+      this.groupModel.create({
       data: {
         organizationId: params.organizationId,
         name: params.name,
         description: params.description,
+        groupType: params.groupType,
+        groupPrivacy: params.groupPrivacy,
+        photoUrl: params.photoUrl,
         createdBy: params.createdBy,
         members: {
           create: {
@@ -68,6 +103,9 @@ export class GroupsRepository {
         id: true,
         name: true,
         description: true,
+        groupType: true,
+        groupPrivacy: true,
+        photoUrl: true,
         createdAt: true,
         _count: {
           select: {
@@ -75,7 +113,8 @@ export class GroupsRepository {
           },
         },
       },
-    });
+    }),
+    );
   }
 
   async findOrganizationMembership(userId: string, organizationId: string): Promise<boolean> {
@@ -94,8 +133,27 @@ export class GroupsRepository {
     return Boolean(row);
   }
 
-  findGroupById(groupId: string): Promise<{ id: string; organizationId: string; name: string } | null> {
-    return this.orm.group.findUnique({
+  findOrganizationMembershipWithRole(userId: string, organizationId: string): Promise<{
+    role: string;
+  } | null> {
+    return this.orm.organizationMember.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId,
+          userId,
+        },
+      },
+      select: {
+        role: true,
+      },
+    });
+  }
+
+  findGroupById(
+    groupId: string,
+  ): Promise<{ id: string; organizationId: string; name: string; groupType: string; groupPrivacy: string; photoUrl: string | null } | null> {
+    return this.ensureGroupMetadataColumns().then(() =>
+      this.groupModel.findUnique({
       where: {
         id: groupId,
       },
@@ -103,7 +161,89 @@ export class GroupsRepository {
         id: true,
         organizationId: true,
         name: true,
+        groupType: true,
+        groupPrivacy: true,
+        photoUrl: true,
       },
+    }),
+    );
+  }
+
+  updateGroup(
+    groupId: string,
+    payload: { name?: string; description?: string | null; groupType?: string; groupPrivacy?: string; photoUrl?: string | null },
+  ): Promise<{
+    id: string;
+    organizationId: string;
+    name: string;
+    description: string | null;
+    groupType: string;
+    groupPrivacy: string;
+    photoUrl: string | null;
+    updatedAt: Date;
+  }> {
+    return this.ensureGroupMetadataColumns().then(() =>
+      this.groupModel.update({
+      where: {
+        id: groupId,
+      },
+      data: {
+        ...(payload.name !== undefined ? { name: payload.name } : {}),
+        ...(payload.description !== undefined ? { description: payload.description } : {}),
+        ...(payload.groupType !== undefined ? { groupType: payload.groupType } : {}),
+        ...(payload.groupPrivacy !== undefined ? { groupPrivacy: payload.groupPrivacy } : {}),
+        ...(payload.photoUrl !== undefined ? { photoUrl: payload.photoUrl } : {}),
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        description: true,
+        groupType: true,
+        groupPrivacy: true,
+        photoUrl: true,
+        updatedAt: true,
+      },
+    }),
+    );
+  }
+
+  async deleteGroupWithPostPolicy(
+    groupId: string,
+    postPolicy: 'detach' | 'remove',
+  ): Promise<{ affectedPosts: number }> {
+    return this.orm.$transaction(async (tx: unknown) => {
+      const transaction = tx as Record<string, any>;
+
+      const affectedPosts =
+        postPolicy === 'remove'
+          ? (
+              await transaction.post.deleteMany({
+                where: {
+                  groupId,
+                },
+              })
+            ).count ?? 0
+          : (
+              await transaction.post.updateMany({
+                where: {
+                  groupId,
+                },
+                data: {
+                  groupId: null,
+                },
+              })
+            ).count ?? 0;
+
+      await transaction.group.delete({
+        where: {
+          id: groupId,
+        },
+      });
+
+      return {
+        affectedPosts,
+      };
     });
   }
 
@@ -164,8 +304,10 @@ export class GroupsRepository {
   async findGroupByOrganizationAndName(
     organizationId: string,
     name: string,
-  ): Promise<{ id: string; name: string; description: string | null } | null> {
-    return this.orm.group.findFirst({
+  ): Promise<{ id: string; name: string; description: string | null; groupType: string; groupPrivacy: string; photoUrl: string | null } | null> {
+    await this.ensureGroupMetadataColumns();
+
+    return this.groupModel.findFirst({
       where: {
         organizationId,
         name,
@@ -174,6 +316,9 @@ export class GroupsRepository {
         id: true,
         name: true,
         description: true,
+        groupType: true,
+        groupPrivacy: true,
+        photoUrl: true,
       },
     });
   }
@@ -183,7 +328,12 @@ export class GroupsRepository {
     createdBy: string;
     name: string;
     description: string;
+    groupType: string;
+    groupPrivacy: string;
+    photoUrl?: string;
   }): Promise<{ id: string; name: string }> {
+    await this.ensureGroupMetadataColumns();
+
     const existing = await this.findGroupByOrganizationAndName(params.organizationId, params.name);
     if (existing) {
       await this.joinGroup(params.createdBy, existing.id);
@@ -193,11 +343,14 @@ export class GroupsRepository {
       };
     }
 
-    const created = await this.orm.group.create({
+    const created = await this.groupModel.create({
       data: {
         organizationId: params.organizationId,
         name: params.name,
         description: params.description,
+        groupType: params.groupType,
+        groupPrivacy: params.groupPrivacy,
+        photoUrl: params.photoUrl,
         createdBy: params.createdBy,
       },
       select: {

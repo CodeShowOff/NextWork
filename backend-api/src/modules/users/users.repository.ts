@@ -8,6 +8,11 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   refreshTokenHash: string | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationTokenHash: string | null;
+  emailVerificationTokenExpiresAt: Date | null;
+  passwordResetTokenHash: string | null;
+  passwordResetTokenExpiresAt: Date | null;
   activeOrganizationId: string | null;
   status: string;
   createdAt: Date;
@@ -20,7 +25,7 @@ export class UsersRepository {
 
   async findById(id: string): Promise<UserRecord | null> {
     const rows = await this.prisma.$queryRaw<UserRecord[]>`
-      SELECT id, email, password_hash AS "passwordHash", refresh_token_hash AS "refreshTokenHash", active_organization_id AS "activeOrganizationId", status, created_at AS "createdAt", updated_at AS "updatedAt"
+      SELECT id, email, password_hash AS "passwordHash", refresh_token_hash AS "refreshTokenHash", email_verified_at AS "emailVerifiedAt", email_verification_token_hash AS "emailVerificationTokenHash", email_verification_token_expires_at AS "emailVerificationTokenExpiresAt", password_reset_token_hash AS "passwordResetTokenHash", password_reset_token_expires_at AS "passwordResetTokenExpiresAt", active_organization_id AS "activeOrganizationId", status, created_at AS "createdAt", updated_at AS "updatedAt"
       FROM users
       WHERE id = ${id}::uuid
       LIMIT 1
@@ -31,7 +36,7 @@ export class UsersRepository {
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     const rows = await this.prisma.$queryRaw<UserRecord[]>`
-      SELECT id, email, password_hash AS "passwordHash", refresh_token_hash AS "refreshTokenHash", active_organization_id AS "activeOrganizationId", status, created_at AS "createdAt", updated_at AS "updatedAt"
+      SELECT id, email, password_hash AS "passwordHash", refresh_token_hash AS "refreshTokenHash", email_verified_at AS "emailVerifiedAt", email_verification_token_hash AS "emailVerificationTokenHash", email_verification_token_expires_at AS "emailVerificationTokenExpiresAt", password_reset_token_hash AS "passwordResetTokenHash", password_reset_token_expires_at AS "passwordResetTokenExpiresAt", active_organization_id AS "activeOrganizationId", status, created_at AS "createdAt", updated_at AS "updatedAt"
       FROM users
       WHERE email = ${email}
       LIMIT 1
@@ -42,6 +47,35 @@ export class UsersRepository {
 
   create(data: Prisma.UserCreateInput): Promise<User> {
     return this.prisma.user.create({ data });
+  }
+
+  async createWithoutOrganization(params: {
+    email: string;
+    passwordHash: string;
+    displayName: string;
+    organizationSize?: string;
+    jobTitle?: string;
+  }): Promise<UserRecord> {
+    const user = await this.prisma.user.create({
+      data: {
+        email: params.email,
+        passwordHash: params.passwordHash,
+        profile: {
+          create: {
+            displayName: params.displayName,
+            organizationSize: params.organizationSize || null,
+            jobTitle: params.jobTitle || null,
+          },
+        },
+      },
+    });
+
+    const hydrated = await this.findById(user.id);
+    if (!hydrated) {
+      throw new Error('User was created but could not be loaded');
+    }
+
+    return hydrated;
   }
 
   async createWithOnboarding(params: {
@@ -109,6 +143,79 @@ export class UsersRepository {
       SET refresh_token_hash = ${refreshTokenHash}
       WHERE id = ${id}::uuid
     `;
+  }
+
+  async setEmailVerificationToken(
+    userId: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET email_verification_token_hash = ${tokenHash},
+          email_verification_token_expires_at = ${expiresAt}
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async clearEmailVerificationToken(userId: string): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET email_verification_token_hash = NULL,
+          email_verification_token_expires_at = NULL
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET email_verified_at = now(),
+          email_verification_token_hash = NULL,
+          email_verification_token_expires_at = NULL
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async setPasswordResetToken(
+    userId: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET password_reset_token_hash = ${tokenHash},
+          password_reset_token_expires_at = ${expiresAt}
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET password_reset_token_hash = NULL,
+          password_reset_token_expires_at = NULL
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE users
+      SET password_hash = ${passwordHash},
+          refresh_token_hash = NULL,
+          password_reset_token_hash = NULL,
+          password_reset_token_expires_at = NULL
+      WHERE id = ${userId}::uuid
+    `;
+  }
+
+  async deleteById(userId: string): Promise<void> {
+    await this.prisma.user.delete({
+      where: {
+        id: userId,
+      },
+    });
   }
 
   private async generateUniqueOrganizationSlug(

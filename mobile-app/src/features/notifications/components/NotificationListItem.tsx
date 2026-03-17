@@ -3,11 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { NotificationItem } from '../types';
+import { i18n } from '../../../shared/i18n/i18n';
 
 interface Props {
   item: NotificationItem;
   onPress: () => void;
   onLongPress?: () => void;
+  isActorMuted?: boolean;
 }
 
 function buildMessage(item: NotificationItem, t: (key: string, options?: Record<string, unknown>) => string): string {
@@ -22,13 +24,22 @@ function buildMessage(item: NotificationItem, t: (key: string, options?: Record<
       return t('notifications.item.comment', { actor });
     case 'message':
       return t('notifications.item.message', { actor });
+    case 'thanks':
+      return t('notifications.item.thanks', { actor });
+    case 'thanks-note':
+      return t('notifications.item.thanksNote', { actor });
     default:
       return t('notifications.item.fallback', { actor });
   }
 }
 
-export function NotificationListItem({ item, onPress, onLongPress }: Props) {
+export function NotificationListItem({ item, onPress, onLongPress, isActorMuted = false }: Props) {
   const { t } = useTranslation();
+  const message = buildMessage(item, t);
+  const createdAtText = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(item.createdAt));
 
   return (
     <Pressable
@@ -36,12 +47,16 @@ export function NotificationListItem({ item, onPress, onLongPress }: Props) {
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
+      accessibilityRole="button"
+      accessibilityLabel={message}
+      accessibilityHint={t('notifications.item.muteHint')}
     >
       <View style={styles.row}>
-        <Text style={styles.message}>{buildMessage(item, t)}</Text>
+        <Text style={styles.message}>{message}</Text>
         {!item.isRead ? <View style={styles.dot} /> : null}
       </View>
-      <Text style={styles.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
+      <Text style={styles.meta}>{createdAtText}</Text>
+      {isActorMuted ? <Text style={styles.mutedLabel}>{t('notifications.labels.muted')}</Text> : null}
       {item.actor ? <Text style={styles.hint}>{t('notifications.item.muteHint')}</Text> : null}
     </Pressable>
   );
@@ -74,6 +89,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: '#64748B',
     fontSize: 12,
+  },
+  mutedLabel: {
+    marginTop: 4,
+    color: '#B45309',
+    fontWeight: '700',
+    fontSize: 11,
   },
   hint: {
     marginTop: 4,

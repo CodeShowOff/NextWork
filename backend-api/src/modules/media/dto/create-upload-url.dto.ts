@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -6,6 +6,8 @@ const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 export class CreateUploadUrlDto {
   @ApiProperty({ description: 'Original client filename' })
   @IsString()
+  @MaxLength(120)
+  @Matches(/^[A-Za-z0-9._-]+$/)
   fileName!: string;
 
   @ApiProperty({ enum: ALLOWED_CONTENT_TYPES })

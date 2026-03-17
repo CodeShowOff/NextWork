@@ -176,4 +176,82 @@ export class PostsRepository {
 
     return rows.map((row: { userId: string }) => row.userId);
   }
+
+  findById(postId: string): Promise<PostWithRelations | null> {
+    return this.prisma.post.findUnique({
+      where: { id: postId },
+      include: postInclude,
+    }) as unknown as Promise<PostWithRelations | null>;
+  }
+
+  updateById(postId: string, data: Prisma.PostUpdateInput): Promise<PostWithRelations> {
+    return this.prisma.post.update({
+      where: { id: postId },
+      data,
+      include: postInclude,
+    }) as unknown as Promise<PostWithRelations>;
+  }
+
+  deleteById(postId: string): Promise<void> {
+    return this.prisma.post
+      .delete({
+        where: { id: postId },
+      })
+      .then(() => undefined);
+  }
+
+  async isFollower(followerId: string, followeeId: string): Promise<boolean> {
+    const row = await this.prisma.follow.findUnique({
+      where: {
+        followerId_followeeId: {
+          followerId,
+          followeeId,
+        },
+      },
+      select: {
+        followerId: true,
+      },
+    });
+
+    return Boolean(row);
+  }
+
+  addPostMetadata(postId: string, mediaType: string, mediaUrl: string): Promise<void> {
+    return this.prisma.postMedia
+      .create({
+        data: {
+          post: {
+            connect: { id: postId },
+          },
+          mediaType,
+          mediaUrl,
+          sortOrder: 0,
+        },
+      })
+      .then(() => undefined);
+  }
+
+  async replacePollVote(postId: string, userId: string, optionId: string, voteMediaType: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.postMedia.deleteMany({
+        where: {
+          postId,
+          mediaType: voteMediaType,
+          mediaUrl: {
+            startsWith: `${userId}|`,
+          },
+        },
+      }),
+      this.prisma.postMedia.create({
+        data: {
+          post: {
+            connect: { id: postId },
+          },
+          mediaType: voteMediaType,
+          mediaUrl: `${userId}|${optionId}`,
+          sortOrder: 0,
+        },
+      }),
+    ]);
+  }
 }

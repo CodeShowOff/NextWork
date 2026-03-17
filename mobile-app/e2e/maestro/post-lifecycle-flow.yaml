@@ -1,0 +1,12 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Feed
+- tapOn: Share an update
+- inputText: Phase 9 release lifecycle post
+- tapOn: Post
+- assertVisible: Phase 9 release lifecycle post
+- tapOn: Edit
+- tapOn: Save
+- tapOn: Delete
+- tapOn: Delete

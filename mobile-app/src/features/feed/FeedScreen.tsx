@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Share,
   ScrollView,
   RefreshControl,
   Pressable,
@@ -18,14 +19,31 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 
-import { createPost, FeedPost, listFeed, PaginatedFeed } from '../../shared/api/feed.api';
+import {
+  createPost,
+  deletePost,
+  FeedPost,
+  getPostShareLink,
+  listFeed,
+  PaginatedFeed,
+  updatePost,
+  votePostPoll,
+} from '../../shared/api/feed.api';
 import { listGroups } from '../../shared/api/groups.api';
 import { getLikeState, likePost, unlikePost } from '../../shared/api/likes.api';
 import { uploadImageWithContract } from '../../shared/api/media.api';
 import { listMyOrganizations } from '../../shared/api/organizations.api';
+import { searchAll, SearchUserItem } from '../../shared/api/search.api';
 import { getCurrentUser } from '../../shared/api/users.api';
+import { i18n } from '../../shared/i18n/i18n';
 import { FeedStackParamList } from './screens/FeedStack';
-import { applyOptimisticLikeToFeed, reconcileLikeCountInFeed } from './engagement-cache';
+import {
+  applyOptimisticLikeToFeed,
+  reconcileLikeCountInFeed,
+  removePostFromFeed,
+  reconcilePollInFeed,
+  updatePostInFeed,
+} from './engagement-cache';
 
 const pageSize = 20;
 
@@ -63,6 +81,22 @@ export function FeedScreen({ navigation }: Props) {
   const [composerImage, setComposerImage] = useState<ComposerImage | null>(null);
   const [likedByMeMap, setLikedByMeMap] = useState<Record<string, boolean>>({});
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [selectedTaggedUsers, setSelectedTaggedUsers] = useState<SearchUserItem[]>([]);
+  const [tagSearchInput, setTagSearchInput] = useState('');
+  const [debouncedTagSearch, setDebouncedTagSearch] = useState('');
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [composerValidationMessage, setComposerValidationMessage] = useState('');
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedTagSearch(tagSearchInput.trim());
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [tagSearchInput]);
 
   const meQuery = useQuery({
     queryKey: ['users', 'me'],
@@ -110,12 +144,50 @@ export function FeedScreen({ navigation }: Props) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
+  const tagSearchQuery = useQuery({
+    queryKey: ['feed', 'tag-search', debouncedTagSearch],
+    queryFn: () => searchAll({ query: debouncedTagSearch, limit: 8 }),
+    enabled: debouncedTagSearch.length >= 2,
+  });
+
+  const availableTagUsers = useMemo(() => {
+    const users = tagSearchQuery.data?.users ?? [];
+    const selectedIds = new Set(selectedTaggedUsers.map((user) => user.id));
+    return users.filter((user) => !selectedIds.has(user.id));
+  }, [selectedTaggedUsers, tagSearchQuery.data?.users]);
+
   const createPostMutation = useMutation({
     mutationFn: async () => {
       const content = composerText.trim();
       if (!content) {
         throw new Error(t('feed.alerts.writeBeforePosting'));
       }
+
+      const normalizedPollOptions = pollOptions.map((value) => value.trim()).filter(Boolean);
+      const hasPollInput = Boolean(pollQuestion.trim()) || normalizedPollOptions.length > 0;
+      const pollPayload = hasPollInput
+        ? (() => {
+            if (!pollQuestion.trim()) {
+              throw new Error(t('feed.poll.validations.questionRequired'));
+            }
+            if (normalizedPollOptions.length < 2) {
+              throw new Error(t('feed.poll.validations.minOptions'));
+            }
+            if (normalizedPollOptions.length > 6) {
+              throw new Error(t('feed.poll.validations.maxOptions'));
+            }
+
+            const lowered = normalizedPollOptions.map((option) => option.toLowerCase());
+            if (new Set(lowered).size !== lowered.length) {
+              throw new Error(t('feed.poll.validations.uniqueOptions'));
+            }
+
+            return {
+              question: pollQuestion.trim(),
+              options: normalizedPollOptions.map((text) => ({ text })),
+            };
+          })()
+        : undefined;
 
       let mediaPayload:
         | {
@@ -147,12 +219,24 @@ export function FeedScreen({ navigation }: Props) {
       return createPost({
         content,
         ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+        ...(selectedTaggedUsers.length
+          ? {
+              taggedUserIds: selectedTaggedUsers.map((user) => user.id),
+            }
+          : {}),
+        ...(pollPayload ? { poll: pollPayload } : {}),
         ...(mediaPayload ? { media: mediaPayload } : {}),
       });
     },
     onSuccess: (created) => {
+      setComposerValidationMessage('');
       setComposerText('');
       setComposerImage(null);
+      setSelectedTaggedUsers([]);
+      setTagSearchInput('');
+      setDebouncedTagSearch('');
+      setPollQuestion('');
+      setPollOptions(['', '']);
       queryClient.setQueryData(
         ['feed'],
         (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) => {
@@ -177,9 +261,45 @@ export function FeedScreen({ navigation }: Props) {
       );
     },
     onError: (error) => {
-      Alert.alert(t('feed.alerts.createPostFailedTitle'), (error as Error).message);
+      setComposerValidationMessage((error as Error).message);
     },
   });
+
+  const setPollOptionAt = (index: number, value: string) => {
+    setPollOptions((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)));
+  };
+
+  const addPollOption = () => {
+    setPollOptions((current) => {
+      if (current.length >= 6) {
+        setComposerValidationMessage(t('feed.poll.validations.addLimit'));
+        return current;
+      }
+      setComposerValidationMessage('');
+      return [...current, ''];
+    });
+  };
+
+  const removePollOption = (index: number) => {
+    setPollOptions((current) => {
+      if (current.length <= 2) {
+        setComposerValidationMessage(t('feed.poll.validations.removeMin'));
+        return current;
+      }
+      setComposerValidationMessage('');
+      return current.filter((_, itemIndex) => itemIndex !== index);
+    });
+  };
+
+  const addTaggedUser = (user: SearchUserItem) => {
+    setSelectedTaggedUsers((current) => [...current, user]);
+    setTagSearchInput('');
+    setDebouncedTagSearch('');
+  };
+
+  const removeTaggedUser = (userId: string) => {
+    setSelectedTaggedUsers((current) => current.filter((user) => user.id !== userId));
+  };
 
   async function pickComposerImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -284,6 +404,74 @@ export function FeedScreen({ navigation }: Props) {
     },
   });
 
+  const updatePostMutation = useMutation({
+    mutationFn: async (params: { postId: string; content: string }) =>
+      updatePost(params.postId, { content: params.content }),
+    onSuccess: (updated) => {
+      setEditingPostId(null);
+      setEditingContent('');
+      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+        updatePostInFeed(current, {
+          postId: updated.id,
+          content: updated.content,
+          updatedAt: updated.updatedAt,
+        }),
+      );
+    },
+    onError: (error) => {
+      Alert.alert(t('feed.alerts.updatePostFailedTitle'), (error as Error).message);
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      await deletePost(postId);
+      return postId;
+    },
+    onSuccess: (postId) => {
+      if (editingPostId === postId) {
+        setEditingPostId(null);
+        setEditingContent('');
+      }
+
+      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+        removePostFromFeed(current, postId),
+      );
+    },
+    onError: (error) => {
+      Alert.alert(t('feed.alerts.deletePostFailedTitle'), (error as Error).message);
+    },
+  });
+
+  const sharePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const shareLink = await getPostShareLink(postId);
+      await Share.share({
+        message: shareLink.shareUrl,
+        url: shareLink.shareUrl,
+      });
+    },
+    onError: (error) => {
+      Alert.alert(t('feed.alerts.sharePostFailedTitle'), (error as Error).message);
+    },
+  });
+
+  const votePollMutation = useMutation({
+    mutationFn: async (params: { postId: string; optionId: string }) =>
+      votePostPoll(params.postId, params.optionId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+        reconcilePollInFeed(current, {
+          postId: updated.id,
+          poll: updated.poll,
+        }),
+      );
+    },
+    onError: (error) => {
+      Alert.alert(t('feed.alerts.votePollFailedTitle'), (error as Error).message);
+    },
+  });
+
   const items = useMemo(
     () => feedQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [feedQuery.data],
@@ -298,17 +486,28 @@ export function FeedScreen({ navigation }: Props) {
           placeholder={t('feed.composer.placeholder')}
           style={styles.composerInput}
           multiline
+          accessibilityLabel={t('feed.composer.placeholder')}
         />
         {composerImage ? (
           <View style={styles.composerImageContainer}>
             <Image source={{ uri: composerImage.uri }} style={styles.composerImagePreview} />
-            <Pressable style={styles.removeImageButton} onPress={() => setComposerImage(null)}>
+            <Pressable
+              style={styles.removeImageButton}
+              onPress={() => setComposerImage(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('feed.composer.removeImage')}
+            >
               <Text style={styles.removeImageButtonText}>{t('feed.composer.removeImage')}</Text>
             </Pressable>
           </View>
         ) : null}
         <View style={styles.composerActionsRow}>
-          <Pressable style={styles.secondaryButton} onPress={pickComposerImage}>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={pickComposerImage}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.composer.attachImage')}
+          >
             <Text style={styles.secondaryButtonText}>{t('feed.composer.attachImage')}</Text>
           </Pressable>
         <Pressable
@@ -317,12 +516,88 @@ export function FeedScreen({ navigation }: Props) {
             createPostMutation.mutate();
           }}
           disabled={createPostMutation.isPending}
+          accessibilityRole="button"
+          accessibilityLabel={t('feed.composer.post')}
         >
           <Text style={styles.postButtonText}>
             {createPostMutation.isPending ? t('feed.composer.posting') : t('feed.composer.post')}
           </Text>
         </Pressable>
         </View>
+        <Text style={styles.metaSectionLabel}>{t('feed.composer.tagPeople')}</Text>
+        {selectedTaggedUsers.length ? (
+          <View style={styles.taggedUsersWrap}>
+            {selectedTaggedUsers.map((user) => (
+              <Pressable
+                key={user.id}
+                style={styles.taggedUserChip}
+                onPress={() => removeTaggedUser(user.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('common.actions.remove')} ${user.displayName}`}
+              >
+                <Text style={styles.taggedUserChipText}>{user.displayName} x</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <TextInput
+          value={tagSearchInput}
+          onChangeText={setTagSearchInput}
+          placeholder={t('feed.composer.searchPeopleToTag')}
+          style={styles.metaInput}
+          autoCapitalize="none"
+          accessibilityLabel={t('feed.composer.searchPeopleToTag')}
+        />
+        {tagSearchQuery.isFetching ? <ActivityIndicator size="small" color="#0B6E4F" /> : null}
+        {availableTagUsers.length ? (
+          <View style={styles.tagResultsList}>
+            {availableTagUsers.map((user) => (
+              <Pressable key={user.id} style={styles.tagResultItem} onPress={() => addTaggedUser(user)}>
+                <Text style={styles.tagResultName}>{user.displayName}</Text>
+                <Text style={styles.tagResultMeta}>{user.email}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <Text style={styles.metaSectionLabel}>{t('feed.composer.pollOptional')}</Text>
+        <TextInput
+          value={pollQuestion}
+          onChangeText={setPollQuestion}
+          placeholder={t('feed.composer.pollQuestionOptional')}
+          style={styles.metaInput}
+          accessibilityLabel={t('feed.composer.pollQuestionOptional')}
+        />
+        {pollOptions.map((option, index) => (
+          <View key={`poll-option-${index}`} style={styles.pollOptionRow}>
+            <TextInput
+              value={option}
+              onChangeText={(value) => setPollOptionAt(index, value)}
+              placeholder={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
+              style={[styles.metaInput, styles.pollOptionInput]}
+              accessibilityLabel={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
+            />
+            <Pressable
+              style={styles.pollOptionRemoveButton}
+              onPress={() => removePollOption(index)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.actions.remove')}
+            >
+              <Text style={styles.pollOptionRemoveText}>{t('common.actions.remove')}</Text>
+            </Pressable>
+          </View>
+        ))}
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={addPollOption}
+          accessibilityRole="button"
+          accessibilityLabel={t('feed.composer.addOption')}
+        >
+          <Text style={styles.secondaryButtonText}>{t('feed.composer.addOption')}</Text>
+        </Pressable>
+        {composerValidationMessage ? (
+          <Text style={styles.validationMessage}>{composerValidationMessage}</Text>
+        ) : null}
       </View>
 
       {feedQuery.isLoading ? (
@@ -364,7 +639,11 @@ export function FeedScreen({ navigation }: Props) {
               >
                 <Text style={styles.authorName}>{item.author.displayName}</Text>
               </Pressable>
-              <Text style={styles.timestamp}>{new Date(item.createdAt).toLocaleString()}</Text>
+              <Text style={styles.timestamp}>
+                {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
+                  new Date(item.createdAt),
+                )}
+              </Text>
               {item.groupId ? (
                 <Text style={styles.groupBadgeText}>
                   {t('feed.targeting.groupLabel', {
@@ -374,7 +653,71 @@ export function FeedScreen({ navigation }: Props) {
               ) : (
                 <Text style={styles.groupBadgeText}>{t('feed.targeting.globalPost')}</Text>
               )}
-              <Text style={styles.content}>{item.content}</Text>
+              {editingPostId === item.id ? (
+                <View style={styles.editSection}>
+                  <TextInput
+                    value={editingContent}
+                    onChangeText={setEditingContent}
+                    style={styles.editInput}
+                    multiline
+                  />
+                  <View style={styles.editActionsRow}>
+                    <Pressable
+                      style={styles.commentButton}
+                      onPress={() => {
+                        setEditingPostId(null);
+                        setEditingContent('');
+                      }}
+                    >
+                      <Text style={styles.commentButtonText}>{t('common.actions.cancel')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.actionButton}
+                      onPress={() => {
+                        const nextContent = editingContent.trim();
+                        if (!nextContent) {
+                          return;
+                        }
+
+                        updatePostMutation.mutate({
+                          postId: item.id,
+                          content: nextContent,
+                        });
+                      }}
+                      disabled={updatePostMutation.isPending}
+                    >
+                      <Text style={styles.actionButtonText}>{t('common.actions.save')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.content}>{item.content}</Text>
+              )}
+              {item.hashtags.length ? (
+                <Text style={styles.hashtagsText}>{item.hashtags.join(' ')}</Text>
+              ) : null}
+              {item.poll ? (
+                <View style={styles.pollCard}>
+                  <Text style={styles.pollQuestion}>{item.poll.question}</Text>
+                  {item.poll.options.map((option) => (
+                    <Pressable
+                      key={option.id}
+                      style={[
+                        styles.pollOptionButton,
+                        item.poll?.votedOptionId === option.id ? styles.pollOptionButtonActive : null,
+                      ]}
+                      onPress={() => votePollMutation.mutate({ postId: item.id, optionId: option.id })}
+                      disabled={votePollMutation.isPending}
+                    >
+                      <Text style={styles.pollOptionText}>{option.text}</Text>
+                      <Text style={styles.pollOptionVotes}>{option.voteCount}</Text>
+                    </Pressable>
+                  ))}
+                      <Text style={styles.pollTotalVotes}>
+                        {t('feed.poll.totalVotes', { count: item.poll.totalVotes })}
+                      </Text>
+                </View>
+              ) : null}
               {item.media.length ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
                   {item.media.map((mediaItem) => (
@@ -408,6 +751,46 @@ export function FeedScreen({ navigation }: Props) {
                 >
                   <Text style={styles.commentButtonText}>{t('feed.actions.comments')}</Text>
                 </Pressable>
+                <Pressable
+                  style={styles.commentButton}
+                  onPress={() => sharePostMutation.mutate(item.id)}
+                  disabled={sharePostMutation.isPending}
+                >
+                  <Text style={styles.commentButtonText}>{t('common.actions.share')}</Text>
+                </Pressable>
+                {item.authorId === meQuery.data?.id ? (
+                  <>
+                    <Pressable
+                      style={styles.commentButton}
+                      onPress={() => {
+                        setEditingPostId(item.id);
+                        setEditingContent(item.content);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('feed.actions.edit')}
+                    >
+                      <Text style={styles.commentButtonText}>{t('feed.actions.edit')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.dangerButton}
+                      onPress={() => {
+                        Alert.alert(t('feed.alerts.deletePostConfirmTitle'), t('feed.alerts.deletePostConfirmBody'), [
+                          { text: t('common.actions.cancel'), style: 'cancel' },
+                          {
+                            text: t('common.actions.delete'),
+                            style: 'destructive',
+                            onPress: () => deletePostMutation.mutate(item.id),
+                          },
+                        ]);
+                      }}
+                      disabled={deletePostMutation.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('feed.actions.delete')}
+                    >
+                      <Text style={styles.dangerButtonText}>{t('feed.actions.delete')}</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
           )}
@@ -485,6 +868,80 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  metaInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  metaSectionLabel: {
+    color: '#334155',
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  taggedUsersWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  taggedUserChip: {
+    borderWidth: 1,
+    borderColor: '#0B6E4F',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#DCFCE7',
+  },
+  taggedUserChipText: {
+    color: '#166534',
+    fontWeight: '700',
+  },
+  tagResultsList: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  tagResultItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  tagResultName: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  tagResultMeta: {
+    color: '#64748B',
+    fontSize: 12,
+  },
+  pollOptionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  pollOptionInput: {
+    flex: 1,
+  },
+  pollOptionRemoveButton: {
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  pollOptionRemoveText: {
+    color: '#B91C1C',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  validationMessage: {
+    color: '#B91C1C',
+    fontWeight: '600',
+  },
   secondaryButton: {
     borderWidth: 1,
     borderColor: '#0B6E4F',
@@ -542,6 +999,69 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     lineHeight: 20,
   },
+  hashtagsText: {
+    marginTop: 6,
+    color: '#0369A1',
+    fontWeight: '600',
+  },
+  pollCard: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  pollQuestion: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  pollOptionButton: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  pollOptionButtonActive: {
+    borderColor: '#0B6E4F',
+    backgroundColor: '#DCFCE7',
+  },
+  pollOptionText: {
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  pollOptionVotes: {
+    color: '#334155',
+    fontWeight: '700',
+  },
+  pollTotalVotes: {
+    color: '#475569',
+    fontSize: 12,
+  },
+  editSection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minHeight: 44,
+    backgroundColor: '#FFFFFF',
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
   mediaRow: {
     marginTop: 10,
     paddingRight: 8,
@@ -582,6 +1102,17 @@ const styles = StyleSheet.create({
   },
   commentButtonText: {
     color: '#0B6E4F',
+    fontWeight: '700',
+  },
+  dangerButton: {
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dangerButtonText: {
+    color: '#B91C1C',
     fontWeight: '700',
   },
   footerSpinner: {

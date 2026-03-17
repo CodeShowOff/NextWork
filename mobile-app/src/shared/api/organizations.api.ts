@@ -30,3 +30,38 @@ export function switchOrganization(organizationId: string) {
     method: 'POST',
   });
 }
+
+export function updateOrganization(organizationId: string, payload: { name?: string }) {
+  return requestJson<{
+    organizationId: string;
+    name: string;
+    slug: string;
+    updatedAt: string;
+  }>(`/organizations/${organizationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deactivateOrganization(organizationId: string) {
+  return requestJson<{
+    status: 'ok';
+    organizationId: string;
+    deactivated: true;
+    affectedMembers: number;
+    affectedGroups: number;
+  }>(`/organizations/${organizationId}/deactivate`, {
+    method: 'POST',
+  });
+}
+
+export function deleteOrganization(organizationId: string) {
+  return requestJson<{
+    status: 'ok';
+    organizationId: string;
+    deleted: true;
+    deletedPostCount: number;
+  }>(`/organizations/${organizationId}`, {
+    method: 'DELETE',
+  });
+}

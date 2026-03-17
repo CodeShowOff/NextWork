@@ -36,4 +36,10 @@ export class SignUpDto {
   @IsString()
   @MaxLength(80)
   jobTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  inviteToken?: string;
 }

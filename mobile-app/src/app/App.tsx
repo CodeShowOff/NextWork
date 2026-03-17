@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, useColorScheme } from 'react-native';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,6 +23,7 @@ import { extractInviteToken } from '../shared/linking/invite-linking';
 import { useInviteLinkStore } from '../shared/session/invite-link.store';
 import { useSessionStore } from '../shared/session/session.store';
 import { i18n } from '../shared/i18n/i18n';
+import { resolveAppTheme, useThemeStore } from '../shared/theme/theme.store';
 
 const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
@@ -95,11 +96,28 @@ function AuthenticatedTabs() {
   const { t } = useTranslation();
   const unreadMessages = useMessagesBadgeStore((state) => state.unreadCount);
   const unreadCount = useNotificationBadgeStore((state) => state.unreadCount);
+  const systemScheme = useColorScheme();
+  const normalizedScheme = systemScheme === 'light' || systemScheme === 'dark' ? systemScheme : null;
+  const themePreference = useThemeStore((state) => state.preference);
+  const appTheme = resolveAppTheme(themePreference, normalizedScheme);
   useMessagesBadgeBridge();
   useNotificationBadgeBridge();
 
   return (
-    <Tab.Navigator initialRouteName="Groups">
+    <Tab.Navigator
+      initialRouteName="Groups"
+      screenOptions={{
+        tabBarActiveTintColor: appTheme.dark ? '#86EFAC' : '#0B6E4F',
+        tabBarInactiveTintColor: appTheme.dark ? '#94A3B8' : '#64748B',
+        tabBarStyle: {
+          backgroundColor: appTheme.colors.card,
+        },
+        headerStyle: {
+          backgroundColor: appTheme.colors.card,
+        },
+        headerTintColor: appTheme.colors.text,
+      }}
+    >
       <Tab.Screen
         name="Feed"
         component={FeedStack}
@@ -159,13 +177,17 @@ function AuthenticatedTabs() {
 
 export default function App() {
   const accessToken = useSessionStore((state) => state.accessToken);
+  const systemScheme = useColorScheme();
+  const normalizedScheme = systemScheme === 'light' || systemScheme === 'dark' ? systemScheme : null;
+  const themePreference = useThemeStore((state) => state.preference);
+  const appTheme = resolveAppTheme(themePreference, normalizedScheme);
 
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <InviteLinkBridge />
-          <NavigationContainer>
+          <NavigationContainer theme={appTheme}>
             {accessToken ? <AuthenticatedTabs /> : <AuthScreen />}
           </NavigationContainer>
         </I18nextProvider>

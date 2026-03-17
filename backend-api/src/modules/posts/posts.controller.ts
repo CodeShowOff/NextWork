@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -15,7 +15,9 @@ import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { IdempotencyService } from '../../common/reliability/idempotency.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
-import { PaginatedPostsResponse, PostView, PostsService } from './posts.service';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { VotePollDto } from './dto/vote-poll.dto';
+import { PaginatedPostsResponse, PostShareLinkView, PostView, PostsService } from './posts.service';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -75,5 +77,53 @@ export class PostsController {
     @Query() query: ListPostsQueryDto,
   ): Promise<PaginatedPostsResponse> {
     return this.postsService.listPostsByUser(userId, user.sub, query);
+  }
+
+  @Patch(':postId')
+  @ApiOperation({ summary: 'Update post', description: 'Updates post content or visibility for the author.' })
+  @ApiParam({ name: 'postId', type: String, format: 'uuid' })
+  @ApiBody({ type: UpdatePostDto })
+  @ApiOkResponse({ description: 'Updated post payload' })
+  updatePost(
+    @CurrentUser() user: JwtPayload,
+    @Param('postId') postId: string,
+    @Body() payload: UpdatePostDto,
+  ): Promise<PostView> {
+    return this.postsService.updatePost(user.sub, postId, payload);
+  }
+
+  @Delete(':postId')
+  @ApiOperation({ summary: 'Delete post', description: 'Deletes a post owned by the current user.' })
+  @ApiParam({ name: 'postId', type: String, format: 'uuid' })
+  @ApiOkResponse({ description: 'Delete result status' })
+  deletePost(
+    @CurrentUser() user: JwtPayload,
+    @Param('postId') postId: string,
+  ): Promise<{ status: 'ok' }> {
+    return this.postsService.deletePost(user.sub, postId);
+  }
+
+  @Get(':postId/share-link')
+  @ApiOperation({ summary: 'Get post share link', description: 'Returns web and app links for post sharing.' })
+  @ApiParam({ name: 'postId', type: String, format: 'uuid' })
+  @ApiOkResponse({ description: 'Post share links' })
+  getShareLink(
+    @CurrentUser() user: JwtPayload,
+    @Param('postId') postId: string,
+  ): Promise<PostShareLinkView> {
+    return this.postsService.getPostShareLink(user.sub, postId);
+  }
+
+  @Post(':postId/poll/vote')
+  @ApiOperation({ summary: 'Vote in post poll', description: 'Creates or updates current user poll vote on a post.' })
+  @ApiParam({ name: 'postId', type: String, format: 'uuid' })
+  @ApiBody({ type: VotePollDto })
+  @ApiOkResponse({ description: 'Updated post payload including poll stats' })
+  votePoll(
+    @CurrentUser() user: JwtPayload,
+    @Param('postId') postId: string,
+    @Body() payload: VotePollDto,
+  ): Promise<PostView> {
+    return this.postsService.votePoll(user.sub, postId, payload.optionId);
   }
 }

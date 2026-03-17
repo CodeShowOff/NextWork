@@ -42,4 +42,8 @@ export class ProfilesRepository {
   countPostsByUserId(userId: string): Promise<number> {
     return this.prisma.post.count({ where: { authorId: userId } });
   }
+
+  countGroupsFollowedByUserId(userId: string): Promise<number> {
+    return this.prisma.groupMember.count({ where: { userId } });
+  }
 }

@@ -260,6 +260,62 @@ export class MessagesRepository {
     });
   }
 
+  findMessageForConversation(
+    messageId: string,
+    conversationId: string,
+  ): Promise<{
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    createdAt: Date;
+    editedAt: Date | null;
+  } | null> {
+    return this.prisma.message.findFirst({
+      where: {
+        id: messageId,
+        conversationId,
+      },
+      select: {
+        id: true,
+        conversationId: true,
+        senderId: true,
+        body: true,
+        createdAt: true,
+        editedAt: true,
+      },
+    });
+  }
+
+  updateMessageBody(messageId: string, body: string): Promise<MessageWithSender> {
+    return this.prisma.message.update({
+      where: {
+        id: messageId,
+      },
+      data: {
+        body,
+        editedAt: new Date(),
+      },
+      include: messageInclude,
+    }) as unknown as Promise<MessageWithSender>;
+  }
+
+  async countUnreadMessagesForUser(userId: string): Promise<number> {
+    const rows = await this.prisma.$queryRaw<Array<{ unreadCount: number }>>`
+      SELECT COUNT(m.id)::int AS "unreadCount"
+      FROM conversation_participants cp
+      JOIN messages m
+        ON m.conversation_id = cp.conversation_id
+      LEFT JOIN messages lr
+        ON lr.id = cp.last_read_message_id
+      WHERE cp.user_id = ${userId}::uuid
+        AND m.sender_id <> ${userId}::uuid
+        AND (cp.last_read_message_id IS NULL OR m.created_at > lr.created_at)
+    `;
+
+    return rows[0]?.unreadCount ?? 0;
+  }
+
   async countUnreadMessages(params: {
     conversationId: string;
     userId: string;

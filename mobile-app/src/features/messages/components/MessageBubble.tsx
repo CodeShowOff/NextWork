@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Message } from '../types';
 import { useSessionStore } from '../../../shared/session/session.store';
@@ -7,23 +8,37 @@ import { useSessionStore } from '../../../shared/session/session.store';
 interface Props {
   message: Message;
   status?: 'sending' | 'sent' | 'read';
+  onLongPress?: () => void;
 }
 
-export function MessageBubble({ message, status }: Props) {
+export function MessageBubble({ message, status, onLongPress }: Props) {
+  const { t } = useTranslation();
   const userId = useSessionStore((state) => state.userId);
   const isMine = message.senderId === userId;
+  const statusLabel =
+    status === 'sending'
+      ? t('messages.bubble.statusSending')
+      : status === 'read'
+        ? t('messages.bubble.statusRead')
+        : t('messages.bubble.statusSent');
 
   return (
     <View style={[styles.row, isMine ? styles.mineRow : styles.theirRow]}>
-      <View style={[styles.bubble, isMine ? styles.mineBubble : styles.theirBubble]}>
+      <Pressable
+        style={[styles.bubble, isMine ? styles.mineBubble : styles.theirBubble]}
+        onLongPress={onLongPress}
+        accessibilityRole="button"
+        accessibilityLabel={isMine ? message.body : `${message.sender.displayName}: ${message.body}`}
+      >
         {!isMine ? <Text style={styles.sender}>{message.sender.displayName}</Text> : null}
         <Text style={[styles.body, isMine ? styles.mineBody : styles.theirBody]}>{message.body}</Text>
-        {isMine && status ? (
-          <Text style={styles.statusText}>
-            {status === 'sending' ? 'Sending...' : status === 'read' ? 'Read' : 'Sent'}
+        {message.editedAt ? (
+          <Text style={[styles.editedText, isMine ? styles.mineEditedText : styles.theirEditedText]}>
+            {t('messages.bubble.edited')}
           </Text>
         ) : null}
-      </View>
+        {isMine && status ? <Text style={styles.statusText}>{statusLabel}</Text> : null}
+      </Pressable>
     </View>
   );
 }
@@ -73,5 +88,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     textAlign: 'right',
+  },
+  editedText: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  mineEditedText: {
+    color: '#A7F3D0',
+    textAlign: 'right',
+  },
+  theirEditedText: {
+    color: '#64748B',
   },
 });

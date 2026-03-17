@@ -14,6 +14,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useTranslation } from 'react-i18next';
 
 import { getRelationship, followUser, unfollowUser } from '../../../shared/api/follows.api';
+import { sendThanksProfileAction } from '../../../shared/api/notifications.api';
 import { PostItem, listMyPosts, listUserPosts } from '../../../shared/api/posts.api';
 import { getProfile, updateMyProfile } from '../../../shared/api/profiles.api';
 import { getCurrentUser } from '../../../shared/api/users.api';
@@ -22,6 +23,7 @@ import { localeLabels, SupportedLocale, supportedLocales } from '../../../shared
 import { useLocaleStore } from '../../../shared/i18n/locale.store';
 import { useInviteLinkStore } from '../../../shared/session/invite-link.store';
 import { useSessionStore } from '../../../shared/session/session.store';
+import { ThemePreference, useThemeStore } from '../../../shared/theme/theme.store';
 import { toggleFollowRelationshipOptimistic } from '../follow-relationship-cache';
 
 const pageSize = 20;
@@ -42,12 +44,16 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
   const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
   const locale = useLocaleStore((state) => state.locale);
   const setLocale = useLocaleStore((state) => state.setLocale);
+  const themePreference = useThemeStore((state) => state.preference);
+  const setThemePreference = useThemeStore((state) => state.setPreference);
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [organizationSize, setOrganizationSize] = useState('');
+  const [thanksTemplate, setThanksTemplate] = useState('');
+  const [thanksNotificationType, setThanksNotificationType] = useState<'thanks' | 'thanks-note'>('thanks');
 
   const meQuery = useQuery({
     queryKey: ['users', 'me'],
@@ -90,7 +96,8 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     setAvatarUrl(profileQuery.data.avatarUrl ?? '');
     setJobTitle(profileQuery.data.jobTitle ?? '');
     setOrganizationSize(profileQuery.data.organizationSize ?? '');
-  }, [profileQuery.data]);
+    setThanksTemplate(t('profile.thanks.defaultTemplate'));
+  }, [profileQuery.data, t]);
 
   const updateMutation = useMutation({
     mutationFn: updateMyProfile,
@@ -149,11 +156,43 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     },
   });
 
+  const thanksMutation = useMutation({
+    mutationFn: async () => {
+      if (!profileUserId) {
+        throw new Error('Missing profile user id');
+      }
+
+      return sendThanksProfileAction({
+        targetUserId: profileUserId,
+        notificationType: thanksNotificationType,
+        messageTemplate:
+          thanksTemplate.trim().length > 0 && thanksNotificationType === 'thanks-note'
+            ? thanksTemplate.trim()
+            : undefined,
+      });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
+      if (result.muted) {
+        Alert.alert(t('profile.alerts.thanksMutedTitle'), t('profile.alerts.thanksMutedBody'));
+        return;
+      }
+
+      Alert.alert(t('profile.alerts.thanksSentTitle'), t('profile.alerts.thanksSentBody'));
+    },
+    onError: (error) => {
+      Alert.alert(t('profile.alerts.thanksFailedTitle'), (error as Error).message);
+    },
+  });
+
   const posts = useMemo(() => postsQuery.data?.pages.flatMap((page) => page.items) ?? [], [postsQuery.data]);
 
   const loadingProfile = meQuery.isLoading || profileQuery.isLoading;
   const followersCount = relationshipQuery.data?.followersCount ?? 0;
   const followingCount = relationshipQuery.data?.followingCount ?? 0;
+  const skillsEntriesCount = profileQuery.data?.counters.skillsEntries ?? 0;
+  const groupsFollowedCount = profileQuery.data?.counters.groupsFollowed ?? 0;
   const relationshipLabel = isOwnProfile
     ? t('profile.relationship.self')
     : relationshipQuery.data?.isFollowing
@@ -182,16 +221,38 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         </View>
 
         {isOwnProfile && featureFlags.i18n ? (
-          <View style={styles.localeRow}>
-            {supportedLocales.map((item) => (
-              <Pressable
-                key={item}
-                style={[styles.localeChip, locale === item ? styles.localeChipActive : null]}
-                onPress={() => setLocale(item as SupportedLocale)}
-              >
-                <Text style={styles.localeChipText}>{localeLabels[item]}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.preferencesPanel}>
+            <View style={styles.localeRow}>
+              <Text style={styles.localeTitle}>{t('profile.locale.title')}</Text>
+              {supportedLocales.map((item) => (
+                <Pressable
+                  key={item}
+                  style={[styles.localeChip, locale === item ? styles.localeChipActive : null]}
+                  onPress={() => setLocale(item as SupportedLocale)}
+                  accessibilityRole="button"
+                  accessibilityLabel={localeLabels[item]}
+                  accessibilityState={{ selected: locale === item }}
+                >
+                  <Text style={styles.localeChipText}>{localeLabels[item]}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.localeRow}>
+              <Text style={styles.localeTitle}>{t('profile.theme.title')}</Text>
+              {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => (
+                <Pressable
+                  key={option}
+                  style={[styles.localeChip, themePreference === option ? styles.localeChipActive : null]}
+                  onPress={() => setThemePreference(option)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(`profile.theme.${option}`)}
+                  accessibilityState={{ selected: themePreference === option }}
+                >
+                  <Text style={styles.localeChipText}>{t(`profile.theme.${option}`)}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         ) : null}
 
@@ -234,6 +295,34 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
             <Text style={styles.metricValue}>{posts.length}</Text>
             <Text style={styles.metricLabel}>{t('profile.metrics.posts')}</Text>
           </View>
+        </View>
+
+        <View style={styles.profileSectionCard}>
+          <View style={styles.profileSectionHeaderRow}>
+            <Text style={styles.profileSectionTitle}>{t('profile.sections.skills.title')}</Text>
+            {isOwnProfile ? (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    t('profile.sections.skills.editTitle'),
+                    t('profile.sections.skills.editBody'),
+                  );
+                }}
+              >
+                <Text style={styles.profileSectionAction}>{t('profile.sections.skills.edit')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Text style={styles.profileSectionSubtitle}>
+            {t('profile.sections.skills.entries', { count: skillsEntriesCount })}
+          </Text>
+        </View>
+
+        <View style={styles.profileSectionCard}>
+          <Text style={styles.profileSectionTitle}>{t('profile.sections.groupsFollowed.title')}</Text>
+          <Text style={styles.profileSectionSubtitle}>
+            {t('profile.sections.groupsFollowed.count', { count: groupsFollowedCount })}
+          </Text>
         </View>
 
         <TextInput
@@ -290,19 +379,79 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
             <Text style={styles.primaryButtonText}>{t('profile.buttons.saveProfile')}</Text>
           </Pressable>
         ) : (
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => {
-              followMutation.mutate();
-            }}
-            disabled={followMutation.isPending}
-          >
-            <Text style={styles.primaryButtonText}>
-              {relationshipQuery.data?.isFollowing
-                ? t('profile.buttons.unfollow')
-                : t('profile.buttons.follow')}
-            </Text>
-          </Pressable>
+          <View style={styles.profileActionsWrap}>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => {
+                followMutation.mutate();
+              }}
+              disabled={followMutation.isPending}
+            >
+              <Text style={styles.primaryButtonText}>
+                {relationshipQuery.data?.isFollowing
+                  ? t('profile.buttons.unfollow')
+                  : t('profile.buttons.follow')}
+              </Text>
+            </Pressable>
+
+            <View style={styles.thanksCard}>
+              <Text style={styles.thanksTitle}>{t('profile.thanks.title')}</Text>
+              <View style={styles.thanksTypeRow}>
+                <Pressable
+                  style={[
+                    styles.thanksTypeChip,
+                    thanksNotificationType === 'thanks' ? styles.thanksTypeChipActive : null,
+                  ]}
+                  onPress={() => setThanksNotificationType('thanks')}
+                >
+                  <Text
+                    style={[
+                      styles.thanksTypeChipText,
+                      thanksNotificationType === 'thanks' ? styles.thanksTypeChipTextActive : null,
+                    ]}
+                  >
+                    {t('profile.thanks.types.quick')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.thanksTypeChip,
+                    thanksNotificationType === 'thanks-note' ? styles.thanksTypeChipActive : null,
+                  ]}
+                  onPress={() => setThanksNotificationType('thanks-note')}
+                >
+                  <Text
+                    style={[
+                      styles.thanksTypeChipText,
+                      thanksNotificationType === 'thanks-note' ? styles.thanksTypeChipTextActive : null,
+                    ]}
+                  >
+                    {t('profile.thanks.types.withNote')}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {thanksNotificationType === 'thanks-note' ? (
+                <TextInput
+                  value={thanksTemplate}
+                  onChangeText={setThanksTemplate}
+                  placeholder={t('profile.thanks.placeholder')}
+                  style={styles.input}
+                  multiline
+                />
+              ) : null}
+
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => {
+                  thanksMutation.mutate();
+                }}
+                disabled={thanksMutation.isPending}
+              >
+                <Text style={styles.secondaryButtonText}>{t('profile.buttons.sendThanks')}</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
 
         {isOwnProfile ? (
@@ -403,7 +552,18 @@ const styles = StyleSheet.create({
   localeRow: {
     marginTop: 10,
     flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
+  },
+  preferencesPanel: {
+    marginTop: 10,
+    gap: 4,
+  },
+  localeTitle: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '700',
   },
   localeChip: {
     borderWidth: 1,
@@ -449,6 +609,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  profileSectionCard: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  profileSectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profileSectionTitle: {
+    color: '#0F172A',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  profileSectionSubtitle: {
+    marginTop: 6,
+    color: '#64748B',
+    fontSize: 13,
+  },
+  profileSectionAction: {
+    color: '#2563EB',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -466,6 +655,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  profileActionsWrap: {
+    marginTop: 12,
+    gap: 10,
+  },
+  thanksCard: {
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    padding: 10,
+  },
+  thanksTitle: {
+    color: '#312E81',
+    fontWeight: '700',
+  },
+  thanksTypeRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  thanksTypeChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#A5B4FC',
+    borderRadius: 999,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  thanksTypeChipActive: {
+    backgroundColor: '#4338CA',
+    borderColor: '#4338CA',
+  },
+  thanksTypeChipText: {
+    color: '#1E1B4B',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  thanksTypeChipTextActive: {
+    color: '#FFFFFF',
+  },
+  secondaryButton: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4338CA',
+    backgroundColor: '#4338CA',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
   },

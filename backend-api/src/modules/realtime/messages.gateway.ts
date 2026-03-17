@@ -48,6 +48,25 @@ interface MessageReadEvent {
   lastReadMessageId: string;
 }
 
+interface MessageEditedEvent {
+  conversationId: string;
+  participantIds: string[];
+  message: {
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    messageType: string;
+    createdAt: string;
+    editedAt: string | null;
+    sender: {
+      id: string;
+      displayName: string;
+      avatarUrl: string | null;
+    };
+  };
+}
+
 interface NotificationCreatedEvent {
   userId: string;
   notification: {
@@ -116,6 +135,7 @@ export class MessagesGateway
     await this.subscriber.subscribe(
       this.messagesService.getMessageChannelName(),
       this.messagesService.getReadChannelName(),
+      this.messagesService.getEditChannelName(),
       this.notificationsService.getNotificationCreatedChannel(),
       this.notificationsService.getNotificationReadChannel(),
     );
@@ -127,6 +147,11 @@ export class MessagesGateway
 
       if (channel === this.messagesService.getReadChannelName()) {
         this.broadcastReadEvent(payload);
+        return;
+      }
+
+      if (channel === this.messagesService.getEditChannelName()) {
+        this.broadcastMessageEditedEvent(payload);
         return;
       }
 
@@ -376,6 +401,25 @@ export class MessagesGateway
       }
     } catch (error) {
       this.logger.error(`Failed to parse read event: ${(error as Error).message}`);
+    }
+  }
+
+  private broadcastMessageEditedEvent(payload: string): void {
+    try {
+      const event = JSON.parse(payload) as MessageEditedEvent;
+      const roomName = this.conversationRoom(event.conversationId);
+
+      this.server.to(roomName).emit('message.edited', event.message);
+      for (const participantId of event.participantIds) {
+        this.server
+          .to(this.userRoom(participantId))
+          .emit('conversation.message_edited', {
+            conversationId: event.conversationId,
+            message: event.message,
+          });
+      }
+    } catch (error) {
+      this.logger.error(`Failed to parse message edited event: ${(error as Error).message}`);
     }
   }
 

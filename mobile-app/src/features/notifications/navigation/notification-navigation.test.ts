@@ -73,6 +73,9 @@ describe('resolveNotificationNavigationAction', () => {
                 createdAt: '2026-03-16T00:00:00.000Z',
                 updatedAt: '2026-03-16T00:00:00.000Z',
                 media: [],
+                taggedUserIds: [],
+                hashtags: [],
+                poll: null,
                 author: {
                   id: 'u1',
                   displayName: 'User One',

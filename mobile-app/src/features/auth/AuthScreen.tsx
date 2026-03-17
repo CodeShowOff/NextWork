@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,7 +12,15 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { login, signUp } from '../../shared/api/auth.api';
+import {
+  confirmPasswordReset,
+  login,
+  requestPasswordReset,
+  resendVerification,
+  signUp,
+  verifyEmail,
+} from '../../shared/api/auth.api';
+import { useInviteLinkStore } from '../../shared/session/invite-link.store';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { useSessionStore } from '../../shared/session/session.store';
 
@@ -32,9 +40,15 @@ const signUpStepLabelKeys: Record<SignUpStep, string> = {
 export function AuthScreen() {
   const { t } = useTranslation();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [authStep, setAuthStep] = useState<'credentials' | 'verify' | 'forgot' | 'reset'>('credentials');
   const [signUpStep, setSignUpStep] = useState<SignUpStep>(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [authHint, setAuthHint] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [organizationSize, setOrganizationSize] = useState('');
@@ -44,6 +58,22 @@ export function AuthScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const setSession = useSessionStore((state) => state.setSession);
+  const pendingInviteToken = useInviteLinkStore((state) => state.pendingInviteToken);
+  const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
+  const inviteToken = pendingInviteToken.trim();
+  const isInviteSignup = mode === 'signup' && inviteToken.length > 0;
+  const activeSignUpSteps: SignUpStep[] = isInviteSignup ? [0, 1, 2] : signUpStepOrder;
+  const maxSignUpStep = activeSignUpSteps[activeSignUpSteps.length - 1];
+
+  useEffect(() => {
+    if (mode !== 'signup') {
+      return;
+    }
+
+    if (!activeSignUpSteps.includes(signUpStep)) {
+      setSignUpStep(activeSignUpSteps[0]);
+    }
+  }, [activeSignUpSteps, mode, signUpStep]);
 
   const isCurrentSignUpStepValid = () => {
     switch (signUpStep) {
@@ -68,14 +98,131 @@ export function AuthScreen() {
     Boolean(email.trim()) &&
     Boolean(password.trim()) &&
     Boolean(fullName.trim()) &&
-    Boolean(organizationName.trim()) &&
-    Boolean(organizationSize.trim()) &&
-    Boolean(jobTitle.trim());
+    (isInviteSignup
+      ? true
+      : Boolean(organizationName.trim()) &&
+        Boolean(organizationSize.trim()) &&
+        Boolean(jobTitle.trim()));
 
   const switchMode = (nextMode: 'login' | 'signup') => {
     setMode(nextMode);
+    setAuthStep('credentials');
+    setAuthHint(null);
     if (nextMode === 'signup') {
       setSignUpStep(0);
+    }
+  };
+
+  const parseApiErrorMessage = (error: unknown): string => {
+    const fallback = (error as Error).message || t('auth.alerts.authFailedTitle');
+
+    try {
+      const parsed = JSON.parse(fallback) as {
+        error?: {
+          message?: string | string[];
+        };
+      };
+
+      const message = parsed.error?.message;
+      if (Array.isArray(message)) {
+        return message.join(', ');
+      }
+      if (typeof message === 'string') {
+        return message;
+      }
+    } catch {
+      // Keep fallback.
+    }
+
+    return fallback;
+  };
+
+  const submitVerification = async () => {
+    if (!email.trim() || !verificationToken.trim()) {
+      Alert.alert(t('auth.alerts.missingFieldsTitle'), t('auth.alerts.missingVerificationFieldsBody'));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await verifyEmail({
+        email: email.trim(),
+        token: verificationToken.trim(),
+      });
+
+      setAuthHint(t('auth.alerts.verifySuccessBody'));
+      setAuthStep('credentials');
+      setMode('login');
+      setVerificationToken('');
+      Alert.alert(t('auth.alerts.verifySuccessTitle'), t('auth.alerts.verifySuccessBody'));
+    } catch (error) {
+      Alert.alert(t('auth.alerts.verifyFailedTitle'), parseApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert(t('auth.alerts.missingFieldsTitle'), t('auth.alerts.missingEmailFieldBody'));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await requestPasswordReset({
+        email: email.trim(),
+      });
+
+      const expiryText = result.expiresAt
+        ? t('auth.alerts.resetRequestedWithExpiryBody', {
+            expiresAt: new Date(result.expiresAt).toLocaleString(),
+          })
+        : t('auth.alerts.resetRequestedBody');
+      const debugText = result.debugCode
+        ? `\n${t('auth.alerts.debugCodeLabel')}: ${result.debugCode}`
+        : '';
+
+      setAuthHint(`${expiryText}${debugText}`);
+      setAuthStep('reset');
+      Alert.alert(t('auth.alerts.resetRequestedTitle'), `${expiryText}${debugText}`);
+    } catch (error) {
+      Alert.alert(t('auth.alerts.resetRequestFailedTitle'), parseApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitResetPassword = async () => {
+    if (!email.trim() || !resetToken.trim() || !newPassword.trim()) {
+      Alert.alert(t('auth.alerts.missingFieldsTitle'), t('auth.alerts.missingResetFieldsBody'));
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert(t('auth.alerts.resetMismatchTitle'), t('auth.alerts.resetMismatchBody'));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await confirmPasswordReset({
+        email: email.trim(),
+        token: resetToken.trim(),
+        newPassword: newPassword.trim(),
+      });
+
+      setPassword(newPassword.trim());
+      setResetToken('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setAuthHint(t('auth.alerts.resetSuccessBody'));
+      setAuthStep('credentials');
+      setMode('login');
+      Alert.alert(t('auth.alerts.resetSuccessTitle'), t('auth.alerts.resetSuccessBody'));
+    } catch (error) {
+      Alert.alert(t('auth.alerts.resetFailedTitle'), parseApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -95,21 +242,40 @@ export function AuthScreen() {
       const normalizedApiBaseUrl = apiBaseUrl.trim();
       const normalizedRealtimeBaseUrl = realtimeBaseUrl.trim();
 
-      const tokens =
-        mode === 'signup'
-          ? await signUp({
-              email: email.trim(),
-              password: password.trim(),
-              displayName: fullName.trim(),
-              fullName: fullName.trim(),
-              organizationName: organizationName.trim(),
-              organizationSize: organizationSize.trim(),
-              jobTitle: jobTitle.trim(),
-            })
-          : await login({
-              email: email.trim(),
-              password: password.trim(),
-            });
+      if (mode === 'signup') {
+        const signupResult = await signUp({
+          email: email.trim(),
+          password: password.trim(),
+          displayName: fullName.trim(),
+          fullName: fullName.trim(),
+          organizationName: isInviteSignup ? '' : organizationName.trim(),
+          organizationSize: isInviteSignup ? '' : organizationSize.trim(),
+          jobTitle: isInviteSignup ? '' : jobTitle.trim(),
+          ...(isInviteSignup ? { inviteToken } : {}),
+        });
+
+        const expiryText = t('auth.alerts.verificationRequiredBody', {
+          expiresAt: new Date(signupResult.expiresAt).toLocaleString(),
+        });
+        const debugText = signupResult.debugCode
+          ? `\n${t('auth.alerts.debugCodeLabel')}: ${signupResult.debugCode}`
+          : '';
+
+        setAuthHint(`${expiryText}${debugText}`);
+        setAuthStep('verify');
+        setMode('login');
+        setVerificationToken('');
+        if (isInviteSignup) {
+          clearPendingInviteToken();
+        }
+        Alert.alert(t('auth.alerts.verificationRequiredTitle'), `${expiryText}${debugText}`);
+        return;
+      }
+
+      const tokens = await login({
+        email: email.trim(),
+        password: password.trim(),
+      });
 
       const previous = useSessionStore.getState();
       setSession({
@@ -128,7 +294,13 @@ export function AuthScreen() {
       });
     } catch (error) {
       useSessionStore.getState().clearSession();
-      Alert.alert(t('auth.alerts.authFailedTitle'), (error as Error).message);
+      const message = parseApiErrorMessage(error);
+      if (message.toLowerCase().includes('email not verified')) {
+        setAuthStep('verify');
+        setAuthHint(t('auth.alerts.verifyBeforeLoginHint'));
+      }
+
+      Alert.alert(t('auth.alerts.authFailedTitle'), message);
     } finally {
       setIsSubmitting(false);
     }
@@ -159,7 +331,136 @@ export function AuthScreen() {
             </Pressable>
           </View>
 
-          {mode === 'login' ? (
+          {authHint ? <Text style={styles.hintText}>{authHint}</Text> : null}
+
+          {authStep === 'verify' ? (
+            <>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.placeholders.email')}
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <TextInput
+                value={verificationToken}
+                onChangeText={setVerificationToken}
+                placeholder={t('auth.placeholders.verificationToken')}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+              <View style={styles.wizardActionsRow}>
+                <Pressable
+                  style={styles.secondaryWizardButton}
+                  onPress={() => setAuthStep('credentials')}
+                >
+                  <Text style={styles.secondaryWizardButtonText}>{t('common.actions.back')}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryWizardButton}
+                  onPress={async () => {
+                    setIsSubmitting(true);
+                    try {
+                      const result = await resendVerification({ email: email.trim() });
+                      const expiryText = result.expiresAt
+                        ? t('auth.alerts.verificationRequiredBody', {
+                            expiresAt: new Date(result.expiresAt).toLocaleString(),
+                          })
+                        : t('auth.alerts.resendDoneBody');
+                      const debugText = result.debugCode
+                        ? `\n${t('auth.alerts.debugCodeLabel')}: ${result.debugCode}`
+                        : '';
+                      setAuthHint(`${expiryText}${debugText}`);
+                      Alert.alert(t('auth.alerts.resendDoneTitle'), `${expiryText}${debugText}`);
+                    } catch (error) {
+                      Alert.alert(t('auth.alerts.resendFailedTitle'), parseApiErrorMessage(error));
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.secondaryWizardButtonText}>{t('auth.buttons.resendCode')}</Text>
+                </Pressable>
+              </View>
+              <Pressable style={styles.submitButton} onPress={submitVerification} disabled={isSubmitting}>
+                <Text style={styles.submitButtonText}>
+                  {isSubmitting ? t('auth.buttons.pleaseWait') : t('auth.buttons.verifyEmail')}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {authStep === 'forgot' ? (
+            <>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.placeholders.email')}
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <View style={styles.wizardActionsRow}>
+                <Pressable style={styles.secondaryWizardButton} onPress={() => setAuthStep('credentials')}>
+                  <Text style={styles.secondaryWizardButtonText}>{t('common.actions.back')}</Text>
+                </Pressable>
+              </View>
+              <Pressable style={styles.submitButton} onPress={submitForgotPassword} disabled={isSubmitting}>
+                <Text style={styles.submitButtonText}>
+                  {isSubmitting ? t('auth.buttons.pleaseWait') : t('auth.buttons.sendResetCode')}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {authStep === 'reset' ? (
+            <>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.placeholders.email')}
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <TextInput
+                value={resetToken}
+                onChangeText={setResetToken}
+                placeholder={t('auth.placeholders.resetToken')}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder={t('auth.placeholders.newPassword')}
+                style={styles.input}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <TextInput
+                value={confirmNewPassword}
+                onChangeText={setConfirmNewPassword}
+                placeholder={t('auth.placeholders.confirmNewPassword')}
+                style={styles.input}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <View style={styles.wizardActionsRow}>
+                <Pressable style={styles.secondaryWizardButton} onPress={() => setAuthStep('forgot')}>
+                  <Text style={styles.secondaryWizardButtonText}>{t('common.actions.back')}</Text>
+                </Pressable>
+              </View>
+              <Pressable style={styles.submitButton} onPress={submitResetPassword} disabled={isSubmitting}>
+                <Text style={styles.submitButtonText}>
+                  {isSubmitting ? t('auth.buttons.pleaseWait') : t('auth.buttons.resetPassword')}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {mode === 'login' && authStep === 'credentials' ? (
             <>
               <TextInput
                 value={email}
@@ -177,12 +478,23 @@ export function AuthScreen() {
                 secureTextEntry
                 autoCapitalize="none"
               />
+              <Pressable onPress={() => setAuthStep('forgot')}>
+                <Text style={styles.linkText}>{t('auth.buttons.forgotPassword')}</Text>
+              </Pressable>
+              <Pressable onPress={() => setAuthStep('verify')}>
+                <Text style={styles.linkText}>{t('auth.buttons.verifyInstead')}</Text>
+              </Pressable>
             </>
           ) : (
-            <>
+            mode === 'signup' && authStep === 'credentials' ? (
+              <>
+              {isInviteSignup ? <Text style={styles.inviteHintText}>{t('auth.inviteSignupHint')}</Text> : null}
               <View style={styles.stepHeaderRow}>
                 <Text style={styles.stepHeaderTitle}>
-                  {t('auth.stepTitle', { current: signUpStep + 1, total: 6 })}
+                  {t('auth.stepTitle', {
+                    current: activeSignUpSteps.indexOf(signUpStep) + 1,
+                    total: activeSignUpSteps.length,
+                  })}
                 </Text>
                 <Text style={styles.stepHeaderLabel}>{t(signUpStepLabelKeys[signUpStep])}</Text>
               </View>
@@ -256,7 +568,7 @@ export function AuthScreen() {
                       return;
                     }
 
-                    const previousStep = signUpStepOrder[signUpStepOrder.indexOf(signUpStep) - 1];
+                    const previousStep = activeSignUpSteps[activeSignUpSteps.indexOf(signUpStep) - 1];
                     setSignUpStep(previousStep);
                   }}
                   disabled={signUpStep === 0}
@@ -264,7 +576,7 @@ export function AuthScreen() {
                   <Text style={styles.secondaryWizardButtonText}>{t('common.actions.back')}</Text>
                 </Pressable>
 
-                {signUpStep < 5 ? (
+                {signUpStep < maxSignUpStep ? (
                   <Pressable
                     style={[styles.secondaryWizardButton, !isCurrentSignUpStepValid() ? styles.disabledButton : null]}
                     onPress={() => {
@@ -278,7 +590,7 @@ export function AuthScreen() {
                         return;
                       }
 
-                      const nextStep = signUpStepOrder[signUpStepOrder.indexOf(signUpStep) + 1];
+                      const nextStep = activeSignUpSteps[activeSignUpSteps.indexOf(signUpStep) + 1];
                       setSignUpStep(nextStep);
                     }}
                     disabled={!isCurrentSignUpStepValid()}
@@ -287,7 +599,8 @@ export function AuthScreen() {
                   </Pressable>
                 ) : null}
               </View>
-            </>
+              </>
+            ) : null
           )}
 
           <TextInput
@@ -311,7 +624,11 @@ export function AuthScreen() {
               mode === 'signup' && !canSubmitSignup ? styles.disabledButton : null,
             ]}
             onPress={submit}
-            disabled={isSubmitting || (mode === 'signup' && !canSubmitSignup)}
+            disabled={
+              isSubmitting ||
+              authStep !== 'credentials' ||
+              (mode === 'signup' && !canSubmitSignup)
+            }
           >
             <Text style={styles.submitButtonText}>
               {isSubmitting ? t('auth.buttons.pleaseWait') : t('auth.buttons.continue')}
@@ -349,6 +666,29 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#475569',
     lineHeight: 20,
+  },
+  hintText: {
+    color: '#0F766E',
+    fontSize: 12,
+    backgroundColor: '#ECFEFF',
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
+    borderRadius: 10,
+    padding: 8,
+  },
+  inviteHintText: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    padding: 8,
+  },
+  linkText: {
+    color: '#0369A1',
+    fontWeight: '600',
+    fontSize: 12,
   },
   modeRow: {
     flexDirection: 'row',

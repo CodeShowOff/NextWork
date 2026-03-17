@@ -12,6 +12,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import {
   ConversationWithRelations,
   MessageWithSender,
@@ -72,10 +73,17 @@ interface MessageReadEvent {
   lastReadMessageId: string;
 }
 
+interface MessageEditedEvent {
+  conversationId: string;
+  participantIds: string[];
+  message: MessageView;
+}
+
 @Injectable()
 export class MessagesService {
   private readonly newMessageChannel = 'messages:new';
   private readonly readMessageChannel = 'messages:read';
+  private readonly editedMessageChannel = 'messages:edited';
 
   constructor(
     private readonly messagesRepository: MessagesRepository,
@@ -160,6 +168,11 @@ export class MessagesService {
     return response;
   }
 
+  async getUnreadCount(userId: string): Promise<{ unreadCount: number }> {
+    const unreadCount = await this.messagesRepository.countUnreadMessagesForUser(userId);
+    return { unreadCount };
+  }
+
   async listMessages(
     userId: string,
     conversationId: string,
@@ -228,6 +241,47 @@ export class MessagesService {
     return messageView;
   }
 
+  async updateMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    payload: UpdateMessageDto,
+  ): Promise<MessageView> {
+    await this.ensureParticipant(conversationId, userId);
+
+    const existing = await this.messagesRepository.findMessageForConversation(messageId, conversationId);
+    if (!existing) {
+      throw new NotFoundException('Message not found in this conversation.');
+    }
+
+    if (existing.senderId !== userId) {
+      throw new ForbiddenException('Only the sender can edit this message.');
+    }
+
+    const nextBody = payload.body.trim();
+    if (!nextBody) {
+      throw new BadRequestException('Message body is required.');
+    }
+
+    const updated = await this.messagesRepository.updateMessageBody(messageId, nextBody);
+
+    const messageView = this.toMessageView(updated);
+    const participantIds = (await this.messagesRepository.listParticipantIds(conversationId)).map(
+      (item) => item.userId,
+    );
+
+    const eventPayload: MessageEditedEvent = {
+      conversationId,
+      participantIds,
+      message: messageView,
+    };
+
+    await this.redisService.getClient().publish(this.editedMessageChannel, JSON.stringify(eventPayload));
+    await Promise.all(participantIds.map((participantId) => this.invalidateConversationCache(participantId)));
+
+    return messageView;
+  }
+
   async markConversationRead(
     userId: string,
     conversationId: string,
@@ -271,6 +325,10 @@ export class MessagesService {
 
   getReadChannelName(): string {
     return this.readMessageChannel;
+  }
+
+  getEditChannelName(): string {
+    return this.editedMessageChannel;
   }
 
   private normalizeParticipantIds(userId: string, participantIds: string[]): string[] {

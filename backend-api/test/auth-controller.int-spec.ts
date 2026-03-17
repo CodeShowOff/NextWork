@@ -10,9 +10,19 @@ describe('AuthController Integration', () => {
 
   const authServiceMock = {
     signUp: jest.fn().mockResolvedValue({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
+      status: 'verification_required',
+      email: 'new@example.com',
+      expiresAt: '2026-03-17T01:00:00.000Z',
+      debugCode: '123456',
     }),
+    verifyEmail: jest.fn().mockResolvedValue({ status: 'ok' }),
+    resendEmailVerification: jest
+      .fn()
+      .mockResolvedValue({ status: 'ok', expiresAt: '2026-03-17T01:00:00.000Z', debugCode: '123456' }),
+    requestPasswordReset: jest
+      .fn()
+      .mockResolvedValue({ status: 'ok', expiresAt: '2026-03-17T01:00:00.000Z', debugCode: '789012' }),
+    confirmPasswordReset: jest.fn().mockResolvedValue({ status: 'ok' }),
     login: jest.fn().mockResolvedValue({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
@@ -48,10 +58,8 @@ describe('AuthController Integration', () => {
       })
       .expect(201);
 
-    expect(response.body).toEqual({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
-    });
+    expect(response.body.status).toBe('verification_required');
+    expect(response.body.email).toBe('new@example.com');
     expect(authServiceMock.signUp).toHaveBeenCalledTimes(1);
     expect(authServiceMock.signUp).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -85,5 +93,57 @@ describe('AuthController Integration', () => {
 
     expect(response.body.accessToken).toBe('new-access-token');
     expect(authServiceMock.refreshToken).toHaveBeenCalledWith('refresh-token');
+  });
+
+  it('POST /auth/verify-email delegates to service', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({
+        email: 'new@example.com',
+        verificationCode: '123456',
+      })
+      .expect(201);
+
+    expect(authServiceMock.verifyEmail).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      verificationCode: '123456',
+    });
+  });
+
+  it('POST /auth/resend-verification requests a new code', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/resend-verification')
+      .send({ email: 'new@example.com' })
+      .expect(201);
+
+    expect(response.body.status).toBe('ok');
+    expect(authServiceMock.resendEmailVerification).toHaveBeenCalledWith('new@example.com');
+  });
+
+  it('POST /auth/forgot-password delegates to service', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/forgot-password')
+      .send({ email: 'new@example.com' })
+      .expect(201);
+
+    expect(response.body.status).toBe('ok');
+    expect(authServiceMock.requestPasswordReset).toHaveBeenCalledWith('new@example.com');
+  });
+
+  it('POST /auth/reset-password delegates to service', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/reset-password')
+      .send({
+        email: 'new@example.com',
+        resetCode: '789012',
+        newPassword: 'new-password-123',
+      })
+      .expect(201);
+
+    expect(authServiceMock.confirmPasswordReset).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      resetCode: '789012',
+      newPassword: 'new-password-123',
+    });
   });
 });

@@ -13,6 +13,9 @@ describe('OrganizationsController Integration', () => {
     onboardUser: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
     getMyOrganizations: jest.fn().mockResolvedValue({ items: [] }),
     switchActiveOrganization: jest.fn().mockResolvedValue({ status: 'ok' }),
+    updateOrganization: jest.fn().mockResolvedValue({ status: 'ok' }),
+    deactivateOrganization: jest.fn().mockResolvedValue({ status: 'ok' }),
+    deleteOrganization: jest.fn().mockResolvedValue({ status: 'ok' }),
   };
 
   const authGuardMock = {
@@ -62,5 +65,28 @@ describe('OrganizationsController Integration', () => {
     await request(app.getHttpServer()).post('/organizations/org-1/switch').expect(201);
 
     expect(organizationsServiceMock.switchActiveOrganization).toHaveBeenCalledWith('u1', 'org-1');
+  });
+
+  it('PATCH /organizations/:id updates organization details', async () => {
+    const payload = {
+      name: 'Team Alpha Updated',
+      description: 'Updated details',
+    };
+
+    await request(app.getHttpServer()).patch('/organizations/org-1').send(payload).expect(200);
+
+    expect(organizationsServiceMock.updateOrganization).toHaveBeenCalledWith('u1', 'org-1', payload);
+  });
+
+  it('POST /organizations/:id/deactivate deactivates organization', async () => {
+    await request(app.getHttpServer()).post('/organizations/org-1/deactivate').expect(201);
+
+    expect(organizationsServiceMock.deactivateOrganization).toHaveBeenCalledWith('u1', 'org-1');
+  });
+
+  it('DELETE /organizations/:id deletes organization', async () => {
+    await request(app.getHttpServer()).delete('/organizations/org-1').expect(200);
+
+    expect(organizationsServiceMock.deleteOrganization).toHaveBeenCalledWith('u1', 'org-1');
   });
 });

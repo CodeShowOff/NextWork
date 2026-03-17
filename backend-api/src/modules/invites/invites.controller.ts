@@ -7,11 +7,11 @@ import { CreateInviteLinkDto } from './dto/create-invite-link.dto';
 import { InvitesService } from './invites.service';
 
 @Controller('invites')
-@UseGuards(JwtAuthGuard)
 export class InvitesController {
   constructor(private readonly invitesService: InvitesService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   create(@CurrentUser() user: JwtPayload, @Body() payload: CreateInviteLinkDto) {
     return this.invitesService.createInviteLink(user.sub, payload);
   }
@@ -22,6 +22,7 @@ export class InvitesController {
   }
 
   @Post(':token/accept')
+  @UseGuards(JwtAuthGuard)
   accept(@CurrentUser() user: JwtPayload, @Param('token') token: string) {
     return this.invitesService.acceptInvite(user.sub, token);
   }

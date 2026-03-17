@@ -29,6 +29,8 @@ describe('ProfilesController Integration', () => {
         posts: 4,
         followers: 10,
         following: 3,
+        groupsFollowed: 2,
+        skillsEntries: 0,
       },
       relationship: {
         isFollowing: false,

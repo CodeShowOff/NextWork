@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { i18n, isSupportedLocale } from './i18n';
-import { supportedLocales, SupportedLocale } from './resources';
+import { localeLabels, supportedLocales, SupportedLocale } from './resources';
 
 interface LocaleState {
   locale: SupportedLocale;
@@ -23,6 +23,6 @@ export const useLocaleStore = create<LocaleState>((set) => ({
 export function useLocaleOptions(): Array<{ value: SupportedLocale; label: string }> {
   return supportedLocales.map((locale) => ({
     value: locale,
-    label: locale,
+    label: localeLabels[locale],
   }));
 }

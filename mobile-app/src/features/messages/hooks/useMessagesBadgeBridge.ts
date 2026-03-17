@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { listConversations } from '../../../shared/api/messages.api';
+import { getUnreadMessagesCount } from '../../../shared/api/messages.api';
+import { connectMessagesSocket, disconnectMessagesSocket } from '../../../shared/realtime/messages.socket';
 import { useSessionStore } from '../../../shared/session/session.store';
 import { Conversation, PaginatedResponse } from '../types';
 import { messagesKeys } from './keys';
@@ -11,25 +12,6 @@ function totalUnread(items: Conversation[]): number {
   return items.reduce((sum, item) => sum + item.unreadCount, 0);
 }
 
-async function fetchUnreadSummary(): Promise<number> {
-  let before: string | undefined;
-  let unread = 0;
-  let pageCount = 0;
-
-  while (pageCount < 5) {
-    const page = await listConversations({ limit: 50, ...(before ? { before } : {}) });
-    unread += totalUnread(page.items);
-    pageCount += 1;
-
-    if (!page.nextCursor) {
-      break;
-    }
-    before = page.nextCursor;
-  }
-
-  return unread;
-}
-
 export function useMessagesBadgeBridge() {
   const queryClient = useQueryClient();
   const userId = useSessionStore((state) => state.userId);
@@ -37,23 +19,54 @@ export function useMessagesBadgeBridge() {
   const setUnreadCount = useMessagesBadgeStore((state) => state.setUnreadCount);
   const reset = useMessagesBadgeStore((state) => state.reset);
 
-  const summaryQuery = useQuery({
-    queryKey: [...messagesKeys.conversations(), 'unread-summary'],
-    queryFn: fetchUnreadSummary,
-    enabled: Boolean(userId && token),
-    refetchInterval: 20000,
-  });
+  useEffect(() => {
+    if (!userId || !token) {
+      return;
+    }
+
+    let isCancelled = false;
+    const syncUnread = async () => {
+      try {
+        const result = await getUnreadMessagesCount();
+        if (!isCancelled) {
+          setUnreadCount(result.unreadCount);
+        }
+      } catch {
+        // Keep current count and retry on next interval/event.
+      }
+    };
+
+    void syncUnread();
+    const intervalId = setInterval(syncUnread, 20000);
+
+    const onConversationMessage = () => {
+      void syncUnread();
+    };
+    const onRead = () => {
+      void syncUnread();
+    };
+
+    const socket = connectMessagesSocket({
+      onConversationMessage,
+      onRead,
+    });
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+      socket.off('conversation.message', onConversationMessage);
+      socket.off('message.read', onRead);
+      socket.off('conversation.read', onRead);
+    };
+  }, [setUnreadCount, token, userId]);
 
   useEffect(() => {
     if (!userId || !token) {
       reset();
+      disconnectMessagesSocket();
       return;
     }
-
-    if (typeof summaryQuery.data === 'number') {
-      setUnreadCount(summaryQuery.data);
-    }
-  }, [reset, setUnreadCount, summaryQuery.data, token, userId]);
+  }, [reset, token, userId]);
 
   useEffect(() => {
     if (!userId || !token) {

@@ -18,6 +18,10 @@ export class SearchController {
   @ApiOperation({ summary: 'Search users, groups, and posts' })
   @ApiQuery({ name: 'q', required: true, type: String })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'usersCursor', required: false, type: String })
+  @ApiQuery({ name: 'groupsCursor', required: false, type: String })
+  @ApiQuery({ name: 'postsCursor', required: false, type: String })
+  @ApiQuery({ name: 'scope', required: false, enum: ['all', 'users', 'groups', 'posts'] })
   @ApiOkResponse({ description: 'Aggregated search result payload' })
   search(@CurrentUser() user: JwtPayload, @Query() query: SearchQueryDto): Promise<SearchResponse> {
     return this.searchService.search(user.sub, query);

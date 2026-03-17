@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { CacheService } from '../../common/cache/cache.service';
 import { RedisService } from '../../common/redis/redis.service';
@@ -16,6 +16,10 @@ describe('NotificationsService', () => {
     create: jest.fn(),
     getPreferences: jest.fn(),
     isMuted: jest.fn(),
+    userExists: jest.fn(),
+    hasRecentThanks: jest.fn(),
+    findOrCreateDirectConversationBetweenUsers: jest.fn(),
+    createDirectMessage: jest.fn(),
   } as unknown as NotificationsRepository;
 
   const redisPublishMock = jest.fn();
@@ -81,5 +85,70 @@ describe('NotificationsService', () => {
     (notificationsRepositoryMock.findById as jest.Mock).mockResolvedValue(null);
 
     await expect(service.markRead('u1', 'missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('suppresses thanks delivery when sender is muted by target', async () => {
+    (notificationsRepositoryMock.userExists as jest.Mock).mockResolvedValue(true);
+    (notificationsRepositoryMock.hasRecentThanks as jest.Mock).mockResolvedValue(false);
+    (notificationsRepositoryMock.isMuted as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.sendThanks('sender-1', {
+      targetUserId: 'target-1',
+      notificationType: 'thanks',
+    });
+
+    expect(result).toEqual({
+      status: 'ok',
+      delivered: false,
+      muted: true,
+      notificationId: null,
+      conversationId: null,
+      messageId: null,
+    });
+    expect(notificationsRepositoryMock.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks duplicate thanks inside cooldown window', async () => {
+    (notificationsRepositoryMock.userExists as jest.Mock).mockResolvedValue(true);
+    (notificationsRepositoryMock.hasRecentThanks as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.sendThanks('sender-1', {
+        targetUserId: 'target-1',
+        notificationType: 'thanks',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('openNotification marks unread notification and returns canonical message route', async () => {
+    (notificationsRepositoryMock.findById as jest.Mock).mockResolvedValue({
+      id: 'n-open-1',
+      userId: 'u1',
+      isRead: false,
+      entityType: 'conversation',
+      entityId: 'c1',
+    });
+
+    const result = await service.openNotification('u1', 'n-open-1');
+
+    expect(result.readApplied).toBe(true);
+    expect(result.action).toEqual({
+      target: 'messages',
+      entityType: 'conversation',
+      entityId: 'c1',
+    });
+    expect(notificationsRepositoryMock.markRead).toHaveBeenCalledWith('n-open-1');
+  });
+
+  it('openNotification denies opening notifications from another user', async () => {
+    (notificationsRepositoryMock.findById as jest.Mock).mockResolvedValue({
+      id: 'n-open-2',
+      userId: 'u2',
+      isRead: false,
+      entityType: 'user',
+      entityId: 'u9',
+    });
+
+    await expect(service.openNotification('u1', 'n-open-2')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

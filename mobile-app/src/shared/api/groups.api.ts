@@ -4,6 +4,9 @@ export interface Group {
   id: string;
   name: string;
   description: string | null;
+  groupType: string;
+  groupPrivacy: string;
+  photoUrl: string | null;
   createdAt: string;
   memberCount: number;
 }
@@ -60,7 +63,14 @@ export function initializeStarterGroups(payload: {
   });
 }
 
-export function createGroup(payload: { organizationId: string; name: string; description?: string }) {
+export function createGroup(payload: {
+  organizationId: string;
+  name: string;
+  description?: string;
+  groupType?: string;
+  groupPrivacy?: string;
+  photoUrl?: string;
+}) {
   return requestJson<Group>('/groups', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -75,4 +85,35 @@ export function joinGroup(groupId: string) {
 
 export function listGroupMembers(groupId: string) {
   return requestJson<{ groupId: string; items: GroupMember[] }>(`/groups/${groupId}/members`);
+}
+
+export function updateGroup(
+  groupId: string,
+  payload: { name?: string; description?: string; groupType?: string; groupPrivacy?: string; photoUrl?: string },
+) {
+  return requestJson<{
+    id: string;
+    organizationId: string;
+    name: string;
+    description: string | null;
+    groupType: string;
+    groupPrivacy: string;
+    photoUrl: string | null;
+    updatedAt: string;
+  }>(`/groups/${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteGroup(groupId: string, payload?: { postPolicy?: 'detach' | 'remove' }) {
+  return requestJson<{
+    status: 'ok';
+    groupId: string;
+    postPolicy: 'detach' | 'remove';
+    affectedPosts: number;
+  }>(`/groups/${groupId}`, {
+    method: 'DELETE',
+    body: JSON.stringify(payload ?? {}),
+  });
 }
