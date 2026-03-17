@@ -433,6 +433,12 @@ export const resources = {
           email: 'Email: {{email}}',
           hidden: 'Hidden',
         },
+        details: {
+          worksAt: 'Works at {{organizationName}}',
+          email: 'Email: {{email}}',
+          about: 'See {{name}}\'s about info',
+          unknownOrganization: 'organization',
+        },
         relationship: {
           self: 'This is you',
           following: 'Following',

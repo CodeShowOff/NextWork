@@ -2,6 +2,7 @@ import { requestJson } from './http';
 
 export interface Profile {
   userId: string;
+  email: string;
   displayName: string;
   bio: string | null;
   avatarUrl: string | null;

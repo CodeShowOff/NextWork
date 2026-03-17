@@ -7,6 +7,7 @@ import { ProfilesRepository } from './profiles.repository';
 
 export interface ProfileView {
   userId: string;
+  email: string;
   displayName: string;
   bio: string | null;
   avatarUrl: string | null;
@@ -27,7 +28,7 @@ export interface ProfileView {
 }
 
 interface ProfileSummary {
-  profile: Profile;
+  profile: Profile & { user: { email: string } };
   postCount: number;
   followersCount: number;
   followingCount: number;
@@ -48,6 +49,7 @@ export class ProfilesService {
 
     return {
       userId: summary.profile.userId,
+      email: summary.profile.user.email,
       displayName: summary.profile.displayName,
       bio: summary.profile.bio,
       avatarUrl: summary.profile.avatarUrl,
@@ -93,7 +95,7 @@ export class ProfilesService {
       return cached;
     }
 
-    const profile = await this.profilesRepository.findByUserId(userId);
+    const profile = await this.profilesRepository.findWithUserByUserId(userId);
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }

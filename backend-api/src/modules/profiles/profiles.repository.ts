@@ -11,6 +11,19 @@ export class ProfilesRepository {
     return this.prisma.profile.findUnique({ where: { userId } });
   }
 
+  findWithUserByUserId(userId: string): Promise<(Profile & { user: { email: string } }) | null> {
+    return this.prisma.profile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
   updateByUserId(userId: string, data: Prisma.ProfileUpdateInput): Promise<Profile> {
     return this.prisma.profile.update({ where: { userId }, data });
   }

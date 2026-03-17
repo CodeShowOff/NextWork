@@ -13,8 +13,10 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
+import { createPost } from '../../../shared/api/feed.api';
 import { getRelationship, followUser, unfollowUser } from '../../../shared/api/follows.api';
 import { sendThanksProfileAction } from '../../../shared/api/notifications.api';
+import { listMyOrganizations } from '../../../shared/api/organizations.api';
 import { PostItem, listMyPosts, listUserPosts } from '../../../shared/api/posts.api';
 import { getProfile, updateMyProfile } from '../../../shared/api/profiles.api';
 import { getCurrentUser } from '../../../shared/api/users.api';
@@ -51,6 +53,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [organizationSize, setOrganizationSize] = useState('');
+  const [profileComposerText, setProfileComposerText] = useState('');
   const [thanksTemplate, setThanksTemplate] = useState('');
   const [thanksNotificationType, setThanksNotificationType] = useState<'thanks' | 'thanks-note'>('thanks');
 
@@ -66,6 +69,11 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     queryKey: ['profiles', profileUserId],
     queryFn: () => getProfile(profileUserId as string),
     enabled: Boolean(profileUserId),
+  });
+
+  const organizationsQuery = useQuery({
+    queryKey: ['organizations', 'me'],
+    queryFn: listMyOrganizations,
   });
 
   const relationshipQuery = useQuery({
@@ -185,7 +193,44 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     },
   });
 
+  const createProfilePostMutation = useMutation({
+    mutationFn: async () => {
+      const content = profileComposerText.trim();
+      if (!content) {
+        throw new Error(t('feed.alerts.writeBeforePosting'));
+      }
+
+      return createPost({ content });
+    },
+    onSuccess: () => {
+      setProfileComposerText('');
+      queryClient.invalidateQueries({ queryKey: ['profile', 'posts', profileUserId] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+    },
+    onError: (error) => {
+      Alert.alert(t('feed.alerts.createPostFailedTitle'), (error as Error).message);
+    },
+  });
+
   const posts = useMemo(() => postsQuery.data?.pages.flatMap((page) => page.items) ?? [], [postsQuery.data]);
+  const activeOrganizationName = useMemo(() => {
+    const memberships = organizationsQuery.data?.items ?? [];
+    const activeOrganizationId = meQuery.data?.activeOrganizationId;
+
+    if (!memberships.length) {
+      return null;
+    }
+
+    if (!activeOrganizationId) {
+      return memberships[0]?.organization.name ?? null;
+    }
+
+    return (
+      memberships.find((membership) => membership.organizationId === activeOrganizationId)?.organization.name ??
+      memberships[0]?.organization.name ??
+      null
+    );
+  }, [meQuery.data?.activeOrganizationId, organizationsQuery.data?.items]);
 
   const loadingProfile = meQuery.isLoading || profileQuery.isLoading;
   const followersCount = relationshipQuery.data?.followersCount ?? 0;
@@ -212,11 +257,29 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         <Text style={styles.title}>{isOwnProfile ? t('profile.title.mine') : t('profile.title.other')}</Text>
         <Text style={styles.subtitle}>
           {t('profile.subtitle.email', {
-            email: isOwnProfile ? meQuery.data?.email : t('profile.subtitle.hidden'),
+            email: profileQuery.data?.email ?? meQuery.data?.email ?? t('profile.subtitle.hidden'),
           })}
         </Text>
         <View style={styles.relationshipBadge}>
           <Text style={styles.relationshipBadgeText}>{relationshipLabel}</Text>
+        </View>
+
+        <View style={styles.profileSectionCard}>
+          <Text style={styles.profileSectionSubtitle}>
+            {t('profile.details.worksAt', {
+              organizationName: activeOrganizationName ?? t('profile.details.unknownOrganization'),
+            })}
+          </Text>
+          <Text style={styles.profileSectionSubtitle}>
+            {t('profile.details.email', {
+              email: profileQuery.data?.email ?? meQuery.data?.email ?? t('profile.subtitle.hidden'),
+            })}
+          </Text>
+          <Text style={styles.profileSectionSubtitle}>
+            {t('profile.details.about', {
+              name: profileQuery.data?.displayName ?? '',
+            })}
+          </Text>
         </View>
 
         {isOwnProfile && featureFlags.i18n ? (
@@ -295,6 +358,30 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
             <Text style={styles.metricLabel}>{t('profile.metrics.posts')}</Text>
           </View>
         </View>
+
+        {isOwnProfile ? (
+          <View style={styles.createPostCard}>
+            <Text style={styles.profileSectionTitle}>{t('profile.metrics.posts')}</Text>
+            <TextInput
+              value={profileComposerText}
+              onChangeText={setProfileComposerText}
+              placeholder={t('feed.composer.placeholder')}
+              style={styles.input}
+              multiline
+            />
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => {
+                createProfilePostMutation.mutate();
+              }}
+              disabled={createProfilePostMutation.isPending}
+            >
+              <Text style={styles.primaryButtonText}>
+                {createProfilePostMutation.isPending ? t('feed.composer.posting') : t('feed.composer.post')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.profileSectionCard}>
           <View style={styles.profileSectionHeaderRow}>
@@ -607,6 +694,15 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 12,
     marginTop: 2,
+  },
+  createPostCard: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
   },
   profileSectionCard: {
     marginTop: 10,

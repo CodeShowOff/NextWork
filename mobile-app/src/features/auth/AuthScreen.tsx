@@ -76,6 +76,18 @@ export function AuthScreen() {
     }
   }, [activeSignUpSteps, mode, signUpStep]);
 
+  useEffect(() => {
+    if (!inviteToken) {
+      return;
+    }
+
+    // Deep-link invites should immediately land users in the invited signup flow.
+    setMode('signup');
+    setAuthStep('credentials');
+    setSignUpStep(0);
+    setAuthHint(null);
+  }, [inviteToken]);
+
   const isCurrentSignUpStepValid = () => {
     switch (signUpStep) {
       case 0:
