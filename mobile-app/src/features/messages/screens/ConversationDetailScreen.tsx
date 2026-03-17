@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -9,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { FlashList, ListRenderItem } from '@shopify/flash-list';
+import { FlashList } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -22,11 +23,34 @@ import { useSendMessage } from '../hooks/useSendMessage';
 import { MessagesStackParamList } from './MessagesStack';
 import { useSessionStore } from '../../../shared/session/session.store';
 import { getMessagesSocket } from '../../../shared/realtime/messages.socket';
-import { updateMessage } from '../../../shared/api/messages.api';
+import {
+  addMessageReaction,
+  MessageReactionType,
+  removeMessageReaction,
+  updateMessage,
+} from '../../../shared/api/messages.api';
 import { messagesKeys } from '../hooks/keys';
 import { featureFlags } from '../../../shared/config/runtime';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ConversationDetail'>;
+
+const reactionPickerOrder: MessageReactionType[] = [
+  'thumbsup',
+  'heart',
+  'laughing',
+  'astonished',
+  'cry',
+  'angry',
+];
+
+const reactionLabelByType: Record<MessageReactionType, string> = {
+  thumbsup: '+1',
+  heart: 'Love',
+  laughing: 'Haha',
+  astonished: 'Wow',
+  cry: 'Sad',
+  angry: 'Angry',
+};
 
 export function ConversationDetailScreen({ route }: Props) {
   const { t } = useTranslation();
@@ -37,6 +61,7 @@ export function ConversationDetailScreen({ route }: Props) {
   const queryClient = useQueryClient();
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingBody, setEditingBody] = useState('');
+  const [reactionTargetMessageId, setReactionTargetMessageId] = useState<string | null>(null);
 
   const editMessageMutation = useMutation({
     mutationFn: (payload: { messageId: string; body: string }) =>
@@ -61,15 +86,128 @@ export function ConversationDetailScreen({ route }: Props) {
     },
   });
 
+  const reactionMutation = useMutation({
+    mutationFn: async (payload: { messageId: string; reactionType: MessageReactionType; remove: boolean }) => {
+      if (payload.remove) {
+        return removeMessageReaction(payload.messageId, payload.reactionType);
+      }
+
+      return addMessageReaction(payload.messageId, payload.reactionType);
+    },
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: messagesKeys.conversationMessages(conversationId) });
+      const previous = queryClient.getQueryData(messagesKeys.conversationMessages(conversationId));
+
+      queryClient.setQueryData(messagesKeys.conversationMessages(conversationId), (current: any) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          pages: current.pages.map((page: any) => ({
+            ...page,
+            items: page.items.map((item: Message) => {
+              if (item.id !== payload.messageId) {
+                return item;
+              }
+
+              if (payload.remove) {
+                return {
+                  ...item,
+                  reactions: item.reactions
+                    .map((reaction) => {
+                      if (reaction.reactionType !== payload.reactionType) {
+                        return reaction.reactedByMe ? { ...reaction, reactedByMe: false } : reaction;
+                      }
+
+                      return {
+                        ...reaction,
+                        count: Math.max(0, reaction.count - 1),
+                        reactedByMe: false,
+                      };
+                    })
+                    .filter((reaction) => reaction.count > 0),
+                };
+              }
+
+              const withoutMine = item.reactions
+                .map((reaction) =>
+                  reaction.reactedByMe
+                    ? { ...reaction, reactedByMe: false, count: Math.max(0, reaction.count - 1) }
+                    : reaction,
+                )
+                .filter((reaction) => reaction.count > 0);
+
+              const target = withoutMine.find((reaction) => reaction.reactionType === payload.reactionType);
+              if (target) {
+                return {
+                  ...item,
+                  reactions: withoutMine.map((reaction) =>
+                    reaction.reactionType === payload.reactionType
+                      ? { ...reaction, count: reaction.count + 1, reactedByMe: true }
+                      : reaction,
+                  ),
+                };
+              }
+
+              return {
+                ...item,
+                reactions: [
+                  ...withoutMine,
+                  {
+                    reactionType: payload.reactionType,
+                    count: 1,
+                    reactedByMe: true,
+                  },
+                ],
+              };
+            }),
+          })),
+        };
+      });
+
+      return { previous };
+    },
+    onSuccess: (result, payload) => {
+      queryClient.setQueryData(messagesKeys.conversationMessages(conversationId), (current: any) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          pages: current.pages.map((page: any) => ({
+            ...page,
+            items: page.items.map((item: Message) =>
+              item.id === payload.messageId
+                ? {
+                    ...item,
+                    reactions: result.reactions,
+                  }
+                : item,
+            ),
+          })),
+        };
+      });
+    },
+    onError: (error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(messagesKeys.conversationMessages(conversationId), context.previous);
+      }
+
+      Alert.alert(t('messages.alerts.reactionFailedTitle'), (error as Error).message);
+    },
+  });
+
   const messages = useMemo(
     () => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [messagesQuery.data],
   );
-  const ConversationMessagesListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
   const keyExtractor = useCallback((item: Message) => item.id, []);
 
-  const renderMessageItem = useCallback<ListRenderItem<Message>>(
-    ({ item }) => {
+  const renderMessageItem = useCallback(
+    ({ item }: { item: Message }) => {
       const isMine = item.senderId === currentUserId;
       const isOptimistic = item.id.startsWith('optimistic-');
 
@@ -86,10 +224,9 @@ export function ConversationDetailScreen({ route }: Props) {
           message={item}
           status={status}
           onLongPress={
-            isMine && !isOptimistic
+            !isOptimistic
               ? () => {
-                  setEditingMessageId(item.id);
-                  setEditingBody(item.body);
+                  setReactionTargetMessageId((current) => (current === item.id ? null : item.id));
                 }
               : undefined
           }
@@ -133,28 +270,49 @@ export function ConversationDetailScreen({ route }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ConversationMessagesListComponent<Message>
-        data={messages}
-        keyExtractor={keyExtractor}
-        renderItem={renderMessageItem}
-        estimatedItemSize={92}
-        drawDistance={300}
-        extraData={messagesQuery.lastReadByOtherMessageId ?? ''}
-        contentContainerStyle={styles.listContent}
-        inverted
-        onEndReached={() => {
-          if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
-            messagesQuery.fetchNextPage();
+      {featureFlags.flashListRendering ? (
+        <FlashList<Message>
+          data={messages}
+          keyExtractor={keyExtractor}
+          renderItem={renderMessageItem}
+          extraData={messagesQuery.lastReadByOtherMessageId ?? ''}
+          contentContainerStyle={styles.listContent}
+          inverted
+          onEndReached={() => {
+            if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
+              messagesQuery.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            messagesQuery.isFetchingNextPage ? (
+              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+            ) : null
           }
-        }}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          messagesQuery.isFetchingNextPage ? (
-            <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
-          ) : null
-        }
-        ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
-      />
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
+        />
+      ) : (
+        <FlatList<Message>
+          data={messages}
+          keyExtractor={keyExtractor}
+          renderItem={renderMessageItem}
+          extraData={messagesQuery.lastReadByOtherMessageId ?? ''}
+          contentContainerStyle={styles.listContent}
+          inverted
+          onEndReached={() => {
+            if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
+              messagesQuery.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            messagesQuery.isFetchingNextPage ? (
+              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+            ) : null
+          }
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
+        />
+      )}
       {typingLabel ? <Text style={styles.typingText}>{typingLabel}</Text> : null}
       {editingMessageId ? (
         <View style={styles.editBar}>
@@ -193,6 +351,63 @@ export function ConversationDetailScreen({ route }: Props) {
           </Pressable>
         </View>
       ) : null}
+      {reactionTargetMessageId ? (
+        <View style={styles.reactionPickerBar}>
+          {reactionPickerOrder.map((reactionType) => (
+            <Pressable
+              key={reactionType}
+              style={styles.reactionPickerChip}
+              onPress={() => {
+                const target = messages.find((message) => message.id === reactionTargetMessageId);
+                if (!target) {
+                  return;
+                }
+
+                const mine = target.reactions.find((reaction) => reaction.reactedByMe);
+                const remove = mine?.reactionType === reactionType;
+
+                reactionMutation.mutate({
+                  messageId: reactionTargetMessageId,
+                  reactionType,
+                  remove,
+                });
+                setReactionTargetMessageId(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={reactionLabelByType[reactionType]}
+            >
+              <Text style={styles.reactionPickerChipText}>{reactionLabelByType[reactionType]}</Text>
+            </Pressable>
+          ))}
+          {messages.find((message) => message.id === reactionTargetMessageId)?.senderId === currentUserId ? (
+            <Pressable
+              style={styles.reactionPickerEdit}
+              onPress={() => {
+                const target = messages.find((message) => message.id === reactionTargetMessageId);
+                if (!target) {
+                  return;
+                }
+
+                setEditingMessageId(target.id);
+                setEditingBody(target.body);
+                setReactionTargetMessageId(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.actions.edit')}
+            >
+              <Text style={styles.reactionPickerEditText}>{t('common.actions.edit')}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            style={styles.reactionPickerClose}
+            onPress={() => setReactionTargetMessageId(null)}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.actions.cancel')}
+          >
+            <Text style={styles.reactionPickerCloseText}>{t('common.actions.cancel')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <MessageComposer
         isSending={sendMutation.isPending}
         onTypingChange={(isTyping) => {
@@ -205,8 +420,15 @@ export function ConversationDetailScreen({ route }: Props) {
             conversationId,
           });
         }}
-        onSend={(text) => {
-          sendMutation.mutate(text);
+        onSend={(input, onSent) => {
+          sendMutation.mutate(input, {
+            onSuccess: () => {
+              onSent();
+            },
+            onError: (error) => {
+              Alert.alert(t('messages.alerts.sendAttachmentFailedTitle'), (error as Error).message);
+            },
+          });
         }}
       />
     </SafeAreaView>
@@ -280,5 +502,52 @@ const styles = StyleSheet.create({
   editCancelText: {
     color: '#334155',
     fontWeight: '600',
+  },
+  reactionPickerBar: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  reactionPickerChip: {
+    borderWidth: 1,
+    borderColor: '#0B6E4F',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#DCFCE7',
+  },
+  reactionPickerChipText: {
+    color: '#166534',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  reactionPickerClose: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  reactionPickerCloseText: {
+    color: '#334155',
+    fontWeight: '600',
+  },
+  reactionPickerEdit: {
+    borderWidth: 1,
+    borderColor: '#0B6E4F',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#ECFDF5',
+  },
+  reactionPickerEditText: {
+    color: '#166534',
+    fontWeight: '700',
   },
 });

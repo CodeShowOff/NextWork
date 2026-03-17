@@ -10,7 +10,7 @@ export interface UploadContract {
 
 export async function createUploadContract(payload: {
   fileName: string;
-  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
   sizeBytes?: number;
 }) {
   return requestJson<UploadContract>('/media/uploads/presign', {
@@ -19,10 +19,10 @@ export async function createUploadContract(payload: {
   });
 }
 
-export async function uploadImageWithContract(params: {
+export async function uploadAttachmentWithContract(params: {
   localUri: string;
   fileName: string;
-  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
   sizeBytes?: number;
 }) {
   const contract = await createUploadContract({
@@ -52,3 +52,5 @@ export async function uploadImageWithContract(params: {
     sizeBytes: params.sizeBytes ?? blob.size,
   };
 }
+
+export const uploadImageWithContract = uploadAttachmentWithContract;

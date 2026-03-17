@@ -23,6 +23,16 @@ const conversationInclude = {
           profile: true,
         },
       },
+      attachments: {
+        orderBy: {
+          createdAt: 'asc' as const,
+        },
+      },
+      reactions: {
+        orderBy: {
+          createdAt: 'asc' as const,
+        },
+      },
     },
   },
 };
@@ -31,6 +41,16 @@ const messageInclude = {
   sender: {
     include: {
       profile: true,
+    },
+  },
+  attachments: {
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
+  },
+  reactions: {
+    orderBy: {
+      createdAt: 'asc' as const,
     },
   },
 };
@@ -68,6 +88,26 @@ export interface ConversationWithRelations {
         avatarUrl: string | null;
       } | null;
     };
+    attachments: Array<{
+      attachmentId: string;
+      mediaType: string;
+      mimeType: string;
+      fileName: string;
+      fileSizeBytes: number;
+      storageKey: string;
+      publicUrl: string;
+      width: number | null;
+      height: number | null;
+      durationMs: number | null;
+      thumbnailKey: string | null;
+      createdAt: Date;
+    }>;
+    reactions: Array<{
+      userId: string;
+      reactionType: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
   }>;
 }
 
@@ -86,6 +126,26 @@ export interface MessageWithSender {
       avatarUrl: string | null;
     } | null;
   };
+  attachments: Array<{
+    attachmentId: string;
+    mediaType: string;
+    mimeType: string;
+    fileName: string;
+    fileSizeBytes: number;
+    storageKey: string;
+    publicUrl: string;
+    width: number | null;
+    height: number | null;
+    durationMs: number | null;
+    thumbnailKey: string | null;
+    createdAt: Date;
+  }>;
+  reactions: Array<{
+    userId: string;
+    reactionType: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
 }
 
 @Injectable()
@@ -209,6 +269,19 @@ export class MessagesRepository {
     senderId: string;
     body: string;
     messageType: string;
+    attachments?: Array<{
+      attachmentId: string;
+      mediaType: string;
+      mimeType: string;
+      fileName: string;
+      fileSizeBytes: number;
+      storageKey: string;
+      publicUrl: string;
+      width?: number | null;
+      height?: number | null;
+      durationMs?: number | null;
+      thumbnailKey?: string | null;
+    }>;
   }): Promise<MessageWithSender> {
     return this.prisma.message.create({
       data: {
@@ -224,6 +297,29 @@ export class MessagesRepository {
         },
         body: params.body,
         messageType: params.messageType,
+        ...(params.attachments?.length
+          ? {
+              attachments: {
+                createMany: {
+                  data: params.attachments.map((attachment) => ({
+                    attachmentId: attachment.attachmentId,
+                    mediaType: attachment.mediaType,
+                    mimeType: attachment.mimeType,
+                    fileName: attachment.fileName,
+                    fileSizeBytes: attachment.fileSizeBytes,
+                    storageKey: attachment.storageKey,
+                    publicUrl: attachment.publicUrl,
+                    ...(attachment.width !== undefined && attachment.width !== null ? { width: attachment.width } : {}),
+                    ...(attachment.height !== undefined && attachment.height !== null ? { height: attachment.height } : {}),
+                    ...(attachment.durationMs !== undefined && attachment.durationMs !== null
+                      ? { durationMs: attachment.durationMs }
+                      : {}),
+                    ...(attachment.thumbnailKey ? { thumbnailKey: attachment.thumbnailKey } : {}),
+                  })),
+                },
+              },
+            }
+          : {}),
       },
       include: messageInclude,
     }) as unknown as Promise<MessageWithSender>;
@@ -255,6 +351,27 @@ export class MessagesRepository {
       },
       select: {
         id: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  findMessageById(
+    messageId: string,
+  ): Promise<{
+    id: string;
+    conversationId: string;
+    senderId: string;
+    createdAt: Date;
+  } | null> {
+    return this.prisma.message.findUnique({
+      where: {
+        id: messageId,
+      },
+      select: {
+        id: true,
+        conversationId: true,
+        senderId: true,
         createdAt: true,
       },
     });
@@ -298,6 +415,58 @@ export class MessagesRepository {
       },
       include: messageInclude,
     }) as unknown as Promise<MessageWithSender>;
+  }
+
+  async upsertReaction(params: { messageId: string; userId: string; reactionType: string }): Promise<void> {
+    await this.prisma.messageReaction.upsert({
+      where: {
+        messageId_userId: {
+          messageId: params.messageId,
+          userId: params.userId,
+        },
+      },
+      update: {
+        reactionType: params.reactionType,
+      },
+      create: {
+        messageId: params.messageId,
+        userId: params.userId,
+        reactionType: params.reactionType,
+      },
+    });
+  }
+
+  async removeReaction(params: { messageId: string; userId: string; reactionType?: string }): Promise<number> {
+    const result = await this.prisma.messageReaction.deleteMany({
+      where: {
+        messageId: params.messageId,
+        userId: params.userId,
+        ...(params.reactionType ? { reactionType: params.reactionType } : {}),
+      },
+    });
+
+    return result.count;
+  }
+
+  listMessageReactions(messageId: string): Promise<Array<{ userId: string; reactionType: string }>> {
+    return this.prisma.messageReaction.findMany({
+      where: {
+        messageId,
+      },
+      select: {
+        userId: true,
+        reactionType: true,
+      },
+    });
+  }
+
+  findMessageWithRelations(messageId: string): Promise<MessageWithSender | null> {
+    return this.prisma.message.findUnique({
+      where: {
+        id: messageId,
+      },
+      include: messageInclude,
+    }) as unknown as Promise<MessageWithSender | null>;
   }
 
   async countUnreadMessagesForUser(userId: string): Promise<number> {

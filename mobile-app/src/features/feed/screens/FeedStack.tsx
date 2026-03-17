@@ -6,6 +6,7 @@ import { FeedPost } from '../../../shared/api/feed.api';
 import { FollowListScreen } from '../../profile/screens/FollowListScreen';
 import { UserProfileScreen } from '../../profile/screens/UserProfileScreen';
 import { FeedScreen } from '../FeedScreen';
+import { LikerListScreen } from './LikerListScreen';
 import { PostDetailScreen } from './PostDetailScreen';
 
 export type FeedStackParamList = {
@@ -19,6 +20,10 @@ export type FeedStackParamList = {
   FollowList: {
     userId: string;
     mode: 'followers' | 'following';
+    title: string;
+  };
+  LikerList: {
+    postId: string;
     title: string;
   };
 };
@@ -36,6 +41,13 @@ export function FeedStack() {
       <Stack.Screen
         name="FollowList"
         component={FollowListScreen}
+        options={({ route }: { route: { params: { title: string } } }) => ({
+          title: route.params.title,
+        })}
+      />
+      <Stack.Screen
+        name="LikerList"
+        component={LikerListScreen}
         options={({ route }: { route: { params: { title: string } } }) => ({
           title: route.params.title,
         })}

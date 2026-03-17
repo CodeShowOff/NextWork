@@ -1,4 +1,4 @@
-import { ExecutionContext, INestApplication } from '@nestjs/common';
+import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
@@ -47,6 +47,8 @@ describe('MessagesController Integration', () => {
       senderId: 'u1',
       body: 'Hello',
       messageType: 'text',
+      attachments: [],
+      reactions: [],
       createdAt: '2026-03-16T00:00:00.000Z',
       editedAt: null,
       sender: {
@@ -62,6 +64,8 @@ describe('MessagesController Integration', () => {
       senderId: 'u1',
       body: 'Edited hello',
       messageType: 'text',
+      attachments: [],
+      reactions: [],
       createdAt: '2026-03-16T00:00:00.000Z',
       editedAt: '2026-03-16T00:01:00.000Z',
       sender: {
@@ -69,6 +73,20 @@ describe('MessagesController Integration', () => {
         displayName: 'User One',
         avatarUrl: null,
       },
+    }),
+    upsertMessageReaction: jest.fn().mockResolvedValue({
+      messageId: 'm1',
+      reactions: [
+        {
+          reactionType: 'heart',
+          count: 1,
+          reactedByMe: true,
+        },
+      ],
+    }),
+    removeMessageReaction: jest.fn().mockResolvedValue({
+      messageId: 'm1',
+      reactions: [],
     }),
   };
 
@@ -101,6 +119,13 @@ describe('MessagesController Integration', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
   });
 
@@ -111,7 +136,7 @@ describe('MessagesController Integration', () => {
   it('POST /messages/conversations creates conversation for current user', async () => {
     const payload = {
       type: 'direct',
-      participantIds: ['u2'],
+      participantIds: ['89ce5ff7-bc2a-4df8-b56b-b8e92f93e928'],
     };
 
     const response = await request(app.getHttpServer())
@@ -127,7 +152,7 @@ describe('MessagesController Integration', () => {
     await request(app.getHttpServer()).get('/messages/conversations?limit=10').expect(200);
 
     expect(messagesServiceMock.listConversations).toHaveBeenCalledWith('u1', {
-      limit: '10',
+      limit: 10,
     });
   });
 
@@ -162,6 +187,46 @@ describe('MessagesController Integration', () => {
     expect(messagesServiceMock.sendMessage).toHaveBeenCalledWith('u1', 'c1', payload);
   });
 
+  it('POST /messages/conversations/:id/messages accepts attachment payload', async () => {
+    const payload = {
+      attachments: [
+        {
+          mediaType: 'image',
+          mimeType: 'image/jpeg',
+          fileName: 'photo.jpg',
+          fileSizeBytes: 1024,
+          storageKey: 'uploads/u1/photo.jpg',
+          publicUrl: 'https://cdn.workplace.local/uploads/u1/photo.jpg',
+        },
+      ],
+    };
+
+    await request(app.getHttpServer())
+      .post('/messages/conversations/c1/messages')
+      .send(payload)
+      .expect(201);
+
+    expect(messagesServiceMock.sendMessage).toHaveBeenCalledWith('u1', 'c1', payload);
+  });
+
+  it('POST /messages/conversations/:id/messages rejects invalid attachment mime type', async () => {
+    await request(app.getHttpServer())
+      .post('/messages/conversations/c1/messages')
+      .send({
+        attachments: [
+          {
+            mediaType: 'document',
+            mimeType: 'application/zip',
+            fileName: 'archive.zip',
+            fileSizeBytes: 1024,
+            storageKey: 'uploads/u1/archive.zip',
+            publicUrl: 'https://cdn.workplace.local/uploads/u1/archive.zip',
+          },
+        ],
+      })
+      .expect(400);
+  });
+
   it('POST /messages/conversations/:id/read marks conversation read', async () => {
     await request(app.getHttpServer())
       .post('/messages/conversations/c1/read')
@@ -187,5 +252,26 @@ describe('MessagesController Integration', () => {
 
     expect(response.body.editedAt).toBe('2026-03-16T00:01:00.000Z');
     expect(messagesServiceMock.updateMessage).toHaveBeenCalledWith('u1', 'c1', 'm1', payload);
+  });
+
+  it('PUT /messages/:messageId/reactions upserts reaction', async () => {
+    const payload = { reactionType: 'heart' };
+
+    const response = await request(app.getHttpServer())
+      .put('/messages/m1/reactions')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body.messageId).toBe('m1');
+    expect(messagesServiceMock.upsertMessageReaction).toHaveBeenCalledWith('u1', 'm1', payload);
+  });
+
+  it('DELETE /messages/:messageId/reactions/:reactionType removes reaction', async () => {
+    const response = await request(app.getHttpServer())
+      .delete('/messages/m1/reactions/heart')
+      .expect(200);
+
+    expect(response.body.messageId).toBe('m1');
+    expect(messagesServiceMock.removeMessageReaction).toHaveBeenCalledWith('u1', 'm1', 'heart');
   });
 });

@@ -37,6 +37,7 @@ import {
   reconcilePollInFeed,
   updatePostInFeed,
 } from '../engagement-cache';
+import { canOpenLikerList } from '../likers-list.logic';
 import { FeedStackParamList } from './FeedStack';
 
 type Props = NativeStackScreenProps<FeedStackParamList, 'PostDetail'>;
@@ -372,7 +373,29 @@ export function PostDetailScreen({ route, navigation }: Props) {
               {likedByMe ? t('feed.actions.unlike') : t('feed.actions.like')} ({likeCount})
             </Text>
           </Pressable>
-          <Text style={styles.commentCountLabel}>{t('feed.detail.commentCount', { count: commentCount })}</Text>
+          <View style={styles.engagementMetaColumn}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('LikerList', {
+                  postId: postState.id,
+                  title: `${t('feed.actions.like')} (${likeCount})`,
+                })
+              }
+              disabled={!canOpenLikerList(likeCount)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('feed.actions.like')} (${likeCount})`}
+            >
+              <Text
+                style={[
+                  styles.likeCountLink,
+                  !canOpenLikerList(likeCount) ? styles.likeCountLinkDisabled : null,
+                ]}
+              >
+                {t('feed.actions.like')} ({likeCount})
+              </Text>
+            </Pressable>
+            <Text style={styles.commentCountLabel}>{t('feed.detail.commentCount', { count: commentCount })}</Text>
+          </View>
         </View>
         <View style={styles.postActionsRow}>
           <Pressable
@@ -613,6 +636,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  engagementMetaColumn: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
   actionButton: {
     backgroundColor: '#0B6E4F',
     borderRadius: 10,
@@ -625,6 +652,14 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  likeCountLink: {
+    color: '#0B6E4F',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  likeCountLinkDisabled: {
+    color: '#94A3B8',
   },
   commentCountLabel: {
     color: '#475569',

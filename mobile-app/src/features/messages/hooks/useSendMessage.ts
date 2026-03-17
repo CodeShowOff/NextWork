@@ -1,9 +1,99 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+function localAttachmentId() {
+  return `att-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
-import { sendMessage } from '../../../shared/api/messages.api';
+
+import { sendMessage, SendMessageAttachmentPayload } from '../../../shared/api/messages.api';
+import { uploadAttachmentWithContract } from '../../../shared/api/media.api';
 import { useSessionStore } from '../../../shared/session/session.store';
 import { Message } from '../types';
 import { insertLocalMessage, removeLocalMessage } from './useMessages';
+
+export type ComposerAttachment = {
+  id: string;
+  localUri: string;
+  fileName: string;
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  status: 'pending' | 'uploading' | 'failed' | 'uploaded';
+  errorMessage?: string;
+};
+
+export interface SendMessageInput {
+  body: string;
+  attachments: ComposerAttachment[];
+  onAttachmentStateChange?: (attachmentId: string, patch: Partial<ComposerAttachment>) => void;
+}
+
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+function toMediaType(contentType: ComposerAttachment['contentType']): SendMessageAttachmentPayload['mediaType'] {
+  if (contentType.startsWith('image/')) {
+    return 'image';
+  }
+
+  if (contentType.startsWith('video/')) {
+    return 'video';
+  }
+
+  return 'document';
+}
+
+async function waitFor(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function uploadWithRetry(
+  attachment: ComposerAttachment,
+  onAttachmentStateChange?: (attachmentId: string, patch: Partial<ComposerAttachment>) => void,
+) {
+  onAttachmentStateChange?.(attachment.id, { status: 'uploading', errorMessage: undefined });
+
+  let lastError: Error | null = null;
+  for (let index = 0; index <= RETRY_DELAYS_MS.length; index += 1) {
+    try {
+      const contract = await uploadAttachmentWithContract({
+        localUri: attachment.localUri,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+      });
+
+      onAttachmentStateChange?.(attachment.id, { status: 'uploaded', errorMessage: undefined });
+
+      const payload: SendMessageAttachmentPayload = {
+        attachmentId: localAttachmentId(),
+        mediaType: toMediaType(attachment.contentType),
+        mimeType: attachment.contentType,
+        fileName: attachment.fileName,
+        fileSizeBytes: attachment.sizeBytes ?? contract.sizeBytes ?? 0,
+        storageKey: contract.objectKey,
+        publicUrl: contract.publicUrl,
+        ...(attachment.width !== undefined ? { width: attachment.width } : {}),
+        ...(attachment.height !== undefined ? { height: attachment.height } : {}),
+        ...(attachment.durationMs !== undefined ? { durationMs: attachment.durationMs } : {}),
+      };
+
+      return payload;
+    } catch (error) {
+      lastError = error as Error;
+      if (index >= RETRY_DELAYS_MS.length) {
+        break;
+      }
+      await waitFor(RETRY_DELAYS_MS[index]);
+    }
+  }
+
+  onAttachmentStateChange?.(attachment.id, {
+    status: 'failed',
+    errorMessage: lastError?.message ?? 'Upload failed',
+  });
+  throw lastError ?? new Error('Upload failed');
+}
 
 function optimisticMessage(conversationId: string, text: string, userId: string): Message {
   const now = new Date().toISOString();
@@ -13,6 +103,8 @@ function optimisticMessage(conversationId: string, text: string, userId: string)
     senderId: userId,
     body: text,
     messageType: 'text',
+    attachments: [],
+    reactions: [],
     createdAt: now,
     editedAt: null,
     sender: {
@@ -28,9 +120,22 @@ export function useSendMessage(conversationId: string) {
   const userId = useSessionStore((state) => state.userId);
 
   return useMutation({
-    mutationFn: async (body: string) => sendMessage(conversationId, { body }),
-    onMutate: async (body) => {
-      const optimistic = optimisticMessage(conversationId, body, userId);
+    mutationFn: async (input: SendMessageInput) => {
+      const uploadedAttachments: SendMessageAttachmentPayload[] = [];
+      for (const attachment of input.attachments) {
+        const uploaded = await uploadWithRetry(attachment, input.onAttachmentStateChange);
+        uploadedAttachments.push(uploaded);
+      }
+
+      const trimmedBody = input.body.trim();
+      return sendMessage(conversationId, {
+        ...(trimmedBody ? { body: trimmedBody } : {}),
+        ...(uploadedAttachments.length ? { attachments: uploadedAttachments } : {}),
+        messageType: uploadedAttachments.length ? 'attachment' : 'text',
+      });
+    },
+    onMutate: async (input) => {
+      const optimistic = optimisticMessage(conversationId, input.body.trim(), userId);
       insertLocalMessage(queryClient, conversationId, optimistic);
       return { optimisticId: optimistic.id };
     },

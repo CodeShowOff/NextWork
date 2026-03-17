@@ -46,6 +46,7 @@ import {
   reconcilePollInFeed,
   updatePostInFeed,
 } from './engagement-cache';
+import { canOpenLikerList } from './likers-list.logic';
 
 const pageSize = 20;
 
@@ -750,6 +751,27 @@ export function FeedScreen({ navigation }: Props) {
               </Text>
               <View style={styles.actionsRow}>
                 <Pressable
+                  style={[styles.commentButton, !canOpenLikerList(item.stats.likeCount) ? styles.commentButtonDisabled : null]}
+                  onPress={() =>
+                    navigation.navigate('LikerList', {
+                      postId: item.id,
+                      title: `${t('feed.actions.like')} (${item.stats.likeCount})`,
+                    })
+                  }
+                  disabled={!canOpenLikerList(item.stats.likeCount)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('feed.actions.like')} (${item.stats.likeCount})`}
+                >
+                  <Text
+                    style={[
+                      styles.commentButtonText,
+                      !canOpenLikerList(item.stats.likeCount) ? styles.commentButtonTextDisabled : null,
+                    ]}
+                  >
+                    {t('feed.actions.like')} ({item.stats.likeCount})
+                  </Text>
+                </Pressable>
+                <Pressable
                   style={styles.actionButton}
                   onPress={() => toggleLikeMutation.mutate(item.id)}
                   disabled={toggleLikeMutation.isPending}
@@ -1117,9 +1139,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  commentButtonDisabled: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
   commentButtonText: {
     color: '#0B6E4F',
     fontWeight: '700',
+  },
+  commentButtonTextDisabled: {
+    color: '#94A3B8',
   },
   dangerButton: {
     borderWidth: 1,

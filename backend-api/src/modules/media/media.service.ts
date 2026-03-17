@@ -18,12 +18,24 @@ const CONTENT_TYPE_TO_EXTENSION: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'application/pdf': 'pdf',
 };
 
 const EXTENSIONS_BY_CONTENT_TYPE: Record<string, string[]> = {
   'image/jpeg': ['jpg', 'jpeg'],
   'image/png': ['png'],
   'image/webp': ['webp'],
+  'video/mp4': ['mp4'],
+  'application/pdf': ['pdf'],
+};
+
+const MAX_BYTES_BY_CONTENT_TYPE: Record<string, number> = {
+  'image/jpeg': 10 * 1024 * 1024,
+  'image/png': 10 * 1024 * 1024,
+  'image/webp': 10 * 1024 * 1024,
+  'video/mp4': 25 * 1024 * 1024,
+  'application/pdf': 15 * 1024 * 1024,
 };
 
 function extractFileExtension(fileName: string): string | null {
@@ -47,6 +59,13 @@ export class MediaService {
     const allowedExtensions = EXTENSIONS_BY_CONTENT_TYPE[payload.contentType] ?? [];
     if (extensionFromName && !allowedExtensions.includes(extensionFromName)) {
       throw new BadRequestException('File extension does not match declared content type.');
+    }
+
+    if (payload.sizeBytes) {
+      const maxBytes = MAX_BYTES_BY_CONTENT_TYPE[payload.contentType];
+      if (!maxBytes || payload.sizeBytes > maxBytes) {
+        throw new BadRequestException(`File size exceeds limit for ${payload.contentType}.`);
+      }
     }
 
     const extension = CONTENT_TYPE_TO_EXTENSION[payload.contentType] ?? 'bin';

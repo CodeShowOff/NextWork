@@ -1,6 +1,22 @@
 import { Conversation, Message, PaginatedResponse } from '../../features/messages/types';
 import { requestJson } from './http';
 
+export interface SendMessageAttachmentPayload {
+  attachmentId?: string;
+  mediaType: 'image' | 'video' | 'document';
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
+  fileName: string;
+  fileSizeBytes: number;
+  storageKey: string;
+  publicUrl: string;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  thumbnailKey?: string;
+}
+
+export type MessageReactionType = 'thumbsup' | 'heart' | 'laughing' | 'astonished' | 'cry' | 'angry';
+
 export function listConversations(params: { limit: number; before?: string }) {
   const search = new URLSearchParams({ limit: String(params.limit) });
   if (params.before) {
@@ -32,7 +48,10 @@ export function createConversation(payload: { type: 'direct' | 'group'; particip
   });
 }
 
-export function sendMessage(conversationId: string, payload: { body: string; messageType?: string }) {
+export function sendMessage(
+  conversationId: string,
+  payload: { body?: string; messageType?: string; attachments?: SendMessageAttachmentPayload[] },
+) {
   return requestJson<Message>(`/messages/conversations/${conversationId}/messages`, {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -51,4 +70,23 @@ export function markRead(conversationId: string, lastReadMessageId: string) {
     method: 'POST',
     body: JSON.stringify({ lastReadMessageId }),
   });
+}
+
+export function addMessageReaction(messageId: string, reactionType: MessageReactionType) {
+  return requestJson<{ messageId: string; reactions: Array<{ reactionType: MessageReactionType; count: number; reactedByMe: boolean }> }>(
+    `/messages/${messageId}/reactions`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ reactionType }),
+    },
+  );
+}
+
+export function removeMessageReaction(messageId: string, reactionType: MessageReactionType) {
+  return requestJson<{ messageId: string; reactions: Array<{ reactionType: MessageReactionType; count: number; reactedByMe: boolean }> }>(
+    `/messages/${messageId}/reactions/${reactionType}`,
+    {
+      method: 'DELETE',
+    },
+  );
 }

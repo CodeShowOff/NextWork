@@ -71,6 +71,28 @@ describe('MediaController Integration', () => {
     expect(mediaServiceMock.createUploadContract).toHaveBeenCalledWith('u1', payload);
   });
 
+  it('POST /media/uploads/presign accepts video upload contract payload', async () => {
+    await request(app.getHttpServer())
+      .post('/media/uploads/presign')
+      .send({
+        fileName: 'clip.mp4',
+        contentType: 'video/mp4',
+        sizeBytes: 5 * 1024 * 1024,
+      })
+      .expect(201);
+  });
+
+  it('POST /media/uploads/presign accepts pdf upload contract payload', async () => {
+    await request(app.getHttpServer())
+      .post('/media/uploads/presign')
+      .send({
+        fileName: 'manual.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 2 * 1024 * 1024,
+      })
+      .expect(201);
+  });
+
   it('POST /media/uploads/presign rejects invalid content type', async () => {
     await request(app.getHttpServer())
       .post('/media/uploads/presign')
@@ -87,7 +109,7 @@ describe('MediaController Integration', () => {
       .send({
         fileName: 'profile-photo.jpg',
         contentType: 'image/jpeg',
-        sizeBytes: 12 * 1024 * 1024,
+        sizeBytes: 51 * 1024 * 1024,
       })
       .expect(400);
   });

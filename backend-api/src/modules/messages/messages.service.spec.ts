@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 
 import { CacheService } from '../../common/cache/cache.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { MediaService } from '../media/media.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MessagesRepository } from './messages.repository';
 import { MessagesService } from './messages.service';
@@ -17,6 +18,10 @@ describe('MessagesService', () => {
     countUnreadMessagesForUser: jest.fn(),
     listParticipantIds: jest.fn(),
     listMessagesForConversation: jest.fn(),
+    findMessageById: jest.fn(),
+    upsertReaction: jest.fn(),
+    removeReaction: jest.fn(),
+    listMessageReactions: jest.fn(),
   } as unknown as MessagesRepository;
 
   const redisPublishMock = jest.fn();
@@ -30,6 +35,10 @@ describe('MessagesService', () => {
     createNotification: jest.fn(),
   } as unknown as NotificationsService;
 
+  const mediaServiceMock = {
+    isPublicMediaUrlAllowed: jest.fn(() => true),
+  } as unknown as MediaService;
+
   const cacheServiceMock = {
     deleteByPrefix: jest.fn(),
   } as unknown as CacheService;
@@ -41,6 +50,7 @@ describe('MessagesService', () => {
       redisServiceMock,
       notificationsServiceMock,
       cacheServiceMock,
+      mediaServiceMock,
     );
   });
 
@@ -52,6 +62,8 @@ describe('MessagesService', () => {
       senderId: 'u1',
       body: 'Hello',
       messageType: 'text',
+      attachments: [],
+      reactions: [],
       createdAt: new Date('2026-03-16T01:00:00.000Z'),
       editedAt: null,
       sender: {
@@ -94,6 +106,8 @@ describe('MessagesService', () => {
         senderId: 'u2',
         body: 'Persisted while offline',
         messageType: 'text',
+        attachments: [],
+        reactions: [],
         createdAt: new Date('2026-03-16T01:00:00.000Z'),
         editedAt: null,
         sender: {
@@ -137,6 +151,8 @@ describe('MessagesService', () => {
       senderId: 'u1',
       body: 'New body',
       messageType: 'text',
+      attachments: [],
+      reactions: [],
       createdAt: new Date('2026-03-16T01:00:00.000Z'),
       editedAt: new Date('2026-03-16T01:10:00.000Z'),
       sender: {
@@ -167,5 +183,135 @@ describe('MessagesService', () => {
     const result = await service.getUnreadCount('u1');
 
     expect(result).toEqual({ unreadCount: 9 });
+  });
+
+  it('accepts message attachments when media URLs are authorized', async () => {
+    (messagesRepositoryMock.assertParticipant as jest.Mock).mockResolvedValue(true);
+    (messagesRepositoryMock.listParticipantIds as jest.Mock).mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+    ]);
+    (messagesRepositoryMock.createMessage as jest.Mock).mockResolvedValue({
+      id: 'm2',
+      conversationId: 'c1',
+      senderId: 'u1',
+      body: '',
+      messageType: 'attachment',
+      attachments: [
+        {
+          attachmentId: 'a1',
+          mediaType: 'image',
+          mimeType: 'image/jpeg',
+          fileName: 'pic.jpg',
+          fileSizeBytes: 1024,
+          storageKey: 'uploads/u1/x.jpg',
+          publicUrl: 'https://cdn.workplace.local/uploads/u1/x.jpg',
+          width: 800,
+          height: 600,
+          durationMs: null,
+          thumbnailKey: null,
+          createdAt: new Date('2026-03-16T01:00:00.000Z'),
+        },
+      ],
+      reactions: [],
+      createdAt: new Date('2026-03-16T01:00:00.000Z'),
+      editedAt: null,
+      sender: {
+        id: 'u1',
+        profile: {
+          displayName: 'User One',
+          avatarUrl: null,
+        },
+      },
+    });
+
+    const result = await service.sendMessage('u1', 'c1', {
+      attachments: [
+        {
+          mediaType: 'image',
+          mimeType: 'image/jpeg',
+          fileName: 'pic.jpg',
+          fileSizeBytes: 1024,
+          storageKey: 'uploads/u1/x.jpg',
+          publicUrl: 'https://cdn.workplace.local/uploads/u1/x.jpg',
+          width: 800,
+          height: 600,
+        },
+      ],
+    });
+
+    expect(result.attachments).toHaveLength(1);
+    expect((mediaServiceMock.isPublicMediaUrlAllowed as jest.Mock).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('rejects attachment URL that is not allowed for sender', async () => {
+    (messagesRepositoryMock.assertParticipant as jest.Mock).mockResolvedValue(true);
+    (messagesRepositoryMock.listParticipantIds as jest.Mock).mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+    ]);
+    (mediaServiceMock.isPublicMediaUrlAllowed as jest.Mock).mockReturnValue(false);
+
+    await expect(
+      service.sendMessage('u1', 'c1', {
+        attachments: [
+          {
+            mediaType: 'document',
+            mimeType: 'application/pdf',
+            fileName: 'spec.pdf',
+            fileSizeBytes: 4096,
+            storageKey: 'uploads/u2/spec.pdf',
+            publicUrl: 'https://cdn.workplace.local/uploads/u2/spec.pdf',
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('upserts reaction with idempotent summary response', async () => {
+    (messagesRepositoryMock.findMessageById as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u2',
+      createdAt: new Date('2026-03-16T01:00:00.000Z'),
+    });
+    (messagesRepositoryMock.assertParticipant as jest.Mock).mockResolvedValue(true);
+    (messagesRepositoryMock.listParticipantIds as jest.Mock).mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+    ]);
+    (messagesRepositoryMock.listMessageReactions as jest.Mock).mockResolvedValue([
+      { userId: 'u1', reactionType: 'heart' },
+      { userId: 'u2', reactionType: 'heart' },
+    ]);
+
+    const result = await service.upsertMessageReaction('u1', 'm1', { reactionType: 'heart' });
+
+    expect(messagesRepositoryMock.upsertReaction).toHaveBeenCalledWith({
+      messageId: 'm1',
+      userId: 'u1',
+      reactionType: 'heart',
+    });
+    expect(result.reactions).toEqual([
+      {
+        reactionType: 'heart',
+        count: 2,
+        reactedByMe: true,
+      },
+    ]);
+  });
+
+  it('rejects reaction update when user is not a participant', async () => {
+    (messagesRepositoryMock.findMessageById as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      conversationId: 'c1',
+      senderId: 'u2',
+      createdAt: new Date('2026-03-16T01:00:00.000Z'),
+    });
+    (messagesRepositoryMock.assertParticipant as jest.Mock).mockResolvedValue(false);
+
+    await expect(service.upsertMessageReaction('u3', 'm1', { reactionType: 'heart' })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 });

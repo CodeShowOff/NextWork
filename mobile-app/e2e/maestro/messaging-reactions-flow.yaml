@@ -1,0 +1,13 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Messages
+- assertVisible: Messages
+- tapOn: ${CONVERSATION_TITLE}
+- assertVisible: Send
+# Manual step: long press a message bubble to open reactions.
+- assertVisible: +1
+- tapOn: Love
+# Manual step: validate reaction chip appears on sender and receiver devices.
+# Manual step: tap same reaction again to remove, then choose another reaction and verify realtime sync.
+- assertVisible: Send

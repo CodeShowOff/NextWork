@@ -4,14 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
 import { CacheService } from '../../common/cache/cache.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { MediaService } from '../media/media.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
+import { MessageAttachmentDto } from './dto/send-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { ALLOWED_REACTION_TYPES, UpsertMessageReactionDto } from './dto/upsert-message-reaction.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import {
   ConversationWithRelations,
@@ -32,6 +36,8 @@ export interface MessageView {
   senderId: string;
   body: string;
   messageType: string;
+  attachments: MessageAttachmentView[];
+  reactions: MessageReactionSummaryView[];
   createdAt: string;
   editedAt: string | null;
   sender: {
@@ -39,6 +45,26 @@ export interface MessageView {
     displayName: string;
     avatarUrl: string | null;
   };
+}
+
+export interface MessageReactionSummaryView {
+  reactionType: string;
+  count: number;
+  reactedByMe: boolean;
+}
+
+export interface MessageAttachmentView {
+  attachmentId: string;
+  mediaType: string;
+  mimeType: string;
+  fileName: string;
+  fileSizeBytes: number;
+  storageKey: string;
+  publicUrl: string;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  thumbnailKey: string | null;
 }
 
 export interface ConversationView {
@@ -79,17 +105,57 @@ interface MessageEditedEvent {
   message: MessageView;
 }
 
+interface MessageReactionUpdatedEvent {
+  conversationId: string;
+  participantIds: string[];
+  actorId: string;
+  messageId: string;
+  reactions: Array<{
+    reactionType: string;
+    count: number;
+  }>;
+  eventId: string;
+  serverTimestamp: string;
+}
+
+interface MessageAttachmentLifecycleEvent {
+  conversationId: string;
+  participantIds: string[];
+  actorId: string;
+  messageId?: string;
+  eventId: string;
+  serverTimestamp: string;
+  attachments?: MessageAttachmentView[];
+  reason?: string;
+}
+
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'application/pdf']);
+const MAX_ATTACHMENTS_PER_MESSAGE = 5;
+const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES_BY_MIME: Record<string, number> = {
+  'image/jpeg': 10 * 1024 * 1024,
+  'image/png': 10 * 1024 * 1024,
+  'image/webp': 10 * 1024 * 1024,
+  'video/mp4': 25 * 1024 * 1024,
+  'application/pdf': 15 * 1024 * 1024,
+};
+const ALLOWED_REACTION_TYPE_SET = new Set<string>(ALLOWED_REACTION_TYPES);
+
 @Injectable()
 export class MessagesService {
   private readonly newMessageChannel = 'messages:new';
   private readonly readMessageChannel = 'messages:read';
   private readonly editedMessageChannel = 'messages:edited';
+  private readonly reactionUpdatedChannel = 'messages:reaction-updated';
+  private readonly attachmentUploadedChannel = 'messages:attachment-uploaded';
+  private readonly attachmentFailedChannel = 'messages:attachment-failed';
 
   constructor(
     private readonly messagesRepository: MessagesRepository,
     private readonly redisService: RedisService,
     private readonly notificationsService: NotificationsService,
     private readonly cacheService: CacheService,
+    private readonly mediaService: MediaService,
   ) {}
 
   async createConversation(userId: string, payload: CreateConversationDto): Promise<ConversationView> {
@@ -195,7 +261,7 @@ export class MessagesService {
     const pageItems = hasMore ? messages.slice(0, pageSize) : messages;
 
     return {
-      items: pageItems.map((message) => this.toMessageView(message)),
+      items: pageItems.map((message) => this.toMessageView(message, userId)),
       nextCursor: hasMore ? pageItems[pageItems.length - 1]?.createdAt.toISOString() ?? null : null,
     };
   }
@@ -203,17 +269,37 @@ export class MessagesService {
   async sendMessage(userId: string, conversationId: string, payload: SendMessageDto): Promise<MessageView> {
     await this.ensureParticipant(conversationId, userId);
 
-    const message = await this.messagesRepository.createMessage({
-      conversationId,
-      senderId: userId,
-      body: payload.body.trim(),
-      messageType: payload.messageType ?? 'text',
-    });
-
-    const messageView = this.toMessageView(message);
     const participantIds = (await this.messagesRepository.listParticipantIds(conversationId)).map(
       (item) => item.userId,
     );
+
+    const normalizedBody = payload.body?.trim() ?? '';
+    if (!normalizedBody && !payload.attachments?.length) {
+      throw new BadRequestException('Message body is required when no attachments are provided.');
+    }
+
+    let normalizedAttachments: MessageAttachmentView[] = [];
+    try {
+      normalizedAttachments = this.normalizeAndValidateAttachments(userId, payload.attachments ?? []);
+    } catch (error) {
+      await this.publishAttachmentLifecycle(this.attachmentFailedChannel, {
+        conversationId,
+        participantIds,
+        actorId: userId,
+        reason: (error as Error).message,
+      });
+      throw error;
+    }
+
+    const message = await this.messagesRepository.createMessage({
+      conversationId,
+      senderId: userId,
+      body: normalizedBody,
+      messageType: payload.messageType ?? (normalizedAttachments.length ? 'attachment' : 'text'),
+      ...(normalizedAttachments.length ? { attachments: normalizedAttachments } : {}),
+    });
+
+    const messageView = this.toMessageView(message, userId);
 
     const eventPayload: MessageCreatedEvent = {
       conversationId,
@@ -236,6 +322,17 @@ export class MessagesService {
     );
 
     await this.redisService.getClient().publish(this.newMessageChannel, JSON.stringify(eventPayload));
+
+    if (messageView.attachments.length) {
+      await this.publishAttachmentLifecycle(this.attachmentUploadedChannel, {
+        conversationId,
+        participantIds,
+        actorId: userId,
+        messageId: messageView.id,
+        attachments: messageView.attachments,
+      });
+    }
+
     await Promise.all(participantIds.map((participantId) => this.invalidateConversationCache(participantId)));
 
     return messageView;
@@ -265,7 +362,7 @@ export class MessagesService {
 
     const updated = await this.messagesRepository.updateMessageBody(messageId, nextBody);
 
-    const messageView = this.toMessageView(updated);
+    const messageView = this.toMessageView(updated, userId);
     const participantIds = (await this.messagesRepository.listParticipantIds(conversationId)).map(
       (item) => item.userId,
     );
@@ -319,6 +416,88 @@ export class MessagesService {
     await this.ensureParticipant(conversationId, userId);
   }
 
+  async upsertMessageReaction(
+    userId: string,
+    messageId: string,
+    payload: UpsertMessageReactionDto,
+  ): Promise<{ messageId: string; reactions: MessageReactionSummaryView[] }> {
+    const message = await this.messagesRepository.findMessageById(messageId);
+    if (!message) {
+      throw new NotFoundException('Message not found.');
+    }
+
+    await this.ensureParticipant(message.conversationId, userId);
+
+    if (!ALLOWED_REACTION_TYPE_SET.has(payload.reactionType)) {
+      throw new BadRequestException('Unsupported reaction type.');
+    }
+
+    await this.messagesRepository.upsertReaction({
+      messageId,
+      userId,
+      reactionType: payload.reactionType,
+    });
+
+    const reactions = await this.buildReactionSummary(messageId, userId);
+    const participantIds = (await this.messagesRepository.listParticipantIds(message.conversationId)).map(
+      (item) => item.userId,
+    );
+
+    await this.publishReactionUpdated({
+      conversationId: message.conversationId,
+      participantIds,
+      actorId: userId,
+      messageId,
+      reactions: reactions.map((reaction) => ({
+        reactionType: reaction.reactionType,
+        count: reaction.count,
+      })),
+    });
+
+    return { messageId, reactions };
+  }
+
+  async removeMessageReaction(
+    userId: string,
+    messageId: string,
+    reactionType?: string,
+  ): Promise<{ messageId: string; reactions: MessageReactionSummaryView[] }> {
+    const message = await this.messagesRepository.findMessageById(messageId);
+    if (!message) {
+      throw new NotFoundException('Message not found.');
+    }
+
+    await this.ensureParticipant(message.conversationId, userId);
+
+    if (reactionType && !ALLOWED_REACTION_TYPE_SET.has(reactionType)) {
+      throw new BadRequestException('Unsupported reaction type.');
+    }
+
+    await this.messagesRepository.removeReaction({
+      messageId,
+      userId,
+      ...(reactionType ? { reactionType } : {}),
+    });
+
+    const reactions = await this.buildReactionSummary(messageId, userId);
+    const participantIds = (await this.messagesRepository.listParticipantIds(message.conversationId)).map(
+      (item) => item.userId,
+    );
+
+    await this.publishReactionUpdated({
+      conversationId: message.conversationId,
+      participantIds,
+      actorId: userId,
+      messageId,
+      reactions: reactions.map((reaction) => ({
+        reactionType: reaction.reactionType,
+        count: reaction.count,
+      })),
+    });
+
+    return { messageId, reactions };
+  }
+
   getMessageChannelName(): string {
     return this.newMessageChannel;
   }
@@ -329,6 +508,18 @@ export class MessagesService {
 
   getEditChannelName(): string {
     return this.editedMessageChannel;
+  }
+
+  getReactionUpdatedChannelName(): string {
+    return this.reactionUpdatedChannel;
+  }
+
+  getAttachmentUploadedChannelName(): string {
+    return this.attachmentUploadedChannel;
+  }
+
+  getAttachmentFailedChannelName(): string {
+    return this.attachmentFailedChannel;
   }
 
   private normalizeParticipantIds(userId: string, participantIds: string[]): string[] {
@@ -366,18 +557,43 @@ export class MessagesService {
         avatarUrl: participant.user.profile?.avatarUrl ?? null,
         role: participant.role,
       })),
-      lastMessage: conversation.messages[0] ? this.toMessageView(conversation.messages[0]) : null,
+      lastMessage: conversation.messages[0] ? this.toMessageView(conversation.messages[0], viewerId) : null,
       unreadCount,
     };
   }
 
-  private toMessageView(message: MessageWithSender): MessageView {
+  private toMessageView(message: MessageWithSender, viewerId: string): MessageView {
+    const reactionsByType = new Map<string, Set<string>>();
+    for (const reaction of message.reactions) {
+      const users = reactionsByType.get(reaction.reactionType) ?? new Set<string>();
+      users.add(reaction.userId);
+      reactionsByType.set(reaction.reactionType, users);
+    }
+
     return {
       id: message.id,
       conversationId: message.conversationId,
       senderId: message.senderId,
       body: message.body,
       messageType: message.messageType,
+      attachments: message.attachments.map((attachment) => ({
+        attachmentId: attachment.attachmentId,
+        mediaType: attachment.mediaType,
+        mimeType: attachment.mimeType,
+        fileName: attachment.fileName,
+        fileSizeBytes: attachment.fileSizeBytes,
+        storageKey: attachment.storageKey,
+        publicUrl: attachment.publicUrl,
+        width: attachment.width,
+        height: attachment.height,
+        durationMs: attachment.durationMs,
+        thumbnailKey: attachment.thumbnailKey,
+      })),
+      reactions: [...reactionsByType.entries()].map(([reactionType, users]) => ({
+        reactionType,
+        count: users.size,
+        reactedByMe: users.has(viewerId),
+      })),
       createdAt: message.createdAt.toISOString(),
       editedAt: message.editedAt ? message.editedAt.toISOString() : null,
       sender: {
@@ -390,5 +606,101 @@ export class MessagesService {
 
   private async invalidateConversationCache(userId: string): Promise<void> {
     await this.cacheService.deleteByPrefix(`conversation-summary:${userId}:`);
+  }
+
+  private normalizeAndValidateAttachments(userId: string, attachments: MessageAttachmentDto[]): MessageAttachmentView[] {
+    if (!attachments.length) {
+      return [];
+    }
+
+    if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw new BadRequestException(`Attachments exceed maximum count of ${MAX_ATTACHMENTS_PER_MESSAGE}.`);
+    }
+
+    let totalBytes = 0;
+    return attachments.map((attachment) => {
+      if (!ALLOWED_MIME_TYPES.has(attachment.mimeType)) {
+        throw new BadRequestException(`Unsupported attachment mime type: ${attachment.mimeType}`);
+      }
+
+      const maxPerMime = MAX_BYTES_BY_MIME[attachment.mimeType];
+      if (!maxPerMime || attachment.fileSizeBytes > maxPerMime) {
+        throw new BadRequestException(`Attachment exceeds allowed size for ${attachment.mimeType}.`);
+      }
+
+      totalBytes += attachment.fileSizeBytes;
+      if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+        throw new BadRequestException('Total attachment payload exceeds 50MB limit.');
+      }
+
+      if (!this.mediaService.isPublicMediaUrlAllowed(userId, attachment.publicUrl)) {
+        throw new ForbiddenException('Attachment URL is not allowed for this user.');
+      }
+
+      return {
+        attachmentId: attachment.attachmentId ?? randomUUID(),
+        mediaType: attachment.mediaType,
+        mimeType: attachment.mimeType,
+        fileName: attachment.fileName,
+        fileSizeBytes: attachment.fileSizeBytes,
+        storageKey: attachment.storageKey,
+        publicUrl: attachment.publicUrl,
+        width: attachment.width ?? null,
+        height: attachment.height ?? null,
+        durationMs: attachment.durationMs ?? null,
+        thumbnailKey: attachment.thumbnailKey ?? null,
+      };
+    });
+  }
+
+  private async publishAttachmentLifecycle(
+    channel: string,
+    payload: Omit<MessageAttachmentLifecycleEvent, 'eventId' | 'serverTimestamp'>,
+  ): Promise<void> {
+    await this.redisService
+      .getClient()
+      .publish(
+        channel,
+        JSON.stringify({
+          ...payload,
+          eventId: randomUUID(),
+          serverTimestamp: new Date().toISOString(),
+        } satisfies MessageAttachmentLifecycleEvent),
+      );
+  }
+
+  private async buildReactionSummary(
+    messageId: string,
+    viewerId: string,
+  ): Promise<MessageReactionSummaryView[]> {
+    const reactions = await this.messagesRepository.listMessageReactions(messageId);
+    const byType = new Map<string, Set<string>>();
+
+    for (const reaction of reactions) {
+      const users = byType.get(reaction.reactionType) ?? new Set<string>();
+      users.add(reaction.userId);
+      byType.set(reaction.reactionType, users);
+    }
+
+    return [...byType.entries()].map(([reactionType, users]) => ({
+      reactionType,
+      count: users.size,
+      reactedByMe: users.has(viewerId),
+    }));
+  }
+
+  private async publishReactionUpdated(
+    payload: Omit<MessageReactionUpdatedEvent, 'eventId' | 'serverTimestamp'>,
+  ): Promise<void> {
+    await this.redisService
+      .getClient()
+      .publish(
+        this.reactionUpdatedChannel,
+        JSON.stringify({
+          ...payload,
+          eventId: randomUUID(),
+          serverTimestamp: new Date().toISOString(),
+        } satisfies MessageReactionUpdatedEvent),
+      );
   }
 }

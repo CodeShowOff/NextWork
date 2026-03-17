@@ -31,6 +31,19 @@ interface MessageCreatedEvent {
     senderId: string;
     body: string;
     messageType: string;
+    attachments: Array<{
+      attachmentId: string;
+      mediaType: string;
+      mimeType: string;
+      fileName: string;
+      fileSizeBytes: number;
+      storageKey: string;
+      publicUrl: string;
+      width: number | null;
+      height: number | null;
+      durationMs: number | null;
+      thumbnailKey: string | null;
+    }>;
     createdAt: string;
     editedAt: string | null;
     sender: {
@@ -57,6 +70,19 @@ interface MessageEditedEvent {
     senderId: string;
     body: string;
     messageType: string;
+    attachments: Array<{
+      attachmentId: string;
+      mediaType: string;
+      mimeType: string;
+      fileName: string;
+      fileSizeBytes: number;
+      storageKey: string;
+      publicUrl: string;
+      width: number | null;
+      height: number | null;
+      durationMs: number | null;
+      thumbnailKey: string | null;
+    }>;
     createdAt: string;
     editedAt: string | null;
     sender: {
@@ -65,6 +91,42 @@ interface MessageEditedEvent {
       avatarUrl: string | null;
     };
   };
+}
+
+interface MessageReactionUpdatedEvent {
+  conversationId: string;
+  participantIds: string[];
+  actorId: string;
+  messageId: string;
+  reactions: Array<{
+    reactionType: string;
+    count: number;
+  }>;
+  eventId: string;
+  serverTimestamp: string;
+}
+
+interface MessageAttachmentLifecycleEvent {
+  conversationId: string;
+  participantIds: string[];
+  actorId: string;
+  messageId?: string;
+  eventId: string;
+  serverTimestamp: string;
+  attachments?: Array<{
+    attachmentId: string;
+    mediaType: string;
+    mimeType: string;
+    fileName: string;
+    fileSizeBytes: number;
+    storageKey: string;
+    publicUrl: string;
+    width: number | null;
+    height: number | null;
+    durationMs: number | null;
+    thumbnailKey: string | null;
+  }>;
+  reason?: string;
 }
 
 interface NotificationCreatedEvent {
@@ -136,6 +198,9 @@ export class MessagesGateway
       this.messagesService.getMessageChannelName(),
       this.messagesService.getReadChannelName(),
       this.messagesService.getEditChannelName(),
+      this.messagesService.getReactionUpdatedChannelName(),
+      this.messagesService.getAttachmentUploadedChannelName(),
+      this.messagesService.getAttachmentFailedChannelName(),
       this.notificationsService.getNotificationCreatedChannel(),
       this.notificationsService.getNotificationReadChannel(),
     );
@@ -152,6 +217,21 @@ export class MessagesGateway
 
       if (channel === this.messagesService.getEditChannelName()) {
         this.broadcastMessageEditedEvent(payload);
+        return;
+      }
+
+      if (channel === this.messagesService.getReactionUpdatedChannelName()) {
+        this.broadcastMessageReactionUpdatedEvent(payload);
+        return;
+      }
+
+      if (channel === this.messagesService.getAttachmentUploadedChannelName()) {
+        this.broadcastAttachmentLifecycleEvent('message.attachment.uploaded', payload);
+        return;
+      }
+
+      if (channel === this.messagesService.getAttachmentFailedChannelName()) {
+        this.broadcastAttachmentLifecycleEvent('message.attachment.failed', payload);
         return;
       }
 
@@ -248,7 +328,13 @@ export class MessagesGateway
   @SubscribeMessage('send_message')
   async sendMessage(
     @ConnectedSocket() client: SocketWithUser,
-    @MessageBody() payload: { conversationId?: string; body?: string; messageType?: string },
+    @MessageBody()
+    payload: {
+      conversationId?: string;
+      body?: string;
+      messageType?: string;
+      attachments?: SendMessageDto['attachments'];
+    },
   ): Promise<{ status: 'sent'; messageId: string }> {
     const user = this.getSocketUser(client);
 
@@ -256,13 +342,14 @@ export class MessagesGateway
       throw new WsException('conversationId is required');
     }
 
-    if (!payload?.body || !payload.body.trim()) {
-      throw new WsException('body is required');
+    if ((!payload?.body || !payload.body.trim()) && !payload?.attachments?.length) {
+      throw new WsException('body is required when attachments are missing');
     }
 
     const messagePayload: SendMessageDto = {
-      body: payload.body,
+      ...(payload.body ? { body: payload.body } : {}),
       ...(payload.messageType ? { messageType: payload.messageType } : {}),
+      ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
     };
 
     const message = await this.messagesService.sendMessage(user.sub, payload.conversationId, messagePayload);
@@ -449,6 +536,37 @@ export class MessagesGateway
       });
     } catch (error) {
       this.logger.error(`Failed to parse notification read event: ${(error as Error).message}`);
+    }
+  }
+
+  private broadcastAttachmentLifecycleEvent(
+    eventName: 'message.attachment.uploaded' | 'message.attachment.failed',
+    payload: string,
+  ): void {
+    try {
+      const event = JSON.parse(payload) as MessageAttachmentLifecycleEvent;
+      const roomName = this.conversationRoom(event.conversationId);
+
+      this.server.to(roomName).emit(eventName, event);
+      for (const participantId of event.participantIds) {
+        this.server.to(this.userRoom(participantId)).emit(eventName, event);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to parse ${eventName} event: ${(error as Error).message}`);
+    }
+  }
+
+  private broadcastMessageReactionUpdatedEvent(payload: string): void {
+    try {
+      const event = JSON.parse(payload) as MessageReactionUpdatedEvent;
+      const roomName = this.conversationRoom(event.conversationId);
+
+      this.server.to(roomName).emit('message.reaction.updated', event);
+      for (const participantId of event.participantIds) {
+        this.server.to(this.userRoom(participantId)).emit('message.reaction.updated', event);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to parse message reaction updated event: ${(error as Error).message}`);
     }
   }
 }

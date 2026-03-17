@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
@@ -9,6 +9,7 @@ import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { UpsertMessageReactionDto } from './dto/upsert-message-reaction.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import {
   ConversationView,
@@ -94,5 +95,23 @@ export class MessagesController {
   ): Promise<{ status: 'ok' }> {
     await this.messagesService.markConversationRead(user.sub, conversationId, payload.lastReadMessageId);
     return { status: 'ok' };
+  }
+
+  @Put(':messageId/reactions')
+  upsertReaction(
+    @CurrentUser() user: JwtPayload,
+    @Param('messageId') messageId: string,
+    @Body() payload: UpsertMessageReactionDto,
+  ): Promise<{ messageId: string; reactions: Array<{ reactionType: string; count: number; reactedByMe: boolean }> }> {
+    return this.messagesService.upsertMessageReaction(user.sub, messageId, payload);
+  }
+
+  @Delete(':messageId/reactions/:reactionType')
+  removeReaction(
+    @CurrentUser() user: JwtPayload,
+    @Param('messageId') messageId: string,
+    @Param('reactionType') reactionType: string,
+  ): Promise<{ messageId: string; reactions: Array<{ reactionType: string; count: number; reactedByMe: boolean }> }> {
+    return this.messagesService.removeMessageReaction(user.sub, messageId, reactionType);
   }
 }

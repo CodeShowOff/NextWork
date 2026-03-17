@@ -10,6 +10,8 @@ const requiredFlows = [
   'mobile-app/e2e/maestro/post-lifecycle-flow.yaml',
   'mobile-app/e2e/maestro/poll-vote-regression-flow.yaml',
   'mobile-app/e2e/maestro/messaging-offline-reconnect-flow.yaml',
+  'mobile-app/e2e/maestro/messaging-attachments-flow.yaml',
+  'mobile-app/e2e/maestro/messaging-reactions-flow.yaml',
   'mobile-app/e2e/maestro/notifications-cross-device-read-flow.yaml',
   'mobile-app/e2e/maestro/flashlist-pagination-flow.yaml',
 ];

@@ -1,0 +1,15 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Messages
+- assertVisible: Messages
+- tapOn: ${CONVERSATION_TITLE}
+- assertVisible: Send
+- tapOn: Attach
+# Manual step: select an image or video attachment from device picker.
+- tapOn: Send
+# Manual step: disable network briefly to force retry/failure state if needed.
+# Verify attachment chip transitions through pending/uploading and, on failure, shows continue action.
+- assertVisible: Send
+# Manual step: re-enable network and tap continue on failed attachment then Send.
+# Verify sent attachment appears in conversation and is visible on receiver device.

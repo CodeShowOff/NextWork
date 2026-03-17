@@ -4,6 +4,8 @@ import { useSessionStore } from '../session/session.store';
 import {
   ConversationMessageEvent,
   Message,
+  MessageAttachmentLifecycleEvent,
+  MessageReactionUpdatedEvent,
   MessageReadEvent,
   TypingEvent,
 } from '../../features/messages/types';
@@ -13,6 +15,9 @@ type RealtimeHandlers = {
   onConversationMessage?: (event: ConversationMessageEvent) => void;
   onConversationMessageEdited?: (event: ConversationMessageEvent) => void;
   onMessageEdited?: (message: Message) => void;
+  onAttachmentUploaded?: (event: MessageAttachmentLifecycleEvent) => void;
+  onAttachmentFailed?: (event: MessageAttachmentLifecycleEvent) => void;
+  onReactionUpdated?: (event: MessageReactionUpdatedEvent) => void;
   onRead?: (event: MessageReadEvent) => void;
   onTypingStart?: (event: TypingEvent) => void;
   onTypingStop?: (event: TypingEvent) => void;
@@ -48,6 +53,18 @@ export function connectMessagesSocket(handlers: RealtimeHandlers): Socket {
 
   if (handlers.onMessageEdited) {
     socket.on('message.edited', handlers.onMessageEdited);
+  }
+
+  if (handlers.onAttachmentUploaded) {
+    socket.on('message.attachment.uploaded', handlers.onAttachmentUploaded);
+  }
+
+  if (handlers.onAttachmentFailed) {
+    socket.on('message.attachment.failed', handlers.onAttachmentFailed);
+  }
+
+  if (handlers.onReactionUpdated) {
+    socket.on('message.reaction.updated', handlers.onReactionUpdated);
   }
 
   if (handlers.onRead) {

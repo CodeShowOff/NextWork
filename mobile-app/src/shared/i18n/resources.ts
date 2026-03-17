@@ -360,11 +360,14 @@ export const resources = {
         },
         composer: {
           placeholder: 'Type a message',
+          attach: 'Attach',
           send: 'Send',
           sending: '...',
         },
         alerts: {
           createConversationFailed: 'Could not create conversation',
+          sendAttachmentFailedTitle: 'Could not send attachment',
+          reactionFailedTitle: 'Could not update reaction',
           missingFieldsTitle: 'Missing fields',
           missingFieldsBody: 'User ID and access token are required.',
         },
@@ -585,6 +588,7 @@ export const resources = {
         },
         composer: {
           placeholder: 'Escribe un mensaje',
+          attach: 'Adjuntar',
           send: 'Enviar',
           sending: '...',
         },
@@ -593,6 +597,9 @@ export const resources = {
           statusSending: 'Enviando...',
           statusRead: 'Leido',
           statusSent: 'Enviado',
+        },
+        alerts: {
+          reactionFailedTitle: 'No se pudo actualizar la reaccion',
         },
       },
       notifications: {
@@ -724,6 +731,7 @@ export const resources = {
         },
         composer: {
           placeholder: 'Ecrire un message',
+          attach: 'Joindre',
           send: 'Envoyer',
           sending: '...',
         },
@@ -732,6 +740,9 @@ export const resources = {
           statusSending: 'Envoi...',
           statusRead: 'Lu',
           statusSent: 'Envoye',
+        },
+        alerts: {
+          reactionFailedTitle: 'Impossible de mettre a jour la reaction',
         },
       },
       notifications: {

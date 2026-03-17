@@ -34,6 +34,8 @@ function conversation(overrides: Partial<Conversation> = {}): Conversation {
       senderId: 'u2',
       body: 'Hello',
       messageType: 'text',
+      attachments: [],
+      reactions: [],
       createdAt: '2026-03-17T09:00:00.000Z',
       editedAt: null,
       sender: {

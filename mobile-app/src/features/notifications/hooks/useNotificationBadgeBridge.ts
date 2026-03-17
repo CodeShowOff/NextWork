@@ -10,7 +10,7 @@ import { useSessionStore } from '../../../shared/session/session.store';
 import { useNotificationBadgeStore } from '../notification-badge.store';
 import { PaginatedNotifications } from '../types';
 import { notificationsKeys } from './keys';
-import { applyNotificationReadEvent, mergeIncomingNotification } from './useNotifications';
+import { applyNotificationReadEvent, mergeIncomingNotification } from './notifications-pagination';
 
 export function useNotificationBadgeBridge() {
   const queryClient = useQueryClient();
