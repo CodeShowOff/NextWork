@@ -1,4 +1,4 @@
-# Phase 9 Later Testing Runbook
+# Later Testing Runbook
 
 Date created: 2026-03-17
 Owner: QA + Mobile + Backend
@@ -11,6 +11,7 @@ This runbook covers three deferred validation areas:
 1. Manual screen-reader pass on key mobile flows.
 2. Accessibility automated test additions for critical controls.
 3. Abuse and rate-limit verification using the abuse test script against a live API target.
+4. Mobile list performance benchmark and regression validation after FlashList migration.
 
 ## Exit Criteria
 
@@ -19,6 +20,9 @@ All of the following must be true:
 - Screen-reader checks pass for Feed, Post Detail, Messages, Notifications, and Profile.
 - Accessibility tests are added and passing in CI for critical controls.
 - Abuse check returns expected rate-limit behavior and records at least one 429 response.
+- Feed dropped-frames percentage improves by at least 30% versus baseline during fast scroll.
+- Feed time-to-first-content (TTFC) does not regress above baseline.
+- No increase in memory pressure crash count versus baseline.
 - Evidence is captured in this document under the Evidence Log section.
 
 ---
@@ -195,6 +199,68 @@ If no expected 429 appears:
 
 ---
 
+## Part D: Mobile FlashList Performance Benchmark
+
+### D1. Targets
+
+- Dropped frames improvement during fast feed scroll: >= 30% against baseline.
+- Feed TTFC: <= baseline.
+- Memory pressure crashes: no increase over baseline.
+
+### D2. Prerequisites
+
+- Android release build installed on a representative test device.
+- A seeded account with enough feed data to allow sustained fast scrolling.
+- ADB available and connected.
+- Baseline metrics file at documentation/baselines/mobile-perf-baseline.json.
+- Candidate metrics file at documentation/baselines/mobile-perf-current.json.
+
+### D3. Collect Raw Metrics (Android)
+
+1. Clear old graphics stats:
+
+```powershell
+adb shell dumpsys gfxinfo com.workplace.app reset
+```
+
+2. Launch the app and run the feed fast-scroll scenario for 30-60 seconds.
+
+3. Capture frame stats:
+
+```powershell
+adb shell dumpsys gfxinfo com.workplace.app > .\documentation\baselines\gfxinfo-current.txt
+```
+
+4. Capture TTFC and crash observations from your instrumentation/log pipeline and write the resulting values into documentation/baselines/mobile-perf-current.json.
+
+### D4. Regression Check Script
+
+Run from monorepo root:
+
+```bash
+npm run test:mobile-perf
+```
+
+This command executes:
+
+```bash
+node ./scripts/mobile-perf-regression-check.js --baseline ./documentation/baselines/mobile-perf-baseline.json --current ./documentation/baselines/mobile-perf-current.json --minDroppedFramesImprovement 30 --maxTtfcRegressionMs 0 --maxMemoryCrashIncrease 0
+```
+
+Pass criteria:
+
+- Dropped frame improvement check is PASS.
+- TTFC regression check is PASS.
+- Memory pressure crash increase check is PASS.
+
+Fail handling:
+
+- Recheck device thermal/background load before rerun.
+- Verify the same feed seed volume and same user journey for baseline/current.
+- If still failing, block release and open a performance regression issue with captured artifacts.
+
+---
+
 ## Evidence Log
 
 Use this template for signoff evidence.
@@ -222,6 +288,17 @@ Use this template for signoff evidence.
 - Attempts:
 - Expected status:
 - Output summary:
+- Result:
+
+### Mobile Performance Benchmark
+
+- Device and build:
+- Baseline metrics file:
+- Current metrics file:
+- Dropped-frames improvement:
+- TTFC baseline/current:
+- Memory pressure crashes baseline/current:
+- Regression script output summary:
 - Result:
 
 ---

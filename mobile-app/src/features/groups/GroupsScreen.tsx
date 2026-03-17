@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -597,6 +598,67 @@ export function GroupsScreen() {
     });
   }, [favoriteGroupIds, groupSortFilter, groupsQuery.data?.items, lastActivityByGroupId, visitedGroupIds]);
 
+  const keyExtractorOrganization = useCallback((item: OrganizationMembership) => item.organizationId, []);
+  const keyExtractorFilter = useCallback((item: GroupSortFilterOption) => item, []);
+  const keyExtractorGroup = useCallback((item: Group) => item.id, []);
+  const keyExtractorMember = useCallback((item: GroupMember) => item.userId + item.joinedAt, []);
+
+  const renderOrganizationChip = useCallback(
+    ({ item }: { item: OrganizationMembership }) => (
+      <Pressable
+        style={[
+          styles.chip,
+          item.organizationId === activeOrganizationId ? styles.chipActive : null,
+          item.organizationId === pendingOrganizationId ? styles.chipPending : null,
+        ]}
+        onPress={() => {
+          setPendingOrganizationId(item.organizationId);
+          switchMutation.mutate(item.organizationId);
+        }}
+        disabled={switchMutation.isPending}
+      >
+        <Text style={styles.chipText}>{item.organization.name}</Text>
+      </Pressable>
+    ),
+    [activeOrganizationId, pendingOrganizationId, switchMutation],
+  );
+
+  const renderGroupFilterChip = useCallback(
+    ({ item }: { item: GroupSortFilterOption }) => (
+      <Pressable
+        style={[
+          styles.groupFilterChip,
+          item === groupSortFilter ? styles.groupFilterChipActive : null,
+        ]}
+        onPress={() => setGroupSortFilter(item)}
+      >
+        <Text
+          style={[
+            styles.groupFilterChipText,
+            item === groupSortFilter ? styles.groupFilterChipTextActive : null,
+          ]}
+        >
+          {t(`groups.filters.${item}`)}
+        </Text>
+      </Pressable>
+    ),
+    [groupSortFilter, t],
+  );
+
+  const renderGroupMember = useCallback(
+    ({ item: member }: { item: GroupMember }) => (
+      <View style={styles.memberRow}>
+        <Text style={styles.memberName}>{member.displayName}</Text>
+        <Text style={styles.memberMeta}>
+          {t('groups.labels.memberDate', {
+            date: new Date(member.joinedAt).toLocaleDateString(),
+          })}
+        </Text>
+      </View>
+    ),
+    [t],
+  );
+
   if (organizationsQuery.isLoading) {
     return (
       <View style={styles.centerState}>
@@ -918,29 +980,25 @@ export function GroupsScreen() {
           </View>
         ) : null}
 
-        <FlatList<OrganizationMembership>
-          horizontal
-          data={organizations}
-          keyExtractor={(item) => item.organizationId}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[
-                styles.chip,
-                item.organizationId === activeOrganizationId ? styles.chipActive : null,
-                item.organizationId === pendingOrganizationId ? styles.chipPending : null,
-              ]}
-              onPress={() => {
-                setPendingOrganizationId(item.organizationId);
-                switchMutation.mutate(item.organizationId);
-              }}
-              disabled={switchMutation.isPending}
-            >
-              <Text style={styles.chipText}>{item.organization.name}</Text>
-            </Pressable>
-          )}
-          contentContainerStyle={styles.chipsRow}
-          showsHorizontalScrollIndicator={false}
-        />
+        {featureFlags.flashListRendering ? (
+          <FlashList<OrganizationMembership>
+            horizontal
+            data={organizations}
+            keyExtractor={keyExtractorOrganization}
+            renderItem={renderOrganizationChip}
+            contentContainerStyle={styles.chipsRow}
+            showsHorizontalScrollIndicator={false}
+          />
+        ) : (
+          <FlatList<OrganizationMembership>
+            horizontal
+            data={organizations}
+            keyExtractor={keyExtractorOrganization}
+            renderItem={renderOrganizationChip}
+            contentContainerStyle={styles.chipsRow}
+            showsHorizontalScrollIndicator={false}
+          />
+        )}
         {switchMutation.isPending ? (
           <Text style={styles.switchingText}>{t('groups.labels.switchingOrganization')}</Text>
         ) : null}
@@ -1061,41 +1119,36 @@ export function GroupsScreen() {
 
       <View style={styles.groupListHeaderRow}>
         <Text style={styles.groupListTitle}>{t('groups.title.yourGroups')}</Text>
-        <FlatList<GroupSortFilterOption>
-          horizontal
-          data={groupSortFilterOptions}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.groupFilterRow}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[
-                styles.groupFilterChip,
-                item === groupSortFilter ? styles.groupFilterChipActive : null,
-              ]}
-              onPress={() => setGroupSortFilter(item)}
-            >
-              <Text
-                style={[
-                  styles.groupFilterChipText,
-                  item === groupSortFilter ? styles.groupFilterChipTextActive : null,
-                ]}
-              >
-                {t(`groups.filters.${item}`)}
-              </Text>
-            </Pressable>
-          )}
-        />
+        {featureFlags.flashListRendering ? (
+          <FlashList<GroupSortFilterOption>
+            horizontal
+            data={groupSortFilterOptions}
+            keyExtractor={keyExtractorFilter}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groupFilterRow}
+            renderItem={renderGroupFilterChip}
+          />
+        ) : (
+          <FlatList<GroupSortFilterOption>
+            horizontal
+            data={groupSortFilterOptions}
+            keyExtractor={keyExtractorFilter}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groupFilterRow}
+            renderItem={renderGroupFilterChip}
+          />
+        )}
       </View>
 
       {groupsQuery.isLoading ? (
         <View style={styles.centerState}>
           <ActivityIndicator size="small" color="#0B6E4F" />
         </View>
-      ) : (
-        <FlatList<Group>
+      ) : featureFlags.flashListRendering ? (
+        <FlashList<Group>
           data={sortedAndFilteredGroups}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractorGroup}
+          extraData={`${membersGroupId}|${editingGroupId}|${favoriteGroupIds.join('|')}|${groupSortFilter}`}
           renderItem={({ item }) => (
             <View style={styles.groupCard}>
               <View style={styles.groupIdentityRow}>
@@ -1327,22 +1380,23 @@ export function GroupsScreen() {
                   {groupMembersQuery.isLoading ? (
                     <ActivityIndicator size="small" color="#0B6E4F" />
                   ) : (
-                    <FlatList<GroupMember>
-                      data={groupMembersQuery.data?.items ?? []}
-                      keyExtractor={(member) => member.userId + member.joinedAt}
-                      renderItem={({ item: member }) => (
-                        <View style={styles.memberRow}>
-                          <Text style={styles.memberName}>{member.displayName}</Text>
-                          <Text style={styles.memberMeta}>
-                            {t('groups.labels.memberDate', {
-                              date: new Date(member.joinedAt).toLocaleDateString(),
-                            })}
-                          </Text>
-                        </View>
-                      )}
-                      scrollEnabled={false}
-                      ListEmptyComponent={<Text style={styles.subtitle}>{t('groups.subtitle.noMembers')}</Text>}
-                    />
+                    featureFlags.flashListRendering ? (
+                      <FlashList<GroupMember>
+                        data={groupMembersQuery.data?.items ?? []}
+                        keyExtractor={keyExtractorMember}
+                        renderItem={renderGroupMember}
+                        scrollEnabled={false}
+                        ListEmptyComponent={<Text style={styles.subtitle}>{t('groups.subtitle.noMembers')}</Text>}
+                      />
+                    ) : (
+                      <FlatList<GroupMember>
+                        data={groupMembersQuery.data?.items ?? []}
+                        keyExtractor={keyExtractorMember}
+                        renderItem={renderGroupMember}
+                        scrollEnabled={false}
+                        ListEmptyComponent={<Text style={styles.subtitle}>{t('groups.subtitle.noMembers')}</Text>}
+                      />
+                    )
                   )}
                 </View>
               ) : null}
@@ -1358,7 +1412,275 @@ export function GroupsScreen() {
             </View>
           }
         />
-      )}
+        ) : (
+        <FlatList<Group>
+          data={sortedAndFilteredGroups}
+          keyExtractor={keyExtractorGroup}
+          extraData={`${membersGroupId}|${editingGroupId}|${favoriteGroupIds.join('|')}|${groupSortFilter}`}
+          renderItem={({ item }) => (
+            <View style={styles.groupCard}>
+              <View style={styles.groupIdentityRow}>
+                {item.photoUrl ? (
+                  <Image source={{ uri: item.photoUrl }} style={styles.groupPhoto} />
+                ) : (
+                  <View style={styles.groupPhotoPlaceholder}>
+                    <Text style={styles.groupPhotoPlaceholderText}>{item.name.slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.groupIdentityTextColumn}>
+                  <Text style={styles.groupTitle}>{item.name}</Text>
+                  <Text style={styles.groupMetaSecondary}>{`${item.groupPrivacy} • ${item.groupType}`}</Text>
+                </View>
+              </View>
+              {item.description ? <Text style={styles.groupDescription}>{item.description}</Text> : null}
+              <Text style={styles.groupMeta}>{t('groups.labels.memberCount', { count: item.memberCount })}</Text>
+              <View style={styles.groupActionsRow}>
+                <Pressable
+                  style={[
+                    styles.secondaryButton,
+                    favoriteGroupIds.includes(item.id) ? styles.favoriteButtonActive : null,
+                  ]}
+                  onPress={() => {
+                    setFavoriteGroupIds((current) =>
+                      current.includes(item.id)
+                        ? current.filter((groupId) => groupId !== item.id)
+                        : [...current, item.id],
+                    );
+                    markGroupActivity(item.id);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.secondaryButtonText,
+                      favoriteGroupIds.includes(item.id) ? styles.favoriteButtonTextActive : null,
+                    ]}
+                  >
+                    {favoriteGroupIds.includes(item.id)
+                      ? t('groups.buttons.unfavorite')
+                      : t('groups.buttons.favorite')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    joinGroupMutation.mutate(item.id);
+                  }}
+                  disabled={joinGroupMutation.isPending}
+                >
+                  <Text style={styles.secondaryButtonText}>{t('groups.buttons.join')}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    markGroupVisited(item.id);
+                    markGroupActivity(item.id);
+                    setMembersGroupId((current) => (current === item.id ? '' : item.id));
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {membersGroupId === item.id
+                      ? t('groups.buttons.hideMembers')
+                      : t('groups.buttons.viewMembers')}
+                  </Text>
+                </Pressable>
+                {canManageActiveOrganization ? (
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => {
+                      markGroupVisited(item.id);
+                      markGroupActivity(item.id);
+                      setEditingGroupId((current) => {
+                        if (current === item.id) {
+                          setEditingGroupName('');
+                          setEditingGroupDescription('');
+                          setEditingGroupType(groupTypeOptions[0]);
+                          setEditingGroupPrivacy(groupPrivacyOptions[0]);
+                          setEditingGroupPhotoUrl('');
+                          return '';
+                        }
+
+                        setEditingGroupName(item.name);
+                        setEditingGroupDescription(item.description ?? '');
+                        setEditingGroupType(item.groupType);
+                        setEditingGroupPrivacy(item.groupPrivacy);
+                        setEditingGroupPhotoUrl(item.photoUrl ?? '');
+                        return item.id;
+                      });
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>{t('groups.buttons.editGroup')}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {canManageActiveOrganization && editingGroupId === item.id ? (
+                <View style={styles.adminPanel}>
+                  <Text style={styles.adminPanelTitle}>{t('groups.title.groupAdmin')}</Text>
+                  <TextInput
+                    value={editingGroupName}
+                    onChangeText={setEditingGroupName}
+                    placeholder={t('groups.placeholders.groupName')}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    value={editingGroupDescription}
+                    onChangeText={setEditingGroupDescription}
+                    placeholder={t('groups.placeholders.groupDescription')}
+                    style={styles.input}
+                  />
+                  <Text style={styles.metadataLabel}>{t('groups.labels.groupType')}</Text>
+                  <View style={styles.metadataOptionsRow}>
+                    {groupTypeOptions.map((typeOption) => (
+                      <Pressable
+                        key={typeOption}
+                        style={[
+                          styles.metadataOptionChip,
+                          editingGroupType === typeOption ? styles.metadataOptionChipActive : null,
+                        ]}
+                        onPress={() => setEditingGroupType(typeOption)}
+                      >
+                        <Text
+                          style={[
+                            styles.metadataOptionText,
+                            editingGroupType === typeOption ? styles.metadataOptionTextActive : null,
+                          ]}
+                        >
+                          {typeOption}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.metadataLabel}>{t('groups.labels.groupPrivacy')}</Text>
+                  <View style={styles.metadataOptionsRow}>
+                    {groupPrivacyOptions.map((privacyOption) => (
+                      <Pressable
+                        key={privacyOption}
+                        style={[
+                          styles.metadataOptionChip,
+                          editingGroupPrivacy === privacyOption ? styles.metadataOptionChipActive : null,
+                        ]}
+                        onPress={() => setEditingGroupPrivacy(privacyOption)}
+                      >
+                        <Text
+                          style={[
+                            styles.metadataOptionText,
+                            editingGroupPrivacy === privacyOption ? styles.metadataOptionTextActive : null,
+                          ]}
+                        >
+                          {privacyOption}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={editingGroupPhotoUrl}
+                    onChangeText={setEditingGroupPhotoUrl}
+                    placeholder={t('groups.placeholders.groupPhotoUrl')}
+                    style={styles.input}
+                    autoCapitalize="none"
+                  />
+                  <View style={styles.adminActionsRow}>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        const nextName = editingGroupName.trim();
+                        if (!nextName) {
+                          return;
+                        }
+
+                        updateGroupMutation.mutate({
+                          groupId: item.id,
+                          name: nextName,
+                          description: editingGroupDescription,
+                          groupType: editingGroupType,
+                          groupPrivacy: editingGroupPrivacy,
+                          photoUrl: editingGroupPhotoUrl.trim() || undefined,
+                        });
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.secondaryButtonText}>{t('common.actions.save')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        setEditingGroupId('');
+                        setEditingGroupName('');
+                        setEditingGroupDescription('');
+                        setEditingGroupType(groupTypeOptions[0]);
+                        setEditingGroupPrivacy(groupPrivacyOptions[0]);
+                        setEditingGroupPhotoUrl('');
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.secondaryButtonText}>{t('common.actions.cancel')}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.dangerButton}
+                      onPress={() => {
+                        Alert.alert(
+                          t('groups.alerts.deleteGroupConfirmTitle'),
+                          t('groups.alerts.deleteGroupConfirmBody'),
+                          [
+                            { text: t('common.actions.cancel'), style: 'cancel' },
+                            {
+                              text: t('groups.buttons.deleteGroup'),
+                              style: 'destructive',
+                              onPress: () =>
+                                deleteGroupMutation.mutate({
+                                  groupId: item.id,
+                                  postPolicy: 'detach',
+                                }),
+                            },
+                          ],
+                        );
+                      }}
+                      disabled={isAdminActionLoading}
+                    >
+                      <Text style={styles.dangerButtonText}>{t('groups.buttons.deleteGroup')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              {membersGroupId === item.id ? (
+                <View style={styles.membersPanel}>
+                  {groupMembersQuery.isLoading ? (
+                    <ActivityIndicator size="small" color="#0B6E4F" />
+                  ) : (
+                    featureFlags.flashListRendering ? (
+                      <FlashList<GroupMember>
+                        data={groupMembersQuery.data?.items ?? []}
+                        keyExtractor={keyExtractorMember}
+                        renderItem={renderGroupMember}
+                        scrollEnabled={false}
+                        ListEmptyComponent={<Text style={styles.subtitle}>{t('groups.subtitle.noMembers')}</Text>}
+                      />
+                    ) : (
+                      <FlatList<GroupMember>
+                        data={groupMembersQuery.data?.items ?? []}
+                        keyExtractor={keyExtractorMember}
+                        renderItem={renderGroupMember}
+                        scrollEnabled={false}
+                        ListEmptyComponent={<Text style={styles.subtitle}>{t('groups.subtitle.noMembers')}</Text>}
+                      />
+                    )
+                  )}
+                </View>
+              ) : null}
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.centerState}>
+              <Text style={styles.subtitle}>
+                {groupSortFilter === 'favorites'
+                  ? t('groups.subtitle.noFavoriteGroups')
+                  : t('groups.subtitle.noGroups')}
+              </Text>
+            </View>
+          }
+        />
+        )}
     </SafeAreaView>
   );
 }

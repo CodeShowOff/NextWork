@@ -33,7 +33,7 @@ function buildMessage(item: NotificationItem, t: (key: string, options?: Record<
   }
 }
 
-export function NotificationListItem({ item, onPress, onLongPress, isActorMuted = false }: Props) {
+function NotificationListItemView({ item, onPress, onLongPress, isActorMuted = false }: Props) {
   const { t } = useTranslation();
   const message = buildMessage(item, t);
   const createdAtText = new Intl.DateTimeFormat(i18n.language, {
@@ -61,6 +61,20 @@ export function NotificationListItem({ item, onPress, onLongPress, isActorMuted 
     </Pressable>
   );
 }
+
+export const NotificationListItem = React.memo(NotificationListItemView, (previous, next) => {
+  return (
+    previous.item.id === next.item.id &&
+    previous.item.isRead === next.item.isRead &&
+    previous.item.type === next.item.type &&
+    previous.item.createdAt === next.item.createdAt &&
+    previous.item.actorId === next.item.actorId &&
+    previous.item.actor?.displayName === next.item.actor?.displayName &&
+    previous.isActorMuted === next.isActorMuted &&
+    previous.onPress === next.onPress &&
+    previous.onLongPress === next.onLongPress
+  );
+});
 
 const styles = StyleSheet.create({
   root: {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { InfiniteData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +28,7 @@ import {
 } from '../../../shared/api/feed.api';
 import { getLikeState, likePost, unlikePost } from '../../../shared/api/likes.api';
 import { i18n } from '../../../shared/i18n/i18n';
+import { featureFlags } from '../../../shared/config/runtime';
 import { useSessionStore } from '../../../shared/session/session.store';
 import {
   adjustCommentCountInFeed,
@@ -250,6 +252,39 @@ export function PostDetailScreen({ route, navigation }: Props) {
     () => commentsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [commentsQuery.data],
   );
+  const keyExtractorComment = useCallback((item: CommentItem) => item.id, []);
+  const renderCommentItem = useCallback(
+    ({ item }: { item: CommentItem }) => (
+      <View style={styles.commentCard}>
+        <View style={styles.commentHeader}>
+          <Text style={styles.commentAuthor}>{item.author.displayName}</Text>
+          <Text style={styles.commentTime}>
+            {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
+              new Date(item.createdAt),
+            )}
+          </Text>
+        </View>
+        <Text style={styles.commentBody}>{item.body}</Text>
+        <Pressable
+          style={styles.replyLinkButton}
+          onPress={() => setReplyingTo(item)}
+          disabled={createCommentMutation.isPending}
+        >
+          <Text style={styles.replyLinkText}>{t('feed.detail.actions.reply')}</Text>
+        </Pressable>
+        {item.author.id === currentUserId ? (
+          <Pressable
+            style={styles.deleteLinkButton}
+            onPress={() => deleteCommentMutation.mutate(item.id)}
+            disabled={deleteCommentMutation.isPending}
+          >
+            <Text style={styles.deleteLinkText}>{t('feed.detail.actions.delete')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    ),
+    [createCommentMutation.isPending, currentUserId, deleteCommentMutation, t],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -384,53 +419,45 @@ export function PostDetailScreen({ route, navigation }: Props) {
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#0B6E4F" />
         </View>
-      ) : (
-        <FlatList<CommentItem>
-          data={comments}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.commentCard}>
-              <View style={styles.commentHeader}>
-                <Text style={styles.commentAuthor}>{item.author.displayName}</Text>
-                <Text style={styles.commentTime}>
-                  {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
-                    new Date(item.createdAt),
-                  )}
-                </Text>
-              </View>
-              <Text style={styles.commentBody}>{item.body}</Text>
-              <Pressable
-                style={styles.replyLinkButton}
-                onPress={() => setReplyingTo(item)}
-                disabled={createCommentMutation.isPending}
-              >
-                <Text style={styles.replyLinkText}>{t('feed.detail.actions.reply')}</Text>
-              </Pressable>
-              {item.author.id === currentUserId ? (
-                <Pressable
-                  style={styles.deleteLinkButton}
-                  onPress={() => deleteCommentMutation.mutate(item.id)}
-                  disabled={deleteCommentMutation.isPending}
-                >
-                  <Text style={styles.deleteLinkText}>{t('feed.detail.actions.delete')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          )}
-          onEndReached={() => {
-            if (commentsQuery.hasNextPage && !commentsQuery.isFetchingNextPage) {
-              commentsQuery.fetchNextPage();
+      ) : featureFlags.flashListRendering ? (
+          <FlashList<CommentItem>
+            data={comments}
+            keyExtractor={keyExtractorComment}
+            renderItem={renderCommentItem}
+            extraData={`${replyingTo?.id ?? ''}|${currentUserId}`}
+            onEndReached={() => {
+              if (commentsQuery.hasNextPage && !commentsQuery.isFetchingNextPage) {
+                commentsQuery.fetchNextPage();
+              }
+            }}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              commentsQuery.isFetchingNextPage ? (
+                <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+              ) : null
             }
-          }}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={
-            commentsQuery.isFetchingNextPage ? (
-              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
-            ) : null
-          }
-          ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
-        />
-      )}
+            ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
+          />
+        ) : (
+          <FlatList<CommentItem>
+            data={comments}
+            keyExtractor={keyExtractorComment}
+            renderItem={renderCommentItem}
+            extraData={`${replyingTo?.id ?? ''}|${currentUserId}`}
+            onEndReached={() => {
+              if (commentsQuery.hasNextPage && !commentsQuery.isFetchingNextPage) {
+                commentsQuery.fetchNextPage();
+              }
+            }}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              commentsQuery.isFetchingNextPage ? (
+                <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+              ) : null
+            }
+            ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
+          />
+        )}
 
       <View style={styles.commentComposer}>
         {replyingTo ? (

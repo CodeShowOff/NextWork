@@ -9,7 +9,7 @@ import { messagesKeys } from './keys';
 
 const pageSize = 20;
 
-function mergeConversation(
+export function mergeConversation(
   data: InfiniteData<PaginatedResponse<Conversation>> | undefined,
   incoming: Conversation,
 ): InfiniteData<PaginatedResponse<Conversation>> | undefined {

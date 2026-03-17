@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +37,7 @@ import { listMyOrganizations } from '../../shared/api/organizations.api';
 import { searchAll, SearchUserItem } from '../../shared/api/search.api';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { i18n } from '../../shared/i18n/i18n';
+import { featureFlags } from '../../shared/config/runtime';
 import { FeedStackParamList } from './screens/FeedStack';
 import {
   applyOptimisticLikeToFeed,
@@ -476,6 +478,41 @@ export function FeedScreen({ navigation }: Props) {
     () => feedQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [feedQuery.data],
   );
+  const FeedListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
+  const keyExtractor = useCallback((item: FeedPost) => item.id, []);
+  const likedStateSignature = useMemo(
+    () =>
+      Object.entries(likedByMeMap)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([id, liked]) => `${id}:${liked ? 1 : 0}`)
+        .join('|'),
+    [likedByMeMap],
+  );
+  const feedListHeader = useMemo(
+    () => (
+      <View style={styles.groupTargetSection}>
+        <Text style={styles.groupTargetLabel}>{t('feed.targeting.label')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupChipsRow}>
+          <Pressable
+            style={[styles.groupChip, !selectedGroupId ? styles.groupChipActive : null]}
+            onPress={() => setSelectedGroupId('')}
+          >
+            <Text style={styles.groupChipText}>{t('feed.targeting.global')}</Text>
+          </Pressable>
+          {(groupsQuery.data?.items ?? []).map((group) => (
+            <Pressable
+              key={group.id}
+              style={[styles.groupChip, selectedGroupId === group.id ? styles.groupChipActive : null]}
+              onPress={() => setSelectedGroupId(group.id)}
+            >
+              <Text style={styles.groupChipText}>{group.name}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    ),
+    [groupsQuery.data?.items, selectedGroupId, t],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -605,31 +642,11 @@ export function FeedScreen({ navigation }: Props) {
           <ActivityIndicator size="large" color="#0B6E4F" />
         </View>
       ) : (
-        <FlatList<FeedPost>
+        <FeedListComponent<FeedPost>
           data={items}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={
-            <View style={styles.groupTargetSection}>
-              <Text style={styles.groupTargetLabel}>{t('feed.targeting.label')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupChipsRow}>
-                <Pressable
-                  style={[styles.groupChip, !selectedGroupId ? styles.groupChipActive : null]}
-                  onPress={() => setSelectedGroupId('')}
-                >
-                  <Text style={styles.groupChipText}>{t('feed.targeting.global')}</Text>
-                </Pressable>
-                {(groupsQuery.data?.items ?? []).map((group) => (
-                  <Pressable
-                    key={group.id}
-                    style={[styles.groupChip, selectedGroupId === group.id ? styles.groupChipActive : null]}
-                    onPress={() => setSelectedGroupId(group.id)}
-                  >
-                    <Text style={styles.groupChipText}>{group.name}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          }
+          keyExtractor={keyExtractor}
+          extraData={`${likedStateSignature}|${editingPostId ?? ''}|${editingContent}|${selectedGroupId}|${meQuery.data?.id ?? ''}`}
+          ListHeaderComponent={feedListHeader}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Pressable

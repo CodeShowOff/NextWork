@@ -1,0 +1,14 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Profile
+- tapOn: Sign out
+- tapOn: Feed
+- tapOn: Sign in
+- inputText: qa-user@example.com
+- tapOn: Password
+- inputText: qa-password-123
+- tapOn: Log in
+- assertVisible: Feed
+- tapOn: Notifications
+- assertVisible: Mark all read

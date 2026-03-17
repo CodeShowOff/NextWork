@@ -5,12 +5,11 @@ import { useTranslation } from 'react-i18next';
 
 import { getProfile, updateMyProfile } from '../../shared/api/profiles.api';
 import { getCurrentUser } from '../../shared/api/users.api';
-import { useSessionStore } from '../../shared/session/session.store';
+import { authSessionService } from '../../shared/session/auth-session.service';
 
 export function ProfileScreen() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const clearSession = useSessionStore((state) => state.clearSession);
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -90,8 +89,8 @@ export function ProfileScreen() {
 
         <Pressable
           style={styles.logoutButton}
-          onPress={() => {
-            clearSession();
+          onPress={async () => {
+            await authSessionService.logout();
           }}
         >
           <Text style={styles.logoutButtonText}>{t('profile.buttons.signOut')}</Text>

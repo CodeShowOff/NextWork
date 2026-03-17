@@ -11,6 +11,7 @@
     "test": "jest --config jest.config.ts",
     "test:unit": "jest --config jest.config.ts --testPathPatterns src/.*\\.spec\\.ts$",
     "test:integration": "jest --config jest.config.ts --testPathPatterns test/.*\\.int-spec\\.ts$",
+    "openapi:export": "ts-node src/scripts/export-openapi.ts",
     "db:up": "docker compose -f ../infrastructure/docker-compose.yml up -d",
     "db:down": "docker compose -f ../infrastructure/docker-compose.yml down",
     "bootstrap": "npm run db:up && npm run prisma:sync && npm run prisma:seed",

@@ -22,7 +22,7 @@ import { featureFlags } from '../../../shared/config/runtime';
 import { localeLabels, SupportedLocale, supportedLocales } from '../../../shared/i18n/resources';
 import { useLocaleStore } from '../../../shared/i18n/locale.store';
 import { useInviteLinkStore } from '../../../shared/session/invite-link.store';
-import { useSessionStore } from '../../../shared/session/session.store';
+import { authSessionService } from '../../../shared/session/auth-session.service';
 import { ThemePreference, useThemeStore } from '../../../shared/theme/theme.store';
 import { toggleFollowRelationshipOptimistic } from '../follow-relationship-cache';
 
@@ -40,7 +40,6 @@ interface Props {
 export function ProfileViewScreen({ navigation, userId }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const clearSession = useSessionStore((state) => state.clearSession);
   const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
   const locale = useLocaleStore((state) => state.locale);
   const setLocale = useLocaleStore((state) => state.setLocale);
@@ -457,9 +456,9 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
         {isOwnProfile ? (
           <Pressable
             style={styles.logoutButton}
-            onPress={() => {
+            onPress={async () => {
               clearPendingInviteToken();
-              clearSession();
+              await authSessionService.logout();
             }}
           >
             <Text style={styles.logoutButtonText}>{t('profile.buttons.signOut')}</Text>

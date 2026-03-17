@@ -23,6 +23,7 @@ import {
 import { useInviteLinkStore } from '../../shared/session/invite-link.store';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { useSessionStore } from '../../shared/session/session.store';
+import { authSessionService } from '../../shared/session/auth-session.service';
 
 type SignUpStep = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -286,14 +287,14 @@ export function AuthScreen() {
       });
 
       const me = await getCurrentUser();
-      setSession({
+      await authSessionService.establishSession({
         userId: me.id,
-        accessToken: tokens.accessToken,
+        tokens,
         apiBaseUrl: normalizedApiBaseUrl || previous.apiBaseUrl,
         realtimeBaseUrl: normalizedRealtimeBaseUrl || previous.realtimeBaseUrl,
       });
     } catch (error) {
-      useSessionStore.getState().clearSession();
+      await authSessionService.clearSession();
       const message = parseApiErrorMessage(error);
       if (message.toLowerCase().includes('email not verified')) {
         setAuthStep('verify');

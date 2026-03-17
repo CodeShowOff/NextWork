@@ -1,67 +1,33 @@
-import { requestJson } from './http';
+import type {
+  AuthTokensDto,
+  SignUpRequestDto,
+  SignUpResultDto,
+} from '@workplace/api-contracts';
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
+import { workplaceApi } from './contracts-client';
 
-export interface SignUpResult {
-  status: 'verification_required';
-  email: string;
-  expiresAt: string;
-  debugCode?: string;
-}
-
-export interface SignUpPayload {
-  email: string;
-  password: string;
-  displayName: string;
-  fullName: string;
-  organizationName: string;
-  organizationSize: string;
-  jobTitle: string;
-  inviteToken?: string;
-}
+export type AuthTokens = AuthTokensDto;
+export type SignUpResult = SignUpResultDto;
+export type SignUpPayload = SignUpRequestDto;
 
 export function login(payload: { email: string; password: string }) {
-  return requestJson<AuthTokens>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.auth.login(payload);
 }
 
 export function signUp(payload: SignUpPayload) {
-  return requestJson<SignUpResult>('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.auth.signUp(payload);
 }
 
 export function verifyEmail(payload: { email: string; token: string }) {
-  return requestJson<{ status: 'ok' }>('/auth/verify-email', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.auth.verifyEmail(payload);
 }
 
 export function resendVerification(payload: { email: string }) {
-  return requestJson<{ status: 'ok'; expiresAt: string | null; debugCode?: string }>(
-    '/auth/resend-verification',
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-  );
+  return workplaceApi.auth.resendVerification(payload);
 }
 
 export function requestPasswordReset(payload: { email: string }) {
-  return requestJson<{ status: 'ok'; expiresAt: string | null; debugCode?: string }>(
-    '/auth/forgot-password',
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-  );
+  return workplaceApi.auth.requestPasswordReset(payload);
 }
 
 export function confirmPasswordReset(payload: {
@@ -69,8 +35,5 @@ export function confirmPasswordReset(payload: {
   token: string;
   newPassword: string;
 }) {
-  return requestJson<{ status: 'ok' }>('/auth/reset-password', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.auth.confirmPasswordReset(payload);
 }

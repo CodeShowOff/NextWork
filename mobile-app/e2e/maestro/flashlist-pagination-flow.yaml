@@ -1,0 +1,14 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Feed
+- assertVisible: Feed
+- scroll
+- scroll
+- scroll
+- assertVisible: Share an update
+- tapOn: Messages
+- assertVisible: Start
+- scroll
+- scroll
+- assertVisible: Sign out

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -32,8 +33,11 @@ import {
 } from '../../../shared/api/notifications.api';
 import { PaginatedFeed } from '../../../shared/api/feed.api';
 import { resolveNotificationNavigationAction } from '../navigation/notification-navigation';
+import { featureFlags } from '../../../shared/config/runtime';
 
 export function NotificationsScreen() {
+    const NotificationsListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
+
   const { t } = useTranslation();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
@@ -81,35 +85,114 @@ export function NotificationsScreen() {
     () => new Set((mutedUsersQuery.data?.items ?? []).map((item) => item.userId)),
     [mutedUsersQuery.data?.items],
   );
+  const mutedActorIds = useMemo(() => Array.from(mutedActorIdSet).sort().join(','), [mutedActorIdSet]);
 
-  const routeToEntity = (item: NotificationItem) => {
-    const rootNavigation = navigation as any;
-    const feed = queryClient.getQueryData<{ pageParams: unknown[]; pages: PaginatedFeed[] }>(['feed']);
-    const action = resolveNotificationNavigationAction({ item, feedCache: feed });
+  const routeToEntity = useCallback(
+    (item: NotificationItem) => {
+      const rootNavigation = navigation as any;
+      const feed = queryClient.getQueryData<{ pageParams: unknown[]; pages: PaginatedFeed[] }>(['feed']);
+      const action = resolveNotificationNavigationAction({ item, feedCache: feed });
 
-    if (!action) {
-      return;
-    }
+      if (!action) {
+        return;
+      }
 
-    if (action.target === 'messages') {
-      rootNavigation.navigate('Messages', action.params);
-      return;
-    }
+      if (action.target === 'messages') {
+        rootNavigation.navigate('Messages', action.params);
+        return;
+      }
 
-    if (action.target === 'profile') {
-      rootNavigation.navigate('Profile', action.params);
-      return;
-    }
+      if (action.target === 'profile') {
+        rootNavigation.navigate('Profile', action.params);
+        return;
+      }
 
-    rootNavigation.navigate('Feed', action.params);
-    if (action.needsFeedRefresh) {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      Alert.alert(
-        action.warningMessage ?? t('notifications.alerts.postUnavailableTitle'),
-        t('notifications.alerts.postUnavailableBody'),
-      );
-    }
-  };
+      rootNavigation.navigate('Feed', action.params);
+      if (action.needsFeedRefresh) {
+        queryClient.invalidateQueries({ queryKey: ['feed'] });
+        Alert.alert(
+          action.warningMessage ?? t('notifications.alerts.postUnavailableTitle'),
+          t('notifications.alerts.postUnavailableBody'),
+        );
+      }
+    },
+    [navigation, queryClient, t],
+  );
+
+  const keyExtractor = useCallback((item: NotificationItem) => item.id, []);
+
+  const renderNotificationItem = useCallback(
+    ({ item }: { item: NotificationItem }) => (
+      <NotificationListItem
+        item={item}
+        isActorMuted={Boolean(item.actorId && mutedActorIdSet.has(item.actorId))}
+        onPress={async () => {
+          const opened = await openNotification(item.id).catch(async () => {
+            if (!item.isRead) {
+              await markRead(item.id).catch(() => {
+                // Keep UI responsive; list will sync again on next refresh.
+              });
+            }
+
+            return null;
+          });
+
+          if (!opened) {
+            routeToEntity(item);
+            return;
+          }
+
+          if (opened.action.target === 'messages') {
+            (navigation as any).navigate('Messages', {
+              screen: 'ConversationDetail',
+              params: { conversationId: opened.action.entityId },
+            });
+            return;
+          }
+
+          if (opened.action.target === 'profile') {
+            (navigation as any).navigate('Profile', {
+              screen: 'UserProfile',
+              params: { userId: opened.action.entityId },
+            });
+            return;
+          }
+
+          routeToEntity({ ...item, entityType: opened.action.entityType, entityId: opened.action.entityId });
+        }}
+        onLongPress={() => {
+          const actorId = item.actorId;
+          if (!actorId || !item.actor) {
+            return;
+          }
+
+          const isMuted = mutedActorIdSet.has(actorId);
+
+          Alert.alert(
+            isMuted ? t('notifications.alerts.unmuteTitle') : t('notifications.alerts.muteTitle'),
+            isMuted
+              ? t('notifications.alerts.unmuteBody', { name: item.actor.displayName })
+              : t('notifications.alerts.muteBody', { name: item.actor.displayName }),
+            [
+              { text: t('common.actions.cancel'), style: 'cancel' },
+              {
+                text: isMuted ? t('notifications.actions.unmute') : t('common.actions.mute'),
+                style: 'destructive',
+                onPress: () => {
+                  if (isMuted) {
+                    unmuteMutation.mutate(actorId);
+                  } else {
+                    muteMutation.mutate(actorId);
+                  }
+                },
+              },
+            ],
+          );
+        }}
+      />
+    ),
+    [markRead, muteMutation, mutedActorIdSet, navigation, routeToEntity, t, unmuteMutation],
+  );
 
   if (notificationsQuery.isLoading) {
     return (
@@ -196,78 +279,11 @@ export function NotificationsScreen() {
         )}
       </View>
 
-      <FlatList<NotificationItem>
+      <NotificationsListComponent<NotificationItem>
         data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <NotificationListItem
-            item={item}
-            isActorMuted={Boolean(item.actorId && mutedActorIdSet.has(item.actorId))}
-            onPress={async () => {
-              const opened = await openNotification(item.id).catch(async () => {
-                if (!item.isRead) {
-                  await markRead(item.id).catch(() => {
-                    // Keep UI responsive; list will sync again on next refresh.
-                  });
-                }
-
-                return null;
-              });
-
-              if (!opened) {
-                routeToEntity(item);
-                return;
-              }
-
-              if (opened.action.target === 'messages') {
-                (navigation as any).navigate('Messages', {
-                  screen: 'ConversationDetail',
-                  params: { conversationId: opened.action.entityId },
-                });
-                return;
-              }
-
-              if (opened.action.target === 'profile') {
-                (navigation as any).navigate('Profile', {
-                  screen: 'UserProfile',
-                  params: { userId: opened.action.entityId },
-                });
-                return;
-              }
-
-              routeToEntity({ ...item, entityType: opened.action.entityType, entityId: opened.action.entityId });
-            }}
-            onLongPress={() => {
-              const actorId = item.actorId;
-              if (!actorId || !item.actor) {
-                return;
-              }
-
-              const isMuted = mutedActorIdSet.has(actorId);
-
-              Alert.alert(
-                isMuted ? t('notifications.alerts.unmuteTitle') : t('notifications.alerts.muteTitle'),
-                isMuted
-                  ? t('notifications.alerts.unmuteBody', { name: item.actor.displayName })
-                  : t('notifications.alerts.muteBody', { name: item.actor.displayName }),
-                [
-                  { text: t('common.actions.cancel'), style: 'cancel' },
-                  {
-                    text: isMuted ? t('notifications.actions.unmute') : t('common.actions.mute'),
-                    style: 'destructive',
-                    onPress: () => {
-                      if (isMuted) {
-                        unmuteMutation.mutate(actorId);
-                      } else {
-                        muteMutation.mutate(actorId);
-                      }
-                    },
-                  },
-                ],
-              );
-            }}
-          />
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderNotificationItem}
+        extraData={mutedActorIds}
         onEndReached={() => {
           if (notificationsQuery.hasNextPage && !notificationsQuery.isFetchingNextPage) {
             notificationsQuery.fetchNextPage();

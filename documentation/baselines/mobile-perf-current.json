@@ -1,0 +1,8 @@
+{
+  "label": "android-release-current",
+  "feed": {
+    "droppedFramesPct": 12.5,
+    "ttfcMs": 860,
+    "memoryPressureCrashes": 0
+  }
+}

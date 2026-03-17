@@ -1,0 +1,8 @@
+{
+  "label": "android-release-baseline",
+  "feed": {
+    "droppedFramesPct": 18.2,
+    "ttfcMs": 880,
+    "memoryPressureCrashes": 0
+  }
+}

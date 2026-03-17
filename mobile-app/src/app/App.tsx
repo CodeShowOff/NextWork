@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Alert, Linking, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Linking, View, useColorScheme } from 'react-native';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -22,6 +22,7 @@ import { switchOrganization } from '../shared/api/organizations.api';
 import { extractInviteToken } from '../shared/linking/invite-linking';
 import { useInviteLinkStore } from '../shared/session/invite-link.store';
 import { useSessionStore } from '../shared/session/session.store';
+import { authSessionService } from '../shared/session/auth-session.service';
 import { i18n } from '../shared/i18n/i18n';
 import { resolveAppTheme, useThemeStore } from '../shared/theme/theme.store';
 
@@ -176,11 +177,26 @@ function AuthenticatedTabs() {
 }
 
 export default function App() {
+  const hydrated = useSessionStore((state) => state.hydrated);
   const accessToken = useSessionStore((state) => state.accessToken);
   const systemScheme = useColorScheme();
   const normalizedScheme = systemScheme === 'light' || systemScheme === 'dark' ? systemScheme : null;
   const themePreference = useThemeStore((state) => state.preference);
   const appTheme = resolveAppTheme(themePreference, normalizedScheme);
+
+  useEffect(() => {
+    authSessionService.hydrateSessionFromStorage();
+  }, []);
+
+  if (!hydrated) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#0B6E4F" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>

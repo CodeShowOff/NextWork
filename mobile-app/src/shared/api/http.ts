@@ -1,21 +1,16 @@
+import { requestJsonWithOptions } from '@workplace/api-contracts';
+
 import { useSessionStore } from '../session/session.store';
+import { authSessionService } from '../session/auth-session.service';
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const { accessToken, apiBaseUrl } = useSessionStore.getState();
-
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(init?.headers ?? {}),
+  return requestJsonWithOptions<T>(
+    {
+      baseUrl: () => useSessionStore.getState().apiBaseUrl,
+      getAccessToken: () => useSessionStore.getState().accessToken || undefined,
+      onUnauthorized: ({ path }) => authSessionService.handleUnauthorizedRequest(path),
     },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Request failed with status ${response.status}`);
-  }
-
-  return (await response.json()) as T;
+    path,
+    init,
+  );
 }

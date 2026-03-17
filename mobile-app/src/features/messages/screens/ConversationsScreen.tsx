@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +19,9 @@ import { Conversation } from '../types';
 import { useConversations, upsertConversation } from '../hooks/useConversations';
 import { ConversationListItem } from '../components/ConversationListItem';
 import { createConversation } from '../../../shared/api/messages.api';
+import { authSessionService } from '../../../shared/session/auth-session.service';
 import { useSessionStore } from '../../../shared/session/session.store';
+import { featureFlags } from '../../../shared/config/runtime';
 import { MessagesStackParamList } from './MessagesStack';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'Conversations'>;
@@ -33,7 +36,6 @@ export function ConversationsScreen({ navigation }: Props) {
   const [realtimeBaseUrl, setRealtimeBaseUrl] = useState('');
 
   const setSession = useSessionStore((state) => state.setSession);
-  const clearSession = useSessionStore((state) => state.clearSession);
   const storeUserId = useSessionStore((state) => state.userId);
   const storeToken = useSessionStore((state) => state.accessToken);
 
@@ -44,6 +46,17 @@ export function ConversationsScreen({ navigation }: Props) {
   const items = useMemo(
     () => conversationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [conversationsQuery.data],
+  );
+  const ConversationsListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
+  const keyExtractor = useCallback((item: Conversation) => item.id, []);
+  const renderConversationItem = useCallback(
+    ({ item }: { item: Conversation }) => (
+      <ConversationListItem
+        conversation={item}
+        onPress={() => navigation.navigate('ConversationDetail', { conversationId: item.id })}
+      />
+    ),
+    [navigation],
   );
 
   const createDirectMutation = useMutation({
@@ -153,8 +166,8 @@ export function ConversationsScreen({ navigation }: Props) {
           </Pressable>
         </View>
         <Pressable
-          onPress={() => {
-            clearSession();
+          onPress={async () => {
+            await authSessionService.logout();
           }}
         >
           <Text style={styles.secondaryLink}>{t('messages.toolbar.signOut')}</Text>
@@ -166,15 +179,10 @@ export function ConversationsScreen({ navigation }: Props) {
           <ActivityIndicator size="large" color="#0B6E4F" />
         </View>
       ) : (
-        <FlatList<Conversation>
+        <ConversationsListComponent<Conversation>
           data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ConversationListItem
-              conversation={item}
-              onPress={() => navigation.navigate('ConversationDetail', { conversationId: item.id })}
-            />
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderConversationItem}
           onEndReached={() => {
             if (conversationsQuery.hasNextPage && !conversationsQuery.isFetchingNextPage) {
               conversationsQuery.fetchNextPage();

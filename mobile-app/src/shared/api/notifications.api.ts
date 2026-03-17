@@ -1,75 +1,59 @@
 import {
+  MutedNotificationUsersDto,
+  NotificationPreferencesDto,
+  SendThanksRequestDto,
+  UpdateNotificationPreferencesRequestDto,
+} from '@workplace/api-contracts';
+import {
   MutedNotificationUser,
   NotificationItem,
   NotificationPreferences,
-  PaginatedNotifications,
 } from '../../features/notifications/types';
-import { requestJson } from './http';
+import { workplaceApi } from './contracts-client';
+
+type MutedUsersResponse = MutedNotificationUsersDto;
+type PreferencesResponse = NotificationPreferencesDto;
 
 export function listNotifications(params: { limit: number; before?: string }) {
-  const search = new URLSearchParams({ limit: String(params.limit) });
-  if (params.before) {
-    search.set('before', params.before);
-  }
-
-  return requestJson<PaginatedNotifications>(`/notifications?${search.toString()}`);
+  return workplaceApi.notifications.list(params);
 }
 
 export function getUnreadNotificationCount() {
-  return requestJson<{ unreadCount: number }>('/notifications/unread-count');
+  return workplaceApi.notifications.unreadCount();
 }
 
 export function markNotificationRead(notificationId: string) {
-  return requestJson<{ status: 'ok' }>(`/notifications/${notificationId}/read`, {
-    method: 'POST',
-  });
+  return workplaceApi.notifications.markRead(notificationId);
 }
 
 export function openNotification(notificationId: string) {
-  return requestJson<{
-    status: 'ok';
-    readApplied: boolean;
-    action: {
-      target: 'messages' | 'profile' | 'feed';
-      entityType: string;
-      entityId: string;
-    };
-  }>(`/notifications/${notificationId}/open`, {
-    method: 'POST',
-  });
+  return workplaceApi.notifications.open(notificationId);
 }
 
 export function markAllNotificationsRead() {
-  return requestJson<{ status: 'ok'; updated: number }>('/notifications/read-all', {
-    method: 'POST',
-  });
+  return workplaceApi.notifications.markAllRead();
 }
 
 export function getNotificationPreferences() {
-  return requestJson<NotificationPreferences>('/notifications/preferences');
+  return workplaceApi.notifications.getPreferences() as Promise<PreferencesResponse & NotificationPreferences>;
 }
 
 export function updateNotificationPreferences(payload: Partial<NotificationPreferences>) {
-  return requestJson<NotificationPreferences>('/notifications/preferences', {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.notifications.updatePreferences(
+    payload as UpdateNotificationPreferencesRequestDto,
+  ) as Promise<PreferencesResponse & NotificationPreferences>;
 }
 
 export function listMutedNotificationUsers() {
-  return requestJson<{ items: MutedNotificationUser[] }>('/notifications/muted-users');
+  return workplaceApi.notifications.listMutedUsers() as Promise<MutedUsersResponse & { items: MutedNotificationUser[] }>;
 }
 
 export function muteNotificationUser(userId: string) {
-  return requestJson<{ status: 'ok' }>(`/notifications/muted-users/${userId}`, {
-    method: 'POST',
-  });
+  return workplaceApi.notifications.muteUser(userId);
 }
 
 export function unmuteNotificationUser(userId: string) {
-  return requestJson<{ status: 'ok' }>(`/notifications/muted-users/${userId}`, {
-    method: 'DELETE',
-  });
+  return workplaceApi.notifications.unmuteUser(userId);
 }
 
 export function sendThanksProfileAction(payload: {
@@ -77,17 +61,7 @@ export function sendThanksProfileAction(payload: {
   messageTemplate?: string;
   notificationType?: 'thanks' | 'thanks-note';
 }) {
-  return requestJson<{
-    status: 'ok';
-    delivered: boolean;
-    muted: boolean;
-    notificationId: string | null;
-    conversationId: string | null;
-    messageId: string | null;
-  }>('/notifications/profile-actions/thanks', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  return workplaceApi.notifications.sendThanks(payload as SendThanksRequestDto);
 }
 
 export type { NotificationItem };

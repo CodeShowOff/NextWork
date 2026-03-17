@@ -66,9 +66,3 @@ Forbidden:
 - Redis pub/sub for real-time fan-out
 - background jobs for side effects
 - keyset pagination for feed and messages
-
-## Phase 1 Governance
-
-- Scope authority: `documentation/phase-1-feature-contract.md`
-- Architecture decision record: `documentation/adr/0002-feature-scope-lock-and-phase-gates.md`
-- Rule: execution phases must not begin without mapped acceptance gates.

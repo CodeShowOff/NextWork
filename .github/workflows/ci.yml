@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check generated contracts are up-to-date
+        run: npm run contracts:check
+
       - name: Backend lint
         run: npm run lint --workspace backend-api
 
@@ -56,6 +59,9 @@ jobs:
 
       - name: Mobile tests
         run: npm run test --workspace mobile-app
+
+      - name: Enforce mobile API fetch policy
+        run: npm run contracts:check-fetch
 
       - name: Verify mobile E2E flow specs
         run: |

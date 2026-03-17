@@ -1,37 +1,59 @@
-# Go-Live Signoff
+# Go-Live Signoff (Phase 5)
 
-Date: 2026-03-16
-Release: Phase 7 Production Readiness
+Date: 2026-03-17
+Release scope: Phase 5 Stabilization, Testing, and Rollout
+Owners: Mobile Lead, Backend Lead, QA Lead, Release Manager
 
-## Quality Gates
+## Required Evidence
 
-- [x] Backend lint/typecheck/tests defined in CI.
-- [x] Mobile lint/typecheck/tests defined in CI.
-- [x] Security gate defined in CI.
-- [x] Release gate scripts added (`release:gates`).
+1. End-to-end regression inventory check passed for auth, feed, poll vote, notifications, and messaging.
+2. Mobile unit/integration suite passed with no high-severity failures.
+3. Contract compatibility checks passed:
+- OpenAPI export and generated SDK remain in sync.
+- Mobile SDK wrapper compatibility tests pass.
+4. Rollout flags configured for high-risk areas:
+- EXPO_PUBLIC_FLAG_AUTH_SESSION_REFRESH
+- EXPO_PUBLIC_FLAG_FLASHLIST_RENDERING
+5. UAT completed with zero high-severity regressions.
 
-## Test Coverage
+## Test Commands
 
-- [x] RN unit/integration tests present and passing.
-- [x] Key RN E2E smoke flows documented in Maestro format.
-- [x] Backend integration tests cover core API paths.
+Run from monorepo root:
 
-## Observability
+```bash
+npm run test:e2e:verify
+npm run test --workspace mobile-app
+npm run contracts:check
+npm run test:mobile-perf
+```
 
-- [x] Monitoring stack config added (Prometheus/Grafana/Alertmanager).
-- [x] API/DB/Redis/socket alerts defined.
-- [x] Runbook updated with incident and rollback guidance.
+## UAT Gate
 
-## Performance and Security
+Pass criteria:
 
-- [x] Load test script added with feed/search/messages p95 budgets.
-- [x] Security preflight script added for env/secret checks.
-- [x] Search query input hardening applied.
+- Zero high-severity regressions in auth, feed, poll, notifications, and messaging flows.
+- Token refresh race and offline/online transition scenarios validated.
+- Pagination behavior remains correct after FlashList rollout or fallback flag switch.
 
-## Approval
+If high-severity regression is found:
 
-Engineering Lead: Approved
-Product Owner: Approved
-Operations: Approved
+- Stop rollout.
+- Switch high-risk flag off for affected surface.
+- Re-run UAT and evidence capture before proceeding.
 
-Status: SIGNED OFF FOR PROGRESSIVE ROLLOUT
+## Rollout Controls
+
+Recommended staged plan:
+
+1. Internal users with flags enabled for 24h.
+2. Canary cohort with auth refresh flag enabled and list rendering flag monitored for 24h.
+3. Progressive rollout to 25%, 50%, and 100% after each successful checkpoint.
+
+## Signoff Checklist
+
+- [ ] QA lead approved
+- [ ] Mobile lead approved
+- [ ] Backend lead approved
+- [ ] Release manager approved
+
+Status: [ ] Approved for production rollout

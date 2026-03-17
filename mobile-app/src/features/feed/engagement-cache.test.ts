@@ -1,6 +1,7 @@
 import {
   adjustCommentCountInFeed,
   applyOptimisticLikeToFeed,
+  reconcilePollInFeed,
   reconcileLikeCountInFeed,
 } from './engagement-cache';
 import { PaginatedFeed } from '../../shared/api/feed.api';
@@ -86,5 +87,25 @@ describe('engagement cache helpers', () => {
 
     expect(afterIncrement?.pages[0].items[0].stats.commentCount).toBe(2);
     expect(afterDecrement?.pages[0].items[0].stats.commentCount).toBe(0);
+  });
+
+  it('reconciles poll votes without mutating unrelated post fields', () => {
+    const current = buildFeed(1, 2);
+    const next = reconcilePollInFeed(current, {
+      postId: 'p1',
+      poll: {
+        question: 'Ship now?',
+        options: [
+          { id: 'o1', text: 'Yes', voteCount: 4 },
+          { id: 'o2', text: 'No', voteCount: 1 },
+        ],
+        totalVotes: 5,
+        votedOptionId: 'o1',
+      },
+    });
+
+    expect(next?.pages[0].items[0].poll?.totalVotes).toBe(5);
+    expect(next?.pages[0].items[0].stats.likeCount).toBe(1);
+    expect(next?.pages[0].items[0].stats.commentCount).toBe(2);
   });
 });

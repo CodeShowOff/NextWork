@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { FlashList, ListRenderItem } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +24,7 @@ import { useSessionStore } from '../../../shared/session/session.store';
 import { getMessagesSocket } from '../../../shared/realtime/messages.socket';
 import { updateMessage } from '../../../shared/api/messages.api';
 import { messagesKeys } from '../hooks/keys';
+import { featureFlags } from '../../../shared/config/runtime';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ConversationDetail'>;
 
@@ -63,6 +65,39 @@ export function ConversationDetailScreen({ route }: Props) {
     () => messagesQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [messagesQuery.data],
   );
+  const ConversationMessagesListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  const renderMessageItem = useCallback<ListRenderItem<Message>>(
+    ({ item }) => {
+      const isMine = item.senderId === currentUserId;
+      const isOptimistic = item.id.startsWith('optimistic-');
+
+      const status = !isMine
+        ? undefined
+        : isOptimistic
+          ? 'sending'
+          : messagesQuery.lastReadByOtherMessageId === item.id
+            ? 'read'
+            : 'sent';
+
+      return (
+        <MessageBubble
+          message={item}
+          status={status}
+          onLongPress={
+            isMine && !isOptimistic
+              ? () => {
+                  setEditingMessageId(item.id);
+                  setEditingBody(item.body);
+                }
+              : undefined
+          }
+        />
+      );
+    },
+    [currentUserId, messagesQuery.lastReadByOtherMessageId],
+  );
 
   const senderNames = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -98,36 +133,13 @@ export function ConversationDetailScreen({ route }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList<Message>
+      <ConversationMessagesListComponent<Message>
         data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const isMine = item.senderId === currentUserId;
-          const isOptimistic = item.id.startsWith('optimistic-');
-
-          const status = !isMine
-            ? undefined
-            : isOptimistic
-              ? 'sending'
-              : messagesQuery.lastReadByOtherMessageId === item.id
-                ? 'read'
-                : 'sent';
-
-          return (
-            <MessageBubble
-              message={item}
-              status={status}
-              onLongPress={
-                isMine && !isOptimistic
-                  ? () => {
-                      setEditingMessageId(item.id);
-                      setEditingBody(item.body);
-                    }
-                  : undefined
-              }
-            />
-          );
-        }}
+        keyExtractor={keyExtractor}
+        renderItem={renderMessageItem}
+        estimatedItemSize={92}
+        drawDistance={300}
+        extraData={messagesQuery.lastReadByOtherMessageId ?? ''}
         contentContainerStyle={styles.listContent}
         inverted
         onEndReached={() => {

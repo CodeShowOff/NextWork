@@ -11,7 +11,7 @@ interface Props {
   onLongPress?: () => void;
 }
 
-export function MessageBubble({ message, status, onLongPress }: Props) {
+function MessageBubbleView({ message, status, onLongPress }: Props) {
   const { t } = useTranslation();
   const userId = useSessionStore((state) => state.userId);
   const isMine = message.senderId === userId;
@@ -42,6 +42,18 @@ export function MessageBubble({ message, status, onLongPress }: Props) {
     </View>
   );
 }
+
+export const MessageBubble = React.memo(MessageBubbleView, (previous, next) => {
+  return (
+    previous.message.id === next.message.id &&
+    previous.message.body === next.message.body &&
+    previous.message.senderId === next.message.senderId &&
+    previous.message.sender.displayName === next.message.sender.displayName &&
+    previous.message.editedAt === next.message.editedAt &&
+    previous.status === next.status &&
+    previous.onLongPress === next.onLongPress
+  );
+});
 
 const styles = StyleSheet.create({
   row: {

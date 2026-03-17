@@ -1,0 +1,16 @@
+appId: com.workplace.mobile
+---
+- launchApp
+- tapOn: Feed
+- assertVisible: Feed
+- tapOn: Share an update
+- inputText: Phase 5 poll regression post
+- tapOn: Poll (optional)
+- tapOn: Option 1
+- inputText: Yes
+- tapOn: Option 2
+- inputText: No
+- tapOn: Post
+- assertVisible: Phase 5 poll regression post
+- tapOn: Yes
+- assertVisible: 1

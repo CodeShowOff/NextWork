@@ -10,7 +10,7 @@ interface Props {
   onPress: () => void;
 }
 
-export function ConversationListItem({ conversation, onPress }: Props) {
+function ConversationListItemView({ conversation, onPress }: Props) {
   const { t } = useTranslation();
   const currentUserId = useSessionStore((state) => state.userId);
   const title =
@@ -35,6 +35,25 @@ export function ConversationListItem({ conversation, onPress }: Props) {
     </Pressable>
   );
 }
+
+export const ConversationListItem = React.memo(ConversationListItemView, (previous, next) => {
+  return (
+    previous.conversation.id === next.conversation.id &&
+    previous.conversation.type === next.conversation.type &&
+    previous.conversation.unreadCount === next.conversation.unreadCount &&
+    previous.conversation.lastMessage?.id === next.conversation.lastMessage?.id &&
+    previous.conversation.lastMessage?.body === next.conversation.lastMessage?.body &&
+    previous.conversation.lastMessage?.createdAt === next.conversation.lastMessage?.createdAt &&
+    previous.conversation.participants.length === next.conversation.participants.length &&
+    previous.conversation.participants.every((participant, index) => {
+      const nextParticipant = next.conversation.participants[index];
+      return (
+        participant.userId === nextParticipant?.userId && participant.displayName === nextParticipant?.displayName
+      );
+    }) &&
+    previous.onPress === next.onPress
+  );
+});
 
 const styles = StyleSheet.create({
   root: {

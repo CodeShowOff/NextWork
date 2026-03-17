@@ -119,3 +119,17 @@ If prompted:
 
 - `ios.bundleIdentifier` and `android.package` are both set to `com.workplace.app` in app config.
 - If Android build hangs on toolchain download, verify JDK 17 is installed and environment variables are set.
+
+## Rollout Flags
+
+The following flags control high-risk rollout surfaces:
+
+- `EXPO_PUBLIC_FLAG_AUTH_SESSION_REFRESH` (`true` by default)
+- `EXPO_PUBLIC_FLAG_FLASHLIST_RENDERING` (`true` by default)
+
+Example (PowerShell):
+
+```powershell
+$env:EXPO_PUBLIC_FLAG_AUTH_SESSION_REFRESH="true"
+$env:EXPO_PUBLIC_FLAG_FLASHLIST_RENDERING="true"
+```
