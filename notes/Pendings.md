@@ -6,7 +6,9 @@ Messaging uses manual token bootstrap fallback when session is missing; auto-boo
 
 Media flow currently covers image upload; richer media parity (video/files/voice) is not complete.
 
-Extended social objects from features.md (hashtags, mentions, polls, events, announcements, pinned posts, save/share) are still pending.
+Extended social objects from features.md:
+- Partial: hashtags, mentions/tagged users.
+- Pending: events, announcements, pinned posts, save/bookmark.
 
 
 ---
@@ -19,27 +21,22 @@ Current audit result for the non-COMPLETE rows:
 |---|---|
 | Stories | Not implemented |
 | Reels | Not implemented |
-| Hashtags | Not implemented |
-| Mentions | Not implemented |
-| Poll posts | Not implemented |
+| Hashtags | Partial (extraction/display exists; no hashtag discovery flow yet) |
+| Mentions | Partial (tagged users flow exists; full @mention UX/parsing is incomplete) |
+| Poll posts | Implemented (create, vote, and render poll state) |
 | Event posts | Not implemented |
 | Announcement posts | Not implemented |
 | Pinned posts | Not implemented |
-| Share post | Not implemented |
 | Save/bookmark | Not implemented |
-| Liker list UI | Partial (API exists, UI flow not wired) |
 | Feed media parity | Partial (image/video only, no file parity fields/flows) |
-| Messaging rich media | Partial (messageType exists, but no attachment model/UI flow) |
-| Message reactions | Not implemented |
+| Messaging rich media | Partial (attachment model/UI flow exists; voice-notes parity still pending) |
 | Search expansion | Partial (users/groups/posts only, no hashtags/events result sections) |
 
 Evidence highlights:
 - Planned modules still only listed as roadmap comments in app.module.ts.
 - No backend module files found for stories/reels/hashtags/mentions/polls/events/announcements/bookmarks/shares under modules.
-- Liker endpoint exists in backend at likes.controller.ts, and mobile API client exists at likes.api.ts, but there is no mobile feature usage of listLikers outside API declaration.
 - Feed media currently constrained to image/video in backend DTO at post-media-input.dto.ts, and upload API is image-only in mobile at media.api.ts.
-- Messaging send payload is text-first in backend at send-message.dto.ts, and message rendering is text body in mobile at MessageBubble.tsx.
-- Message schema has no reaction table/model around message definitions in schema.prisma.
+- Messaging send payload now supports attachments, but voice-message parity remains incomplete.
 - Search response only includes users/groups/posts in backend search.service.ts and mobile search.api.ts, and UI copy also reflects that in SearchScreen.tsx.
 
 So to your question: pending/incomplete features are not already fully implemented now.
