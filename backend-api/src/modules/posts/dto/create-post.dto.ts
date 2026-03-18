@@ -51,7 +51,7 @@ export class CreatePostDto {
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID('all')
   groupId?: string;
 
   @ApiPropertyOptional({ type: [PostMediaInputDto], maxItems: 10 })
@@ -75,3 +75,4 @@ export class CreatePostDto {
   @Type(() => CreatePostPollDto)
   poll?: CreatePostPollDto;
 }
+

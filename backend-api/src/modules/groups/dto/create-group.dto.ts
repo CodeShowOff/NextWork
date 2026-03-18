@@ -3,7 +3,7 @@ import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-
 import { GROUP_PRIVACY_OPTIONS, GROUP_TYPE_OPTIONS } from '../groups.constants';
 
 export class CreateGroupDto {
-  @IsUUID('4')
+  @IsUUID('all')
   organizationId!: string;
 
   @IsString()
@@ -31,3 +31,4 @@ export class CreateGroupDto {
   @MaxLength(500)
   photoUrl?: string;
 }
+

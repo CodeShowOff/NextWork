@@ -23,10 +23,14 @@ import {
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
+import { DeviceTokenHeartbeatDto } from './dto/device-token-heartbeat.dto';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { SendThanksDto } from './dto/send-thanks.dto';
+import { UnregisterDeviceTokenDto } from './dto/unregister-device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import {
+  DeviceTokenRegistrationView,
   NotificationPreferencesView,
   NotificationsService,
   PaginatedNotificationsResponse,
@@ -126,7 +130,7 @@ export class NotificationsController {
   @ApiOkResponse({ description: 'Mute status' })
   muteUser(
     @CurrentUser() user: JwtPayload,
-    @Param('mutedUserId', new ParseUUIDPipe({ version: '4' })) mutedUserId: string,
+    @Param('mutedUserId', new ParseUUIDPipe()) mutedUserId: string,
   ): Promise<{ status: 'ok' }> {
     return this.notificationsService.muteActor(user.sub, mutedUserId);
   }
@@ -137,9 +141,42 @@ export class NotificationsController {
   @ApiOkResponse({ description: 'Unmute status' })
   unmuteUser(
     @CurrentUser() user: JwtPayload,
-    @Param('mutedUserId', new ParseUUIDPipe({ version: '4' })) mutedUserId: string,
+    @Param('mutedUserId', new ParseUUIDPipe()) mutedUserId: string,
   ): Promise<{ status: 'ok' }> {
     return this.notificationsService.unmuteActor(user.sub, mutedUserId);
+  }
+
+  @Post('device-tokens/register')
+  @ApiOperation({ summary: 'Register or rebind a push device token for current user' })
+  @ApiBody({ type: RegisterDeviceTokenDto })
+  @ApiOkResponse({ description: 'Device token registration result' })
+  registerDeviceToken(
+    @CurrentUser() user: JwtPayload,
+    @Body() payload: RegisterDeviceTokenDto,
+  ): Promise<{ status: 'ok'; deviceToken: DeviceTokenRegistrationView }> {
+    return this.notificationsService.registerDeviceToken(user.sub, payload);
+  }
+
+  @Post('device-tokens/heartbeat')
+  @ApiOperation({ summary: 'Update last-seen timestamp for an existing device token' })
+  @ApiBody({ type: DeviceTokenHeartbeatDto })
+  @ApiOkResponse({ description: 'Heartbeat update status' })
+  heartbeatDeviceToken(
+    @CurrentUser() user: JwtPayload,
+    @Body() payload: DeviceTokenHeartbeatDto,
+  ): Promise<{ status: 'ok'; found: boolean }> {
+    return this.notificationsService.heartbeatDeviceToken(user.sub, payload);
+  }
+
+  @Post('device-tokens/unregister')
+  @ApiOperation({ summary: 'Unregister one device token for current user' })
+  @ApiBody({ type: UnregisterDeviceTokenDto })
+  @ApiOkResponse({ description: 'Device token removal status' })
+  unregisterDeviceToken(
+    @CurrentUser() user: JwtPayload,
+    @Body() payload: UnregisterDeviceTokenDto,
+  ): Promise<{ status: 'ok'; removed: boolean }> {
+    return this.notificationsService.unregisterDeviceToken(user.sub, payload);
   }
 
   @Post('profile-actions/thanks')

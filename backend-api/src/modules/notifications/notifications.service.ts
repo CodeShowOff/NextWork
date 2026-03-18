@@ -8,8 +8,11 @@ import {
 
 import { CacheService } from '../../common/cache/cache.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { DeviceTokenHeartbeatDto } from './dto/device-token-heartbeat.dto';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { SendThanksDto } from './dto/send-thanks.dto';
+import { UnregisterDeviceTokenDto } from './dto/unregister-device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { NotificationsRepository } from './notifications.repository';
 
@@ -45,6 +48,13 @@ export interface NotificationMutedUserView {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+}
+
+export interface DeviceTokenRegistrationView {
+  id: string;
+  platform: string;
+  token: string;
+  lastSeenAt: string;
 }
 
 interface NotificationEvent {
@@ -255,6 +265,59 @@ export class NotificationsService {
 
   getNotificationReadChannel(): string {
     return this.notificationReadChannel;
+  }
+
+  async registerDeviceToken(
+    userId: string,
+    payload: RegisterDeviceTokenDto,
+  ): Promise<{ status: 'ok'; deviceToken: DeviceTokenRegistrationView }> {
+    const row = await this.notificationsRepository.registerDeviceToken({
+      userId,
+      platform: payload.platform,
+      token: payload.token,
+    });
+
+    return {
+      status: 'ok',
+      deviceToken: {
+        id: row.id,
+        platform: row.platform,
+        token: row.token,
+        lastSeenAt: row.lastSeenAt.toISOString(),
+      },
+    };
+  }
+
+  async heartbeatDeviceToken(
+    userId: string,
+    payload: DeviceTokenHeartbeatDto,
+  ): Promise<{ status: 'ok'; found: boolean }> {
+    const found = await this.notificationsRepository.touchDeviceToken({
+      userId,
+      token: payload.token,
+      ...(payload.platform ? { platform: payload.platform } : {}),
+    });
+
+    return {
+      status: 'ok',
+      found,
+    };
+  }
+
+  async unregisterDeviceToken(
+    userId: string,
+    payload: UnregisterDeviceTokenDto,
+  ): Promise<{ status: 'ok'; removed: boolean }> {
+    const removed = await this.notificationsRepository.unregisterDeviceToken({
+      userId,
+      token: payload.token,
+      ...(payload.platform ? { platform: payload.platform } : {}),
+    });
+
+    return {
+      status: 'ok',
+      removed,
+    };
   }
 
   async getPreferences(userId: string): Promise<NotificationPreferencesView> {

@@ -1,7 +1,7 @@
 import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 export class CreateInviteLinkDto {
-  @IsUUID('4')
+  @IsUUID('all')
   organizationId!: string;
 
   @IsOptional()
@@ -16,3 +16,4 @@ export class CreateInviteLinkDto {
   @Max(24 * 30)
   expiresInHours?: number;
 }
+

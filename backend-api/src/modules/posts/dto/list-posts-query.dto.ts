@@ -18,6 +18,7 @@ export class ListPostsQueryDto {
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID('all')
   groupId?: string;
 }
+

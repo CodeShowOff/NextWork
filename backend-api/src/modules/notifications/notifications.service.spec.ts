@@ -20,6 +20,9 @@ describe('NotificationsService', () => {
     hasRecentThanks: jest.fn(),
     findOrCreateDirectConversationBetweenUsers: jest.fn(),
     createDirectMessage: jest.fn(),
+    registerDeviceToken: jest.fn(),
+    touchDeviceToken: jest.fn(),
+    unregisterDeviceToken: jest.fn(),
   } as unknown as NotificationsRepository;
 
   const redisPublishMock = jest.fn();
@@ -150,5 +153,65 @@ describe('NotificationsService', () => {
     });
 
     await expect(service.openNotification('u1', 'n-open-2')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('registers a device token and returns normalized response', async () => {
+    (notificationsRepositoryMock.registerDeviceToken as jest.Mock).mockResolvedValue({
+      id: 'dt-1',
+      userId: 'u1',
+      platform: 'ios',
+      token: 'token_1234567890123456',
+      lastSeenAt: new Date('2026-03-18T09:00:00.000Z'),
+    });
+
+    const result = await service.registerDeviceToken('u1', {
+      platform: 'ios',
+      token: 'token_1234567890123456',
+    });
+
+    expect(notificationsRepositoryMock.registerDeviceToken).toHaveBeenCalledWith({
+      userId: 'u1',
+      platform: 'ios',
+      token: 'token_1234567890123456',
+    });
+    expect(result).toEqual({
+      status: 'ok',
+      deviceToken: {
+        id: 'dt-1',
+        platform: 'ios',
+        token: 'token_1234567890123456',
+        lastSeenAt: '2026-03-18T09:00:00.000Z',
+      },
+    });
+  });
+
+  it('updates heartbeat and returns found=true when token exists', async () => {
+    (notificationsRepositoryMock.touchDeviceToken as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.heartbeatDeviceToken('u1', {
+      token: 'token_1234567890123456',
+      platform: 'android',
+    });
+
+    expect(notificationsRepositoryMock.touchDeviceToken).toHaveBeenCalledWith({
+      userId: 'u1',
+      token: 'token_1234567890123456',
+      platform: 'android',
+    });
+    expect(result).toEqual({ status: 'ok', found: true });
+  });
+
+  it('unregisters device token and reports removal status', async () => {
+    (notificationsRepositoryMock.unregisterDeviceToken as jest.Mock).mockResolvedValue(true);
+
+    const result = await service.unregisterDeviceToken('u1', {
+      token: 'token_1234567890123456',
+    });
+
+    expect(notificationsRepositoryMock.unregisterDeviceToken).toHaveBeenCalledWith({
+      userId: 'u1',
+      token: 'token_1234567890123456',
+    });
+    expect(result).toEqual({ status: 'ok', removed: true });
   });
 });

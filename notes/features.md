@@ -2,6 +2,9 @@
 
 This is the **main attraction of the app**.
 
+Extra:
+Remider setting option within chat. And notify via push notification. Keep track of reminders in a separate page. Allow manager and Admin to set reminder app wide, and let employees to set their own reminders too. like snooze and all.
+
 Features:
 
 * Company feed (timeline)

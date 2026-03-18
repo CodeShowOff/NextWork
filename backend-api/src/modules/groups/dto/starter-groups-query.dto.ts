@@ -1,6 +1,7 @@
 import { IsUUID } from 'class-validator';
 
 export class StarterGroupsQueryDto {
-  @IsUUID('4')
+  @IsUUID('all')
   organizationId!: string;
 }
+

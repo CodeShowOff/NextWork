@@ -55,6 +55,23 @@ describe('NotificationsController Integration', () => {
       conversationId: null,
       messageId: null,
     }),
+    registerDeviceToken: jest.fn().mockResolvedValue({
+      status: 'ok',
+      deviceToken: {
+        id: 'dt-1',
+        platform: 'ios',
+        token: 'token_1234567890123456',
+        lastSeenAt: '2026-03-18T09:00:00.000Z',
+      },
+    }),
+    heartbeatDeviceToken: jest.fn().mockResolvedValue({
+      status: 'ok',
+      found: true,
+    }),
+    unregisterDeviceToken: jest.fn().mockResolvedValue({
+      status: 'ok',
+      removed: true,
+    }),
     openNotification: jest.fn().mockResolvedValue({
       status: 'ok',
       readApplied: true,
@@ -186,5 +203,49 @@ describe('NotificationsController Integration', () => {
     expect(response.body.status).toBe('ok');
     expect(response.body.action.target).toBe('messages');
     expect(notificationsServiceMock.openNotification).toHaveBeenCalledWith('u1', 'n-open-1');
+  });
+
+  it('POST /notifications/device-tokens/register registers token', async () => {
+    const payload = {
+      platform: 'ios',
+      token: 'token_1234567890123456',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/notifications/device-tokens/register')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body.status).toBe('ok');
+    expect(notificationsServiceMock.registerDeviceToken).toHaveBeenCalledWith('u1', payload);
+  });
+
+  it('POST /notifications/device-tokens/heartbeat updates activity timestamp', async () => {
+    const payload = {
+      token: 'token_1234567890123456',
+      platform: 'ios',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/notifications/device-tokens/heartbeat')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body.found).toBe(true);
+    expect(notificationsServiceMock.heartbeatDeviceToken).toHaveBeenCalledWith('u1', payload);
+  });
+
+  it('POST /notifications/device-tokens/unregister removes device token', async () => {
+    const payload = {
+      token: 'token_1234567890123456',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/notifications/device-tokens/unregister')
+      .send(payload)
+      .expect(201);
+
+    expect(response.body.removed).toBe(true);
+    expect(notificationsServiceMock.unregisterDeviceToken).toHaveBeenCalledWith('u1', payload);
   });
 });

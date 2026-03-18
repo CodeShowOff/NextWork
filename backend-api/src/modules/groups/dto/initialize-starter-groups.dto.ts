@@ -1,7 +1,7 @@
 import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class InitializeStarterGroupsDto {
-  @IsUUID('4')
+  @IsUUID('all')
   organizationId!: string;
 
   @IsOptional()
@@ -15,3 +15,4 @@ export class InitializeStarterGroupsDto {
   @IsBoolean()
   skipped?: boolean;
 }
+

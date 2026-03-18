@@ -12,7 +12,7 @@ import { UpdateGroupDto } from './dto/update-group.dto';
 import { GroupsService } from './groups.service';
 
 class ListGroupsQueryDto {
-  @IsUUID('4')
+  @IsUUID('all')
   organizationId!: string;
 }
 
@@ -65,3 +65,4 @@ export class GroupsController {
     return this.groupsService.listMembers(user.sub, groupId);
   }
 }
+

@@ -22,9 +22,83 @@ export type NotificationMuteRow = {
   };
 };
 
+export type DeviceTokenRow = {
+  id: string;
+  userId: string;
+  platform: string;
+  token: string;
+  lastSeenAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class NotificationsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  registerDeviceToken(params: {
+    userId: string;
+    platform: string;
+    token: string;
+    lastSeenAt?: Date;
+  }): Promise<DeviceTokenRow> {
+    const lastSeenAt = params.lastSeenAt ?? new Date();
+
+    return this.prisma.deviceToken.upsert({
+      where: {
+        platform_token: {
+          platform: params.platform,
+          token: params.token,
+        },
+      },
+      create: {
+        userId: params.userId,
+        platform: params.platform,
+        token: params.token,
+        lastSeenAt,
+      },
+      update: {
+        userId: params.userId,
+        lastSeenAt,
+      },
+    });
+  }
+
+  async touchDeviceToken(params: {
+    userId: string;
+    token: string;
+    platform?: string;
+    lastSeenAt?: Date;
+  }): Promise<boolean> {
+    const result = await this.prisma.deviceToken.updateMany({
+      where: {
+        userId: params.userId,
+        token: params.token,
+        ...(params.platform ? { platform: params.platform } : {}),
+      },
+      data: {
+        lastSeenAt: params.lastSeenAt ?? new Date(),
+      },
+    });
+
+    return result.count > 0;
+  }
+
+  async unregisterDeviceToken(params: {
+    userId: string;
+    token: string;
+    platform?: string;
+  }): Promise<boolean> {
+    const result = await this.prisma.deviceToken.deleteMany({
+      where: {
+        userId: params.userId,
+        token: params.token,
+        ...(params.platform ? { platform: params.platform } : {}),
+      },
+    });
+
+    return result.count > 0;
+  }
 
   create(params: {
     userId: string;

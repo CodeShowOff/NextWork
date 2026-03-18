@@ -1,5 +1,6 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
 
+import { BackgroundJobsService } from './common/reliability/background-jobs.service';
 import { RequestMetricsService } from './common/observability/request-metrics.service';
 import { RealtimeMetricsService } from './common/observability/realtime-metrics.service';
 
@@ -8,14 +9,17 @@ export class OpsController {
   constructor(
     private readonly requestMetricsService: RequestMetricsService,
     private readonly realtimeMetricsService: RealtimeMetricsService,
+    private readonly backgroundJobsService: BackgroundJobsService,
   ) {}
 
   @Get('metrics')
-  metrics() {
+  async metrics() {
     const snapshot = this.requestMetricsService.getSnapshot();
+    const backgroundJobs = await this.backgroundJobsService.getSnapshot();
     return {
       ...snapshot,
       realtime: this.realtimeMetricsService.getSnapshot(),
+      backgroundJobs,
     };
   }
 
@@ -64,9 +68,10 @@ export class OpsController {
 
   @Get('prometheus')
   @Header('Content-Type', 'text/plain; version=0.0.4')
-  prometheus(): string {
+  async prometheus(): Promise<string> {
     const snapshot = this.requestMetricsService.getSnapshot();
     const realtime = this.realtimeMetricsService.getSnapshot();
+    const backgroundJobs = await this.backgroundJobsService.getSnapshot();
     const lines: string[] = [];
 
     lines.push('# HELP workplace_http_requests_total Total HTTP requests by route.');
@@ -124,6 +129,44 @@ export class OpsController {
     lines.push('# HELP workplace_websocket_failed_auth_total Failed websocket authentications.');
     lines.push('# TYPE workplace_websocket_failed_auth_total counter');
     lines.push(`workplace_websocket_failed_auth_total ${realtime.failedAuthentications}`);
+
+    lines.push('# HELP workplace_background_jobs_enqueued_total Enqueued background jobs.');
+    lines.push('# TYPE workplace_background_jobs_enqueued_total counter');
+    lines.push(`workplace_background_jobs_enqueued_total ${backgroundJobs.counters.enqueued}`);
+
+    lines.push('# HELP workplace_background_jobs_processed_total Successfully processed background jobs.');
+    lines.push('# TYPE workplace_background_jobs_processed_total counter');
+    lines.push(`workplace_background_jobs_processed_total ${backgroundJobs.counters.processed}`);
+
+    lines.push('# HELP workplace_background_jobs_failed_total Background job failures.');
+    lines.push('# TYPE workplace_background_jobs_failed_total counter');
+    lines.push(`workplace_background_jobs_failed_total ${backgroundJobs.counters.failed}`);
+
+    lines.push('# HELP workplace_background_jobs_retried_total Background jobs retried after transient failures.');
+    lines.push('# TYPE workplace_background_jobs_retried_total counter');
+    lines.push(`workplace_background_jobs_retried_total ${backgroundJobs.counters.retried}`);
+
+    lines.push('# HELP workplace_background_jobs_dead_lettered_total Background jobs moved to dead-letter queue.');
+    lines.push('# TYPE workplace_background_jobs_dead_lettered_total counter');
+    lines.push(`workplace_background_jobs_dead_lettered_total ${backgroundJobs.counters.deadLettered}`);
+
+    lines.push('# HELP workplace_background_queue_jobs Number of jobs by state in primary background queue.');
+    lines.push('# TYPE workplace_background_queue_jobs gauge');
+    lines.push(`workplace_background_queue_jobs{queue="main",state="waiting"} ${backgroundJobs.queue.waiting}`);
+    lines.push(`workplace_background_queue_jobs{queue="main",state="active"} ${backgroundJobs.queue.active}`);
+    lines.push(`workplace_background_queue_jobs{queue="main",state="delayed"} ${backgroundJobs.queue.delayed}`);
+    lines.push(`workplace_background_queue_jobs{queue="main",state="completed"} ${backgroundJobs.queue.completed}`);
+    lines.push(`workplace_background_queue_jobs{queue="main",state="failed"} ${backgroundJobs.queue.failed}`);
+    lines.push(`workplace_background_queue_jobs{queue="main",state="paused"} ${backgroundJobs.queue.paused}`);
+
+    lines.push('# HELP workplace_background_queue_jobs_dlq Number of jobs by state in dead-letter queue.');
+    lines.push('# TYPE workplace_background_queue_jobs_dlq gauge');
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="waiting"} ${backgroundJobs.deadLetterQueue.waiting}`);
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="active"} ${backgroundJobs.deadLetterQueue.active}`);
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="delayed"} ${backgroundJobs.deadLetterQueue.delayed}`);
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="completed"} ${backgroundJobs.deadLetterQueue.completed}`);
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="failed"} ${backgroundJobs.deadLetterQueue.failed}`);
+    lines.push(`workplace_background_queue_jobs_dlq{queue="dlq",state="paused"} ${backgroundJobs.deadLetterQueue.paused}`);
 
     return `${lines.join('\n')}\n`;
   }

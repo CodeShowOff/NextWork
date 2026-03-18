@@ -3,7 +3,7 @@ import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 export const SEND_THANKS_NOTIFICATION_TYPES = ['thanks', 'thanks-note'] as const;
 
 export class SendThanksDto {
-  @IsUUID('4')
+  @IsUUID('all')
   targetUserId!: string;
 
   @IsOptional()
