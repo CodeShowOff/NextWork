@@ -11,8 +11,8 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const email = (process.env.SEED_USER_EMAIL ?? 'admin@workplace.local').toLowerCase();
-  const password = process.env.SEED_USER_PASSWORD ?? 'ChangeMe123!';
+  const email = (process.env.SEED_USER_EMAIL ?? 'admin@gmail.com').toLowerCase();
+  const password = process.env.SEED_USER_PASSWORD ?? 'Pass123@';
   const displayName = process.env.SEED_USER_DISPLAY_NAME ?? 'Workplace Admin';
   const now = new Date();
 
