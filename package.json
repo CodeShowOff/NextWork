@@ -24,7 +24,7 @@
     "test:abuse": "node ./scripts/abuse-test.js",
     "test:mobile-perf": "node ./scripts/mobile-perf-regression-check.js --baseline ./documentation/baselines/mobile-perf-baseline.json --current ./documentation/baselines/mobile-perf-current.json --minDroppedFramesImprovement 30 --maxTtfcRegressionMs 0 --maxMemoryCrashIncrease 0",
     "test:e2e:verify": "node ./scripts/e2e-verify.js",
-    "release:phase": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
+    "release:check": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
