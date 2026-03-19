@@ -1,13 +1,51 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const defaultHost = Platform.select({
-  android: '10.0.2.2',
+function extractHostFromExpoRuntime(): string | null {
+  const expoConfigHostUri = (Constants.expoConfig as { hostUri?: string } | null)?.hostUri;
+  const manifest2HostUri = (
+    Constants as {
+      manifest2?: {
+        extra?: {
+          expoClient?: {
+            hostUri?: string;
+          };
+        };
+      };
+    }
+  ).manifest2?.extra?.expoClient?.hostUri;
+  const legacyDebuggerHost = (Constants as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost;
+  const metroScriptUrl = (NativeModules as { SourceCode?: { scriptURL?: string } }).SourceCode?.scriptURL;
+
+  const rawHostUri = expoConfigHostUri || manifest2HostUri || legacyDebuggerHost || metroScriptUrl;
+  if (!rawHostUri) {
+    return null;
+  }
+
+  if (rawHostUri.startsWith('http://') || rawHostUri.startsWith('https://')) {
+    try {
+      return new URL(rawHostUri).hostname;
+    } catch {
+      // Continue with fallback parser.
+    }
+  }
+
+  const host = rawHostUri.replace(/^https?:\/\//, '').split(':')[0]?.trim();
+  return host || null;
+}
+
+const fallbackHost = Platform.select({
+  android: Constants.isDevice ? 'localhost' : '10.0.2.2',
   ios: 'localhost',
   default: 'localhost',
 });
 
-export const defaultApiBaseUrl = `http://${defaultHost}:4000/api/v1`;
-export const defaultRealtimeBaseUrl = `http://${defaultHost}:4000/realtime`;
+const runtimeHost = extractHostFromExpoRuntime() || fallbackHost;
+const envApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+const envRealtimeBaseUrl = process.env.EXPO_PUBLIC_REALTIME_BASE_URL?.trim();
+
+export const defaultApiBaseUrl = envApiBaseUrl || `http://${runtimeHost}:4000/api/v1`;
+export const defaultRealtimeBaseUrl = envRealtimeBaseUrl || `http://${runtimeHost}:4000/realtime`;
 
 function readBooleanFlag(name: string, fallback: boolean): boolean {
   const value = process.env[name]?.trim().toLowerCase();

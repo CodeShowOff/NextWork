@@ -4,12 +4,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -24,6 +24,7 @@ import { useInviteLinkStore } from '../../shared/session/invite-link.store';
 import { getCurrentUser } from '../../shared/api/users.api';
 import { useSessionStore } from '../../shared/session/session.store';
 import { authSessionService } from '../../shared/session/auth-session.service';
+import { defaultApiBaseUrl } from '../../shared/config/runtime';
 
 type SignUpStep = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -37,6 +38,26 @@ const signUpStepLabelKeys: Record<SignUpStep, string> = {
   4: 'auth.stepLabels.organizationSize',
   5: 'auth.stepLabels.jobTitle',
 };
+
+const AUTH_REQUEST_TIMEOUT_MS = 15000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
 
 export function AuthScreen() {
   const { t } = useTranslation();
@@ -56,9 +77,11 @@ export function AuthScreen() {
   const [jobTitle, setJobTitle] = useState('');
   const [apiBaseUrl, setApiBaseUrl] = useState('');
   const [realtimeBaseUrl, setRealtimeBaseUrl] = useState('');
+  const [showAdvancedUrls, setShowAdvancedUrls] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const setSession = useSessionStore((state) => state.setSession);
+  const sessionApiBaseUrl = useSessionStore((state) => state.apiBaseUrl);
   const pendingInviteToken = useInviteLinkStore((state) => state.pendingInviteToken);
   const clearPendingInviteToken = useInviteLinkStore((state) => state.clearPendingInviteToken);
   const inviteToken = pendingInviteToken.trim();
@@ -251,21 +274,27 @@ export function AuthScreen() {
     }
 
     setIsSubmitting(true);
+    let effectiveApiBaseUrl = useSessionStore.getState().apiBaseUrl || defaultApiBaseUrl;
     try {
       const normalizedApiBaseUrl = apiBaseUrl.trim();
       const normalizedRealtimeBaseUrl = realtimeBaseUrl.trim();
+      effectiveApiBaseUrl = normalizedApiBaseUrl || useSessionStore.getState().apiBaseUrl || defaultApiBaseUrl;
 
       if (mode === 'signup') {
-        const signupResult = await signUp({
-          email: email.trim(),
-          password: password.trim(),
-          displayName: fullName.trim(),
-          fullName: fullName.trim(),
-          organizationName: isInviteSignup ? '' : organizationName.trim(),
-          organizationSize: isInviteSignup ? '' : organizationSize.trim(),
-          jobTitle: isInviteSignup ? '' : jobTitle.trim(),
-          ...(isInviteSignup ? { inviteToken } : {}),
-        });
+        const signupResult = await withTimeout(
+          signUp({
+            email: email.trim(),
+            password: password.trim(),
+            displayName: fullName.trim(),
+            fullName: fullName.trim(),
+            organizationName: isInviteSignup ? '' : organizationName.trim(),
+            organizationSize: isInviteSignup ? '' : organizationSize.trim(),
+            jobTitle: isInviteSignup ? '' : jobTitle.trim(),
+            ...(isInviteSignup ? { inviteToken } : {}),
+          }),
+          AUTH_REQUEST_TIMEOUT_MS,
+          `Request timeout after ${AUTH_REQUEST_TIMEOUT_MS / 1000}s`,
+        );
 
         const expiryText = t('auth.alerts.verificationRequiredBody', {
           expiresAt: new Date(signupResult.expiresAt).toLocaleString(),
@@ -285,10 +314,14 @@ export function AuthScreen() {
         return;
       }
 
-      const tokens = await login({
-        email: email.trim(),
-        password: password.trim(),
-      });
+      const tokens = await withTimeout(
+        login({
+          email: email.trim(),
+          password: password.trim(),
+        }),
+        AUTH_REQUEST_TIMEOUT_MS,
+        `Request timeout after ${AUTH_REQUEST_TIMEOUT_MS / 1000}s`,
+      );
 
       const previous = useSessionStore.getState();
       setSession({
@@ -308,6 +341,9 @@ export function AuthScreen() {
     } catch (error) {
       await authSessionService.clearSession();
       const message = parseApiErrorMessage(error);
+      if (message.toLowerCase().includes('network request failed') || message.toLowerCase().includes('timeout')) {
+        setAuthHint(`Cannot reach backend at ${effectiveApiBaseUrl}. Open optional API URLs and set your PC LAN IP (example: http://192.168.x.x:4000/api/v1).`);
+      }
       if (message.toLowerCase().includes('email not verified')) {
         setAuthStep('verify');
         setAuthHint(t('auth.alerts.verifyBeforeLoginHint'));
@@ -334,13 +370,17 @@ export function AuthScreen() {
               style={[styles.modeButton, mode === 'login' ? styles.modeActive : null]}
               onPress={() => switchMode('login')}
             >
-              <Text style={styles.modeText}>{t('auth.modeLogin')}</Text>
+              <Text style={[styles.modeText, mode === 'login' ? styles.modeTextActive : null]}>
+                {t('auth.modeLogin')}
+              </Text>
             </Pressable>
             <Pressable
               style={[styles.modeButton, mode === 'signup' ? styles.modeActive : null]}
               onPress={() => switchMode('signup')}
             >
-              <Text style={styles.modeText}>{t('auth.modeSignup')}</Text>
+              <Text style={[styles.modeText, mode === 'signup' ? styles.modeTextActive : null]}>
+                {t('auth.modeSignup')}
+              </Text>
             </Pressable>
           </View>
 
@@ -348,6 +388,7 @@ export function AuthScreen() {
 
           {authStep === 'verify' ? (
             <>
+              <Text style={styles.inputLabel}>{t('auth.placeholders.email')}</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -356,6 +397,7 @@ export function AuthScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.verificationToken')}</Text>
               <TextInput
                 value={verificationToken}
                 onChangeText={setVerificationToken}
@@ -406,6 +448,7 @@ export function AuthScreen() {
 
           {authStep === 'forgot' ? (
             <>
+              <Text style={styles.inputLabel}>{t('auth.placeholders.email')}</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -429,6 +472,7 @@ export function AuthScreen() {
 
           {authStep === 'reset' ? (
             <>
+              <Text style={styles.inputLabel}>{t('auth.placeholders.email')}</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -437,6 +481,7 @@ export function AuthScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.resetToken')}</Text>
               <TextInput
                 value={resetToken}
                 onChangeText={setResetToken}
@@ -444,6 +489,7 @@ export function AuthScreen() {
                 style={styles.input}
                 autoCapitalize="none"
               />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.newPassword')}</Text>
               <TextInput
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -452,6 +498,7 @@ export function AuthScreen() {
                 secureTextEntry
                 autoCapitalize="none"
               />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.confirmNewPassword')}</Text>
               <TextInput
                 value={confirmNewPassword}
                 onChangeText={setConfirmNewPassword}
@@ -475,6 +522,7 @@ export function AuthScreen() {
 
           {mode === 'login' && authStep === 'credentials' ? (
             <>
+              <Text style={styles.inputLabel}>{t('auth.placeholders.email')}</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -483,6 +531,7 @@ export function AuthScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.password')}</Text>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
@@ -513,69 +562,90 @@ export function AuthScreen() {
               </View>
 
               {signUpStep === 0 ? (
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t('auth.placeholders.email')}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.email')}</Text>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder={t('auth.placeholders.email')}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                </>
               ) : null}
 
               {signUpStep === 1 ? (
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder={t('auth.placeholders.password')}
-                  style={styles.input}
-                  secureTextEntry
-                  autoCapitalize="none"
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.password')}</Text>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder={t('auth.placeholders.password')}
+                    style={styles.input}
+                    secureTextEntry
+                    autoCapitalize="none"
+                  />
+                </>
               ) : null}
 
               {signUpStep === 2 ? (
-                <TextInput
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder={t('auth.placeholders.fullName')}
-                  style={styles.input}
-                  autoCapitalize="words"
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.fullName')}</Text>
+                  <TextInput
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder={t('auth.placeholders.fullName')}
+                    style={styles.input}
+                    autoCapitalize="words"
+                  />
+                </>
               ) : null}
 
               {signUpStep === 3 ? (
-                <TextInput
-                  value={organizationName}
-                  onChangeText={setOrganizationName}
-                  placeholder={t('auth.placeholders.organizationName')}
-                  style={styles.input}
-                  autoCapitalize="words"
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.organizationName')}</Text>
+                  <TextInput
+                    value={organizationName}
+                    onChangeText={setOrganizationName}
+                    placeholder={t('auth.placeholders.organizationName')}
+                    style={styles.input}
+                    autoCapitalize="words"
+                  />
+                </>
               ) : null}
 
               {signUpStep === 4 ? (
-                <TextInput
-                  value={organizationSize}
-                  onChangeText={setOrganizationSize}
-                  placeholder={t('auth.placeholders.organizationSize')}
-                  style={styles.input}
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.organizationSize')}</Text>
+                  <TextInput
+                    value={organizationSize}
+                    onChangeText={setOrganizationSize}
+                    placeholder={t('auth.placeholders.organizationSize')}
+                    style={styles.input}
+                  />
+                </>
               ) : null}
 
               {signUpStep === 5 ? (
-                <TextInput
-                  value={jobTitle}
-                  onChangeText={setJobTitle}
-                  placeholder={t('auth.placeholders.jobTitle')}
-                  style={styles.input}
-                  autoCapitalize="words"
-                />
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.placeholders.jobTitle')}</Text>
+                  <TextInput
+                    value={jobTitle}
+                    onChangeText={setJobTitle}
+                    placeholder={t('auth.placeholders.jobTitle')}
+                    style={styles.input}
+                    autoCapitalize="words"
+                  />
+                </>
               ) : null}
 
               <View style={styles.wizardActionsRow}>
                 <Pressable
-                  style={[styles.secondaryWizardButton, signUpStep === 0 ? styles.disabledButton : null]}
+                  style={[
+                    styles.secondaryWizardButton,
+                    signUpStep === 0 ? styles.secondaryWizardButtonDisabled : null,
+                  ]}
                   onPress={() => {
                     if (signUpStep === 0) {
                       return;
@@ -586,12 +656,22 @@ export function AuthScreen() {
                   }}
                   disabled={signUpStep === 0}
                 >
-                  <Text style={styles.secondaryWizardButtonText}>{t('common.actions.back')}</Text>
+                  <Text
+                    style={[
+                      styles.secondaryWizardButtonText,
+                      signUpStep === 0 ? styles.secondaryWizardButtonTextDisabled : null,
+                    ]}
+                  >
+                    {t('common.actions.back')}
+                  </Text>
                 </Pressable>
 
                 {signUpStep < maxSignUpStep ? (
                   <Pressable
-                    style={[styles.secondaryWizardButton, !isCurrentSignUpStepValid() ? styles.disabledButton : null]}
+                    style={[
+                      styles.secondaryWizardButton,
+                      !isCurrentSignUpStepValid() ? styles.secondaryWizardButtonDisabled : null,
+                    ]}
                     onPress={() => {
                       if (!isCurrentSignUpStepValid()) {
                         Alert.alert(
@@ -608,7 +688,14 @@ export function AuthScreen() {
                     }}
                     disabled={!isCurrentSignUpStepValid()}
                   >
-                    <Text style={styles.secondaryWizardButtonText}>{t('common.actions.next')}</Text>
+                    <Text
+                      style={[
+                        styles.secondaryWizardButtonText,
+                        !isCurrentSignUpStepValid() ? styles.secondaryWizardButtonTextDisabled : null,
+                      ]}
+                    >
+                      {t('common.actions.next')}
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -616,20 +703,34 @@ export function AuthScreen() {
             ) : null
           )}
 
-          <TextInput
-            value={apiBaseUrl}
-            onChangeText={setApiBaseUrl}
-            placeholder={t('auth.placeholders.apiUrl')}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <TextInput
-            value={realtimeBaseUrl}
-            onChangeText={setRealtimeBaseUrl}
-            placeholder={t('auth.placeholders.realtimeUrl')}
-            style={styles.input}
-            autoCapitalize="none"
-          />
+          <Pressable style={styles.advancedToggleButton} onPress={() => setShowAdvancedUrls((current) => !current)}>
+            <Text style={styles.advancedToggleText}>
+              {showAdvancedUrls ? 'Hide optional URLs' : 'Set optional API URLs'}
+            </Text>
+          </Pressable>
+
+          {showAdvancedUrls ? (
+            <>
+              <Text style={styles.inputLabel}>{t('auth.placeholders.apiUrl')}</Text>
+              <TextInput
+                value={apiBaseUrl}
+                onChangeText={setApiBaseUrl}
+                placeholder={t('auth.placeholders.apiUrl')}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+              <Text style={styles.inputLabel}>{t('auth.placeholders.realtimeUrl')}</Text>
+              <TextInput
+                value={realtimeBaseUrl}
+                onChangeText={setRealtimeBaseUrl}
+                placeholder={t('auth.placeholders.realtimeUrl')}
+                style={styles.input}
+                autoCapitalize="none"
+              />
+            </>
+          ) : null}
+
+          <Text style={styles.endpointHintText}>Backend: {apiBaseUrl.trim() || sessionApiBaseUrl}</Text>
 
           <Pressable
             style={[
@@ -724,6 +825,9 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '700',
   },
+  modeTextActive: {
+    color: '#FFFFFF',
+  },
   stepHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -738,6 +842,11 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 12,
   },
+  inputLabel: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -745,6 +854,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
+    color: '#0F172A',
   },
   wizardActionsRow: {
     flexDirection: 'row',
@@ -765,6 +875,13 @@ const styles = StyleSheet.create({
     color: '#0B6E4F',
     fontWeight: '700',
   },
+  secondaryWizardButtonDisabled: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
+  secondaryWizardButtonTextDisabled: {
+    color: '#64748B',
+  },
   submitButton: {
     marginTop: 4,
     borderRadius: 12,
@@ -774,11 +891,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabledButton: {
-    opacity: 0.55,
+    backgroundColor: '#7DB6A5',
   },
   submitButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  advancedToggleButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  advancedToggleText: {
+    color: '#0369A1',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  endpointHintText: {
+    color: '#64748B',
+    fontSize: 11,
   },
 });

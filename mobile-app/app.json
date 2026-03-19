@@ -12,6 +12,10 @@
     },
     "android": {
       "package": "com.workplace.app"
-    }
+    },
+    "plugins": [
+      "expo-localization",
+      "expo-secure-store"
+    ]
   }
 }

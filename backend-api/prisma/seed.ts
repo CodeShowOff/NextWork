@@ -11,26 +11,65 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const email = 'admin@workplace.local';
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return;
-  }
+  const email = (process.env.SEED_USER_EMAIL ?? 'admin@workplace.local').toLowerCase();
+  const password = process.env.SEED_USER_PASSWORD ?? 'ChangeMe123!';
+  const displayName = process.env.SEED_USER_DISPLAY_NAME ?? 'Workplace Admin';
+  const now = new Date();
 
-  const passwordHash = await bcrypt.hash('ChangeMe123!', 12);
+  const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.user.create({
-    data: {
+  const user = await prisma.user.upsert({
+    where: { email },
+    create: {
       email,
       passwordHash,
       status: 'active',
+      emailVerifiedAt: now,
+      emailVerificationTokenHash: null,
+      emailVerificationTokenExpiresAt: null,
+      passwordResetTokenHash: null,
+      passwordResetTokenExpiresAt: null,
       profile: {
         create: {
-          displayName: 'Workplace Admin',
-          bio: 'Seeded admin account',
+          displayName,
+          bio: 'Seeded verified account',
         },
       },
     },
+    update: {
+      passwordHash,
+      status: 'active',
+      emailVerifiedAt: now,
+      emailVerificationTokenHash: null,
+      emailVerificationTokenExpiresAt: null,
+      passwordResetTokenHash: null,
+      passwordResetTokenExpiresAt: null,
+      profile: {
+        upsert: {
+          create: {
+            displayName,
+            bio: 'Seeded verified account',
+          },
+          update: {
+            displayName,
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      email: true,
+      emailVerifiedAt: true,
+      status: true,
+    },
+  });
+
+  console.log('Seeded verified user:', {
+    id: user.id,
+    email: user.email,
+    status: user.status,
+    emailVerifiedAt: user.emailVerifiedAt,
+    password,
   });
 }
 

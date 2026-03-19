@@ -14,16 +14,43 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {}
 
+  private isMissingOrPlaceholder(value: string | undefined, placeholders: string[]): boolean {
+    if (!value) {
+      return true;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    return placeholders.some((placeholder) => placeholder.toLowerCase() === normalized);
+  }
+
   async sendTransactionalEmail(params: SendTransactionalEmailParams): Promise<void> {
-    const apiKey = this.configService.get<string>('BREVO_API_KEY');
-    const senderEmail = this.configService.get<string>('BREVO_SENDER_EMAIL');
+    const rawApiKey = this.configService.get<string>('BREVO_API_KEY');
+    const rawSenderEmail = this.configService.get<string>('BREVO_SENDER_EMAIL');
+    const apiKey = this.isMissingOrPlaceholder(rawApiKey, ['your_brevo_api_key'])
+      ? undefined
+      : rawApiKey?.trim();
+    const senderEmail = this.isMissingOrPlaceholder(rawSenderEmail, ['verified_sender@yourdomain.com'])
+      ? undefined
+      : rawSenderEmail?.trim();
     const senderName = this.configService.get<string>('BREVO_SENDER_NAME') ?? 'Workplace';
     const apiBaseUrl =
       this.configService.get<string>('BREVO_API_BASE_URL')?.replace(/\/+$/, '') ??
       'https://api.brevo.com';
 
     if (!apiKey || !senderEmail) {
-      throw new Error('Brevo email configuration is missing');
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        throw new Error('Brevo email configuration is missing');
+      }
+
+      this.logger.warn(
+        `Brevo config missing. Skipping email send in ${process.env.NODE_ENV || 'development'} mode for recipient ${params.to}.`,
+      );
+      return;
     }
 
     const response = await fetch(`${apiBaseUrl}/v3/smtp/email`, {

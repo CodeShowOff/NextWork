@@ -26,6 +26,10 @@
     "test:e2e:verify": "node ./scripts/e2e-verify.js",
     "release:check": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
   },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-native": "0.83.2"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "autocannon": "^8.0.0",
@@ -33,5 +37,9 @@
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
+  },
+  "overrides": {
+    "react": "19.2.0",
+    "react-native": "0.83.2"
   }
 }
