@@ -175,6 +175,7 @@ export class MessagesGateway
   private server!: Server;
 
   private readonly logger = new Logger(MessagesGateway.name);
+  private readonly exportOnlyMode = process.env.OPENAPI_EXPORT_ONLY === 'true';
   private subscriber?: Redis;
 
   constructor(
@@ -188,6 +189,10 @@ export class MessagesGateway
   ) {}
 
   async onModuleInit(): Promise<void> {
+    if (this.exportOnlyMode) {
+      return;
+    }
+
     this.subscriber = this.redisService.getClient().duplicate();
 
     this.subscriber.on('error', (error) => {
