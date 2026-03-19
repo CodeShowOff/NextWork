@@ -83,5 +83,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Dependency audit
-        run: npm audit --audit-level=high
+      - name: Dependency audit gate
+        run: node ./scripts/audit-gate.js

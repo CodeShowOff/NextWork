@@ -11,7 +11,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "contracts:sync-spec": "npm run openapi:export --workspace backend-api",
+    "contracts:sync-spec": "npm run prisma:generate --workspace backend-api && npm run openapi:export --workspace backend-api",
     "contracts:generate": "npm run contracts:sync-spec && npm run generate --workspace @workplace/api-contracts",
     "contracts:check": "npm run contracts:sync-spec && npm run check:generated --workspace @workplace/api-contracts",
     "contracts:check-fetch": "node ./scripts/check-mobile-api-fetch.js",
@@ -31,23 +31,7 @@
     "autocannon": "^8.0.0",
     "globals": "^17.4.0",
     "prettier": "^3.8.1",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-native": "0.84.1",
-    "react-native-safe-area-context": "5.6.2",
-    "react-native-screens": "4.23.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
-  },
-  "overrides": {
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-native": "0.84.1",
-    "react-native-safe-area-context": "5.6.2",
-    "react-native-screens": "4.23.0"
-  },
-  "dependencies": {
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.15.1"
   }
 }
