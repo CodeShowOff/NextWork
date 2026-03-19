@@ -5,6 +5,8 @@ import { dirname, resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+import { AppModule } from '../app.module';
+
 function ensureEnvDefaults(): void {
   process.env.NODE_ENV ??= 'test';
   process.env.PORT ??= '4000';
@@ -19,8 +21,6 @@ function ensureEnvDefaults(): void {
 
 async function run(): Promise<void> {
   ensureEnvDefaults();
-
-  const { AppModule } = require('../app.module') as typeof import('../app.module');
 
   const app = await NestFactory.create(AppModule, {
     logger: false,
