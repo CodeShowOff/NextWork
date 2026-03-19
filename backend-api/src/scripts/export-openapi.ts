@@ -5,8 +5,6 @@ import { dirname, resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-import { AppModule } from '../app.module';
-
 function ensureEnvDefaults(): void {
   process.env.NODE_ENV ??= 'test';
   process.env.PORT ??= '4000';
@@ -21,6 +19,12 @@ function ensureEnvDefaults(): void {
 
 async function run(): Promise<void> {
   ensureEnvDefaults();
+
+  // Load AppModule after env defaults are set to avoid config bootstrap failures.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AppModule } = require('../app.module') as {
+    AppModule: Parameters<typeof NestFactory.create>[0];
+  };
 
   const app = await NestFactory.create(AppModule, {
     logger: false,
