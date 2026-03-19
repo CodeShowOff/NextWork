@@ -5,8 +5,6 @@ import { dirname, resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-import { AppModule } from '../app.module';
-
 function ensureEnvDefaults(): void {
   process.env.NODE_ENV ??= 'test';
   process.env.PORT ??= '4000';
@@ -21,6 +19,8 @@ function ensureEnvDefaults(): void {
 
 async function run(): Promise<void> {
   ensureEnvDefaults();
+
+  const { AppModule } = require('../app.module') as typeof import('../app.module');
 
   const app = await NestFactory.create(AppModule, {
     logger: false,
@@ -49,6 +49,16 @@ async function run(): Promise<void> {
   await app.close();
   console.log(`Exported OpenAPI document to ${outputPath}`);
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('OpenAPI export unhandled rejection:', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('OpenAPI export uncaught exception:', error);
+  process.exit(1);
+});
 
 run().catch((error) => {
   console.error('OpenAPI export failed:', error);
