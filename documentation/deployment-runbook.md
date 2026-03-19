@@ -58,10 +58,11 @@ If `npm run release:gates` fails at contracts check, run:
 
 If deploying this monorepo to Render, use one Web Service for the API with:
 
-1. Root Directory: `backend-api`
-2. Build Command: `npm ci --include=dev && npm run build`
-3. Start Command: `npm run start`
+1. Root Directory: repository root
+2. Build Command: `npm ci --include=dev && npm run build --workspace backend-api`
+3. Start Command: `npm run start --workspace backend-api`
 4. Health Check Path: `/api/v1/health/live`
+5. Node Version: `20`
 
 Required env vars in Render dashboard:
 

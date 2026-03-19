@@ -2,6 +2,10 @@
   "name": "workplace",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x",
+    "npm": ">=10 <12"
+  },
   "workspaces": [
     "mobile-app",
     "backend-api",
@@ -16,7 +20,7 @@
     "contracts:check": "npm run contracts:sync-spec && npm run check:generated --workspace @workplace/api-contracts",
     "contracts:check-fetch": "node ./scripts/check-mobile-api-fetch.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
-    "ci:backend": "npm run lint --workspace backend-api && npm run typecheck --workspace backend-api && npm run test --workspace backend-api",
+    "ci:backend": "npm run prisma:generate --workspace backend-api && npm run lint --workspace backend-api && npm run typecheck --workspace backend-api && npm run test --workspace backend-api",
     "ci:mobile": "npm run lint --workspace mobile-app && npm run typecheck --workspace mobile-app && npm run test --workspace mobile-app && npm run contracts:check-fetch && npm run contracts:check",
     "release:gates": "npm run ci:backend && npm run ci:mobile",
     "test:load": "node ./scripts/load-test.js",

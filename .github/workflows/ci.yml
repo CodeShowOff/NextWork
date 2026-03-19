@@ -14,6 +14,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -22,6 +25,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate --workspace backend-api
 
       - name: Check generated contracts are up-to-date
         run: npm run contracts:check
@@ -41,6 +47,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -73,6 +82,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify lockfile exists
+        run: test -f package-lock.json
 
       - name: Setup Node
         uses: actions/setup-node@v4

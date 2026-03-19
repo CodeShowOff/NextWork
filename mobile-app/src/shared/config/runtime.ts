@@ -1,21 +1,36 @@
 import { NativeModules, Platform } from 'react-native';
-import Constants from 'expo-constants';
+
+type ExpoConstantsShape = {
+  isDevice?: boolean;
+  expoConfig?: { hostUri?: string } | null;
+  manifest2?: {
+    extra?: {
+      expoClient?: {
+        hostUri?: string;
+      };
+    };
+  };
+  manifest?: { debuggerHost?: string };
+};
+
+function loadExpoConstants(): ExpoConstantsShape {
+  try {
+    // Use require to avoid Jest parsing Expo ESM modules when running node-based tests.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-constants').default as ExpoConstantsShape;
+  } catch {
+    return {};
+  }
+}
+
+const constants = loadExpoConstants();
 
 function extractHostFromExpoRuntime(): string | null {
-  const expoConfigHostUri = (Constants.expoConfig as { hostUri?: string } | null)?.hostUri;
-  const manifest2HostUri = (
-    Constants as {
-      manifest2?: {
-        extra?: {
-          expoClient?: {
-            hostUri?: string;
-          };
-        };
-      };
-    }
-  ).manifest2?.extra?.expoClient?.hostUri;
-  const legacyDebuggerHost = (Constants as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost;
-  const metroScriptUrl = (NativeModules as { SourceCode?: { scriptURL?: string } }).SourceCode?.scriptURL;
+  const expoConfigHostUri = constants.expoConfig?.hostUri;
+  const manifest2HostUri = constants.manifest2?.extra?.expoClient?.hostUri;
+  const legacyDebuggerHost = constants.manifest?.debuggerHost;
+  const metroScriptUrl = (NativeModules as { SourceCode?: { scriptURL?: string } } | undefined)?.SourceCode
+    ?.scriptURL;
 
   const rawHostUri = expoConfigHostUri || manifest2HostUri || legacyDebuggerHost || metroScriptUrl;
   if (!rawHostUri) {
@@ -35,7 +50,7 @@ function extractHostFromExpoRuntime(): string | null {
 }
 
 const fallbackHost = Platform.select({
-  android: Constants.isDevice ? 'localhost' : '10.0.2.2',
+  android: constants.isDevice ? 'localhost' : '10.0.2.2',
   ios: 'localhost',
   default: 'localhost',
 });
