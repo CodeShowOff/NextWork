@@ -2,7 +2,7 @@ services:
   - type: web
     name: workplace-backend-api
     runtime: node
-    buildCommand: npm ci --include=dev && npm run build --workspace backend-api
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm ci --include=dev && npm run build --workspace backend-api
     startCommand: npm run start --workspace backend-api
     healthCheckPath: /api/v1/health/live
     envVars:
