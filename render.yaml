@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: workplace-backend-api
+    runtime: node
+    rootDir: backend-api
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_ENV
+        value: production

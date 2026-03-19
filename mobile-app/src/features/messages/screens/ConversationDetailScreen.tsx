@@ -277,13 +277,16 @@ export function ConversationDetailScreen({ route }: Props) {
           renderItem={renderMessageItem}
           extraData={messagesQuery.lastReadByOtherMessageId ?? ''}
           contentContainerStyle={styles.listContent}
-          inverted
-          onEndReached={() => {
+          maintainVisibleContentPosition={{
+            startRenderingFromBottom: true,
+            autoscrollToBottomThreshold: 0.2,
+          }}
+          onStartReached={() => {
             if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
               messagesQuery.fetchNextPage();
             }
           }}
-          onEndReachedThreshold={0.5}
+          onStartReachedThreshold={0.5}
           ListFooterComponent={
             messagesQuery.isFetchingNextPage ? (
               <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />

@@ -54,6 +54,28 @@ If `npm run release:gates` fails at contracts check, run:
 
 ## 4. Backend Deployment Steps
 
+### 4.0 Render (recommended monorepo setup)
+
+If deploying this monorepo to Render, use one Web Service for the API with:
+
+1. Root Directory: `backend-api`
+2. Build Command: `npm ci --include=dev && npm run build`
+3. Start Command: `npm run start`
+4. Health Check Path: `/api/v1/health/live`
+
+Required env vars in Render dashboard:
+
+1. `NODE_ENV=production`
+2. `DATABASE_URL`
+3. `REDIS_URL`
+4. `JWT_ACCESS_SECRET`
+5. `JWT_REFRESH_SECRET`
+
+Strongly recommended on each deploy:
+
+1. Run migrations before traffic switch: `npm run prisma:migrate:deploy`
+2. Keep Render service linked to this repo root and rely on `render.yaml` for source-of-truth config.
+
 ## 4.1 Provision infra
 
 1. Create managed PostgreSQL and Redis.

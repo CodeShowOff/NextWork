@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build",
+    "build": "npm run prisma:generate && tsc -p tsconfig.build.json",
     "start": "node dist/src/main.js",
     "lint": "eslint \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "jest --config jest.config.ts",
     "test:unit": "jest --config jest.config.ts --testPathPatterns src/.*\\.spec\\.ts$",
     "test:integration": "jest --config jest.config.ts --testPathPatterns test/.*\\.int-spec\\.ts$",
