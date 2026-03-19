@@ -173,6 +173,18 @@ export function AuthScreen() {
     return fallback;
   };
 
+  const parseDebugError = (error: unknown): string => {
+    if (error instanceof Error) {
+      return `${error.name}: ${error.message}`;
+    }
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  };
+
   const submitVerification = async () => {
     if (!email.trim() || !verificationToken.trim()) {
       Alert.alert(t('auth.alerts.missingFieldsTitle'), t('auth.alerts.missingVerificationFieldsBody'));
@@ -278,7 +290,16 @@ export function AuthScreen() {
     try {
       const normalizedApiBaseUrl = apiBaseUrl.trim();
       const normalizedRealtimeBaseUrl = realtimeBaseUrl.trim();
-      effectiveApiBaseUrl = normalizedApiBaseUrl || useSessionStore.getState().apiBaseUrl || defaultApiBaseUrl;
+      const previousState = useSessionStore.getState();
+      const effectiveRealtimeBaseUrl = normalizedRealtimeBaseUrl || previousState.realtimeBaseUrl;
+      effectiveApiBaseUrl = normalizedApiBaseUrl || previousState.apiBaseUrl || defaultApiBaseUrl;
+
+      // Apply URL overrides before auth requests so login/signup hit the currently entered backend.
+      useSessionStore.setState({
+        apiBaseUrl: effectiveApiBaseUrl,
+        realtimeBaseUrl: effectiveRealtimeBaseUrl,
+      });
+      console.info('[Auth] submit using API base URL:', effectiveApiBaseUrl);
 
       if (mode === 'signup') {
         const signupResult = await withTimeout(
@@ -341,8 +362,15 @@ export function AuthScreen() {
     } catch (error) {
       await authSessionService.clearSession();
       const message = parseApiErrorMessage(error);
+      console.error('[Auth] submit failed', {
+        apiBaseUrl: effectiveApiBaseUrl,
+        error: parseDebugError(error),
+      });
       if (message.toLowerCase().includes('network request failed') || message.toLowerCase().includes('timeout')) {
-        setAuthHint(`Cannot reach backend at ${effectiveApiBaseUrl}. Open optional API URLs and set your PC LAN IP (example: http://192.168.x.x:4000/api/v1).`);
+        const renderHint = effectiveApiBaseUrl.includes('.onrender.com')
+          ? `Cannot reach backend at ${effectiveApiBaseUrl}. Confirm https:// URL, keep Render service awake, and test ${effectiveApiBaseUrl.replace('/api/v1', '/api/v1/health')} in phone browser.`
+          : `Cannot reach backend at ${effectiveApiBaseUrl}. Open optional API URLs and set your PC LAN IP (example: http://192.168.x.x:4000/api/v1).`;
+        setAuthHint(renderHint);
       }
       if (message.toLowerCase().includes('email not verified')) {
         setAuthStep('verify');
