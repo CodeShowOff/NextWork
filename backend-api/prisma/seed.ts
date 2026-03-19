@@ -1,7 +1,14 @@
+import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const connectionString =
+  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/workplace';
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
 
 async function main() {
   const email = 'admin@workplace.local';

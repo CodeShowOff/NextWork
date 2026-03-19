@@ -48,8 +48,8 @@ export interface BackgroundJobsSnapshot {
 @Injectable()
 export class BackgroundJobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BackgroundJobsService.name);
-  private readonly queueName = 'jobs:cache-invalidation';
-  private readonly deadLetterQueueName = 'jobs:cache-invalidation:dlq';
+  private readonly queueName = 'jobs-cache-invalidation';
+  private readonly deadLetterQueueName = 'jobs-cache-invalidation-dlq';
   private readonly exportOnlyMode = process.env.OPENAPI_EXPORT_ONLY === 'true';
   private readonly retryPolicy: JobsOptions = {
     attempts: 5,

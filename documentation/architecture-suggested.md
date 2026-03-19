@@ -151,7 +151,7 @@ Target: New production-grade system in Workplace with clear bounded contexts, sc
 
 ## 6. Repository Structure
 1. infrastructure
-- docker-compose (local stack)
+- docker-compose (optional local stack)
 - k8s or ecs manifests
 - terraform (optional later)
 - monitoring configs

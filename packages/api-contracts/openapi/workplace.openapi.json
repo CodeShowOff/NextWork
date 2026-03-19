@@ -1026,6 +1026,96 @@
         ]
       }
     },
+    "/notifications/device-tokens/register": {
+      "post": {
+        "operationId": "NotificationsController_registerDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device token registration result"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Register or rebind a push device token for current user",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/device-tokens/heartbeat": {
+      "post": {
+        "operationId": "NotificationsController_heartbeatDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenHeartbeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Heartbeat update status"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update last-seen timestamp for an existing device token",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/device-tokens/unregister": {
+      "post": {
+        "operationId": "NotificationsController_unregisterDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnregisterDeviceTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device token removal status"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Unregister one device token for current user",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/notifications/profile-actions/thanks": {
       "post": {
         "operationId": "NotificationsController_sendThanks",
@@ -2004,6 +2094,70 @@
         ]
       }
     },
+    "/messages/{messageId}/reactions": {
+      "put": {
+        "operationId": "MessagesController_upsertReaction",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertMessageReactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/messages/{messageId}/reactions/{reactionType}": {
+      "delete": {
+        "operationId": "MessagesController_removeReaction",
+        "parameters": [
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reactionType",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/search": {
       "get": {
         "operationId": "SearchController_search",
@@ -2284,13 +2438,15 @@
             "enum": [
               "image/jpeg",
               "image/png",
-              "image/webp"
+              "image/webp",
+              "video/mp4",
+              "application/pdf"
             ]
           },
           "sizeBytes": {
             "type": "number",
             "minimum": 1,
-            "maximum": 10485760
+            "maximum": 52428800
           }
         },
         "required": [
@@ -2299,6 +2455,18 @@
         ]
       },
       "UpdateNotificationPreferencesDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RegisterDeviceTokenDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "DeviceTokenHeartbeatDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UnregisterDeviceTokenDto": {
         "type": "object",
         "properties": {}
       },
@@ -2359,6 +2527,10 @@
         "properties": {}
       },
       "MarkReadDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpsertMessageReactionDto": {
         "type": "object",
         "properties": {}
       }

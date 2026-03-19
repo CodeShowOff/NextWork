@@ -4,6 +4,7 @@ import request from 'supertest';
 
 import { RequestMetricsService } from '../src/common/observability/request-metrics.service';
 import { RealtimeMetricsService } from '../src/common/observability/realtime-metrics.service';
+import { BackgroundJobsService } from '../src/common/reliability/background-jobs.service';
 import { OpsController } from '../src/ops.controller';
 
 describe('OpsController Integration', () => {
@@ -67,12 +68,44 @@ describe('OpsController Integration', () => {
     }),
   };
 
+  const backgroundJobsServiceMock = {
+    getSnapshot: jest.fn().mockResolvedValue({
+      queueName: 'jobs:cache-invalidation',
+      deadLetterQueueName: 'jobs:cache-invalidation:dlq',
+      counters: {
+        enqueued: 1,
+        processed: 1,
+        failed: 0,
+        retried: 0,
+        deadLettered: 0,
+      },
+      queue: {
+        waiting: 0,
+        active: 0,
+        delayed: 0,
+        completed: 1,
+        failed: 0,
+        paused: 0,
+      },
+      deadLetterQueue: {
+        waiting: 0,
+        active: 0,
+        delayed: 0,
+        completed: 0,
+        failed: 0,
+        paused: 0,
+      },
+      sampledAt: '2026-03-16T00:00:00.000Z',
+    }),
+  };
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [OpsController],
       providers: [
         { provide: RequestMetricsService, useValue: requestMetricsServiceMock },
         { provide: RealtimeMetricsService, useValue: realtimeMetricsServiceMock },
+        { provide: BackgroundJobsService, useValue: backgroundJobsServiceMock },
       ],
     }).compile();
 
@@ -90,8 +123,10 @@ describe('OpsController Integration', () => {
     expect(response.body.status).toBe('ok');
     expect(response.body.requests.total).toBe(5);
     expect(response.body.realtime.activeConnections).toBe(3);
+    expect(response.body.backgroundJobs.counters.processed).toBe(1);
     expect(requestMetricsServiceMock.getSnapshot).toHaveBeenCalledTimes(1);
     expect(realtimeMetricsServiceMock.getSnapshot).toHaveBeenCalledTimes(1);
+    expect(backgroundJobsServiceMock.getSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it('GET /ops/performance-check returns pass when p95 values meet budget', async () => {

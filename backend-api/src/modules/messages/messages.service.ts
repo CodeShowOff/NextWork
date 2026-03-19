@@ -278,7 +278,7 @@ export class MessagesService {
       throw new BadRequestException('Message body is required when no attachments are provided.');
     }
 
-    let normalizedAttachments: MessageAttachmentView[] = [];
+    let normalizedAttachments: MessageAttachmentView[];
     try {
       normalizedAttachments = this.normalizeAndValidateAttachments(userId, payload.attachments ?? []);
     } catch (error) {

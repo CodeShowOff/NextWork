@@ -610,6 +610,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/device-tokens/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register or rebind a push device token for current user */
+        post: operations["NotificationsController_registerDeviceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/device-tokens/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update last-seen timestamp for an existing device token */
+        post: operations["NotificationsController_heartbeatDeviceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/device-tokens/unregister": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unregister one device token for current user */
+        post: operations["NotificationsController_unregisterDeviceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications/profile-actions/thanks": {
         parameters: {
             query?: never;
@@ -1079,6 +1130,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/messages/{messageId}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["MessagesController_upsertReaction"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/{messageId}/reactions/{reactionType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MessagesController_removeReaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search": {
         parameters: {
             query?: never;
@@ -1146,10 +1229,13 @@ export interface components {
             /** @description Original client filename */
             fileName: string;
             /** @enum {string} */
-            contentType: "image/jpeg" | "image/png" | "image/webp";
+            contentType: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "application/pdf";
             sizeBytes?: number;
         };
         UpdateNotificationPreferencesDto: Record<string, never>;
+        RegisterDeviceTokenDto: Record<string, never>;
+        DeviceTokenHeartbeatDto: Record<string, never>;
+        UnregisterDeviceTokenDto: Record<string, never>;
         SendThanksDto: Record<string, never>;
         CreateCommentDto: Record<string, never>;
         UpdateCommentDto: Record<string, never>;
@@ -1165,6 +1251,7 @@ export interface components {
         SendMessageDto: Record<string, never>;
         UpdateMessageDto: Record<string, never>;
         MarkReadDto: Record<string, never>;
+        UpsertMessageReactionDto: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -1936,6 +2023,72 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Unmute status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_registerDeviceToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDeviceTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Device token registration result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_heartbeatDeviceToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceTokenHeartbeatDto"];
+            };
+        };
+        responses: {
+            /** @description Heartbeat update status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_unregisterDeviceToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnregisterDeviceTokenDto"];
+            };
+        };
+        responses: {
+            /** @description Device token removal status */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2723,6 +2876,49 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MessagesController_upsertReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertMessageReactionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MessagesController_removeReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: string;
+                reactionType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

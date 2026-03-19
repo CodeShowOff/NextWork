@@ -24,25 +24,25 @@
     "test:abuse": "node ./scripts/abuse-test.js",
     "test:mobile-perf": "node ./scripts/mobile-perf-regression-check.js --baseline ./documentation/baselines/mobile-perf-baseline.json --current ./documentation/baselines/mobile-perf-current.json --minDroppedFramesImprovement 30 --maxTtfcRegressionMs 0 --maxMemoryCrashIncrease 0",
     "test:e2e:verify": "node ./scripts/e2e-verify.js",
-    "release:phase9": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
+    "release:phase": "npm run release:gates && npm run test:integration --workspace backend-api && npm run test:security && npm run test:e2e:verify"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "autocannon": "^8.0.0",
     "globals": "^17.4.0",
     "prettier": "^3.8.1",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-native": "0.83.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-native": "0.84.1",
     "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "4.23.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
   },
   "overrides": {
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-native": "0.83.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-native": "0.84.1",
     "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "4.23.0"
   },

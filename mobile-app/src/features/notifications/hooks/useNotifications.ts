@@ -8,7 +8,7 @@ import {
 import { useNotificationBadgeStore } from '../notification-badge.store';
 import { PaginatedNotifications } from '../types';
 import { notificationsKeys } from './keys';
-import { applyNotificationReadEvent, mergeIncomingNotification } from './notifications-pagination';
+import { applyNotificationReadEvent } from './notifications-pagination';
 
 const pageSize = 20;
 

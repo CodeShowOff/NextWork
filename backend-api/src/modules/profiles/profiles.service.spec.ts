@@ -9,6 +9,7 @@ describe('ProfilesService', () => {
 
   const profilesRepositoryMock = {
     findByUserId: jest.fn(),
+    findWithUserByUserId: jest.fn(),
     updateByUserId: jest.fn(),
     countPostsByUserId: jest.fn(),
     countGroupsFollowedByUserId: jest.fn(),
@@ -28,7 +29,7 @@ describe('ProfilesService', () => {
   });
 
   it('throws NotFoundException if profile does not exist', async () => {
-    (profilesRepositoryMock.findByUserId as jest.Mock).mockResolvedValue(null);
+    (profilesRepositoryMock.findWithUserByUserId as jest.Mock).mockResolvedValue(null);
     (cacheServiceMock.getJson as jest.Mock).mockResolvedValue(null);
 
     await expect(profilesService.findByUserId('missing', 'viewer')).rejects.toBeInstanceOf(
@@ -38,8 +39,9 @@ describe('ProfilesService', () => {
 
   it('returns profile with counters and relationship', async () => {
     (cacheServiceMock.getJson as jest.Mock).mockResolvedValue(null);
-    (profilesRepositoryMock.findByUserId as jest.Mock).mockResolvedValue({
+    (profilesRepositoryMock.findWithUserByUserId as jest.Mock).mockResolvedValue({
       userId: 'u2',
+      user: { email: 'u2@example.com' },
       displayName: 'User Two',
       bio: 'Hi',
       avatarUrl: null,
@@ -55,6 +57,7 @@ describe('ProfilesService', () => {
 
     const result = await profilesService.findByUserId('u2', 'u1');
 
+    expect(result.email).toBe('u2@example.com');
     expect(result.counters.posts).toBe(7);
     expect(result.counters.followers).toBe(11);
     expect(result.counters.following).toBe(5);
