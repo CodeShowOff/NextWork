@@ -28,6 +28,10 @@ export function deletePost(postId: string) {
   return workplaceApi.posts.delete(postId);
 }
 
+export function getPost(postId: string) {
+  return workplaceApi.posts.get(postId);
+}
+
 export function getPostShareLink(postId: string) {
   return workplaceApi.posts.getShareLink(postId);
 }

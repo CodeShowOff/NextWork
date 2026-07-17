@@ -9,6 +9,7 @@ import {
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationsRepository } from './organizations.repository';
+import { MediaService } from '../media/media.service';
 
 export interface OrganizationMembershipView {
   organizationId: string;
@@ -26,7 +27,10 @@ export interface OrganizationMembershipView {
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private readonly organizationsRepository: OrganizationsRepository) {}
+  constructor(
+    private readonly organizationsRepository: OrganizationsRepository,
+    private readonly mediaService?: MediaService,
+  ) {}
 
   private canManageOrganization(role: string): boolean {
     return role === 'owner' || role === 'admin';
@@ -172,6 +176,10 @@ export class OrganizationsService {
       throw new NotFoundException('Organization not found');
     }
 
+    const storageKeys = await this.organizationsRepository.listMediaStorageKeysForOrganization(organizationId);
+    if (storageKeys.length && this.mediaService) {
+      await this.mediaService.deleteStoredObjects(storageKeys);
+    }
     const result = await this.organizationsRepository.deleteOrganizationCascadeSafe(organizationId);
     return {
       status: 'ok',

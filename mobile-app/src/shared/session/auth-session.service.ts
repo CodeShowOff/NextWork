@@ -1,4 +1,5 @@
 import { defaultApiBaseUrl, defaultRealtimeBaseUrl, featureFlags } from '../config/runtime';
+import { i18n } from '../i18n/i18n';
 import { useSessionStore } from './session.store';
 import { secureTokenRepository } from './secure-token.repository';
 
@@ -71,7 +72,7 @@ async function requestRefreshTokens(baseUrl: string, refreshToken: string): Prom
 
   const payload = await safeParseJson(response);
   if (!response.ok) {
-    throw new Error(typeof payload === 'string' ? payload : `Refresh failed with status ${response.status}`);
+    throw new Error(typeof payload === 'string' ? payload : i18n.t('auth.alerts.refreshFailedStatus', { status: response.status }));
   }
 
   return unwrapEnvelope<AuthTokens>(payload);

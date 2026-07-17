@@ -51,6 +51,14 @@ WHERE membership."group_id" = "groups"."id"
   AND membership."user_id" = "groups"."created_by"
   AND membership."role" = 'member';
 
+CREATE TABLE IF NOT EXISTS "organization_onboarding_audits" (
+  "organization_id" UUID PRIMARY KEY REFERENCES "organizations"("id") ON DELETE CASCADE,
+  "initialized_by" UUID NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "initialized_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "skipped" BOOLEAN NOT NULL DEFAULT false,
+  "selected_keys" TEXT[] NOT NULL DEFAULT '{}'
+);
+
 CREATE TABLE IF NOT EXISTS "group_membership_requests" (
   "id" UUID PRIMARY KEY DEFAULT uuidv7(),
   "group_id" UUID NOT NULL REFERENCES "groups"("id") ON DELETE CASCADE,

@@ -7,7 +7,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { PostsRepository } from './posts.repository';
 import { PostsService } from './posts.service';
 
-describe('PostsService media URL validation', () => {
+describe('PostsService media validation', () => {
   const postsRepositoryMock: jest.Mocked<PostsRepository> = {
     findGroupById: jest.fn(),
     isGroupMember: jest.fn(),
@@ -26,6 +26,7 @@ describe('PostsService media URL validation', () => {
   const mediaServiceMock: jest.Mocked<MediaService> = {
     createUploadContract: jest.fn(),
     isPublicMediaUrlAllowed: jest.fn(),
+    assertMediaObjectAvailableForPost: jest.fn(),
   } as unknown as jest.Mocked<MediaService>;
 
   const notificationsServiceMock: jest.Mocked<NotificationsService> = {
@@ -71,5 +72,24 @@ describe('PostsService media URL validation', () => {
 
     await expect(service.createPost('user-1', payload)).rejects.toBeInstanceOf(ForbiddenException);
     expect(postsRepositoryMock.create).not.toHaveBeenCalled();
+  });
+
+  it('requires a scanned MediaObject before publishing a new post attachment', async () => {
+    mediaServiceMock.assertMediaObjectAvailableForPost.mockRejectedValue(
+      new ForbiddenException('This file cannot be published until its security scan succeeds.'),
+    );
+
+    await expect(
+      service.createPost('user-1', {
+        content: 'hello',
+        media: [{ mediaId: '0aa66275-838c-48ea-b63a-2ee1d4d12070', type: 'image' }],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(mediaServiceMock.assertMediaObjectAvailableForPost).toHaveBeenCalledWith(
+      'user-1',
+      undefined,
+      '0aa66275-838c-48ea-b63a-2ee1d4d12070',
+    );
   });
 });

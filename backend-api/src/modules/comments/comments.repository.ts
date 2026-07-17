@@ -7,14 +7,44 @@ import { PrismaService } from '../../common/database/prisma.service';
 export class CommentsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  getPostById(postId: string): Promise<{ id: string; authorId: string } | null> {
+  getPostById(postId: string): Promise<{ id: string; authorId: string; groupId: string | null } | null> {
     return this.prisma.post.findUnique({
       where: { id: postId },
       select: {
         id: true,
         authorId: true,
+        groupId: true,
       },
     });
+  }
+
+  async canAccessGroupPost(userId: string, groupId: string): Promise<boolean> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { organizationId: true },
+    });
+    if (!group) {
+      return false;
+    }
+    const [membership, organizationMembership] = await Promise.all([
+      this.prisma.groupMember.findUnique({
+        where: { groupId_userId: { groupId, userId } },
+        select: { userId: true },
+      }),
+      this.prisma.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId: group.organizationId, userId } },
+        select: { role: true },
+      }),
+    ]);
+    return Boolean(membership) || organizationMembership?.role === 'owner' || organizationMembership?.role === 'admin';
+  }
+
+  async isOrganizationModerator(userId: string, organizationId: string): Promise<boolean> {
+    const membership = await this.prisma.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      select: { role: true },
+    });
+    return membership?.role === 'owner' || membership?.role === 'admin';
   }
 
   getCommentById(commentId: string): Promise<
@@ -250,11 +280,31 @@ export class CommentsRepository {
   > {
     return this.prisma.commentReport.findMany({
       where: {
-        comment: {
-          post: {
-            authorId: params.moderatorUserId,
+        OR: [
+          {
+            comment: {
+              post: {
+                authorId: params.moderatorUserId,
+              },
+            },
           },
-        },
+          {
+            comment: {
+              post: {
+                group: {
+                  organization: {
+                    members: {
+                      some: {
+                        userId: params.moderatorUserId,
+                        role: { in: ['owner', 'admin'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
         ...(params.status ? { status: params.status } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -265,6 +315,11 @@ export class CommentsRepository {
             post: {
               select: {
                 authorId: true,
+                group: {
+                  select: {
+                    organizationId: true,
+                  },
+                },
               },
             },
           },
@@ -286,6 +341,9 @@ export class CommentsRepository {
           id: string;
           post: {
             authorId: string;
+            group: {
+              organizationId: string;
+            } | null;
           };
         };
       }
@@ -302,6 +360,11 @@ export class CommentsRepository {
             post: {
               select: {
                 authorId: true,
+                group: {
+                  select: {
+                    organizationId: true,
+                  },
+                },
               },
             },
           },

@@ -129,6 +129,6 @@ describe('CommentsController Integration', () => {
   it('GET /comments/posts/:postId lists comments', async () => {
     await request(app.getHttpServer()).get('/comments/posts/p1?limit=20').expect(200);
 
-    expect(commentsServiceMock.listComments).toHaveBeenCalledWith('p1', { limit: '20' });
+    expect(commentsServiceMock.listComments).toHaveBeenCalledWith('u1', 'p1', { limit: '20' });
   });
 });

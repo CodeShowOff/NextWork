@@ -1,0 +1,14 @@
+appId: com.workplace.app
+---
+- launchApp
+- tapOn: Feed
+- assertVisible: Feed
+- tapOn: Groups
+- assertVisible: Groups
+- tapOn: Messages
+- assertVisible: Messages
+- tapOn: Notifications
+- assertVisible: Notifications
+- tapOn:
+    id: header-search
+- assertVisible: Search

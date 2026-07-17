@@ -20,6 +20,19 @@ export interface Profile {
   relationship: {
     isFollowing: boolean;
   };
+  skills: Array<{ id: string; name: string }>;
+}
+
+export function replaceMySkills(skills: string[]) {
+  return requestJson<{ items: Array<{ id: string; name: string }> }>('/profiles/me/skills', {
+    method: 'PUT',
+    body: JSON.stringify({ skills }),
+  });
+}
+
+export function searchSkills(query: string) {
+  const search = new URLSearchParams({ q: query });
+  return requestJson<{ items: Array<{ name: string }> }>(`/profiles/skills/search?${search.toString()}`);
 }
 
 export function getProfile(userId: string) {

@@ -10,6 +10,7 @@ import {
   NotificationPreferences,
 } from '../../features/notifications/types';
 import { workplaceApi } from './contracts-client';
+import { requestJson } from './http';
 
 type MutedUsersResponse = MutedNotificationUsersDto;
 type PreferencesResponse = NotificationPreferencesDto;
@@ -62,6 +63,18 @@ export function sendThanksProfileAction(payload: {
   notificationType?: 'thanks' | 'thanks-note';
 }) {
   return workplaceApi.notifications.sendThanks(payload as SendThanksRequestDto);
+}
+
+export function registerNotificationDevice(payload: { platform: 'ios' | 'android' | 'web'; token: string }) {
+  return requestJson<{ status: 'ok'; deviceToken: { id: string; platform: string; token: string; lastSeenAt: string } }>('/notifications/device-tokens/register', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function heartbeatNotificationDevice(payload: { token: string; platform: 'ios' | 'android' | 'web' }) {
+  return requestJson<{ status: 'ok'; found: boolean }>('/notifications/device-tokens/heartbeat', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function unregisterNotificationDevice(payload: { token: string; platform: 'ios' | 'android' | 'web' }) {
+  return requestJson<{ status: 'ok'; removed: boolean }>('/notifications/device-tokens/unregister', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export type { NotificationItem };

@@ -9,6 +9,13 @@ export interface Group {
   photoUrl: string | null;
   createdAt: string;
   memberCount: number;
+  organizationId?: string;
+  membership?: {
+    role: 'owner' | 'admin' | 'member';
+    isFavorite: boolean;
+    lastVisitedAt: string | null;
+  } | null;
+  canManage?: boolean;
 }
 
 export interface StarterGroupCatalogItem {
@@ -40,6 +47,7 @@ export interface GroupMember {
   displayName: string;
   avatarUrl: string | null;
   joinedAt: string;
+  role?: 'owner' | 'admin' | 'member';
 }
 
 export function listGroups(organizationId: string) {
@@ -78,9 +86,74 @@ export function createGroup(payload: {
 }
 
 export function joinGroup(groupId: string) {
-  return requestJson<{ status: 'ok' }>(`/groups/${groupId}/join`, {
+  return requestJson<{ status: 'joined' | 'requested' }>(`/groups/${groupId}/join`, {
     method: 'POST',
   });
+}
+
+export function getGroup(groupId: string) {
+  return requestJson<Group>(`/groups/${groupId}`);
+}
+
+export function requestGroupMembership(groupId: string, message?: string) {
+  return requestJson<{ status: 'joined' | 'requested' }>(`/groups/${groupId}/requests`, {
+    method: 'POST',
+    body: JSON.stringify({ ...(message?.trim() ? { message: message.trim() } : {}) }),
+  });
+}
+
+export function setGroupFavorite(groupId: string, isFavorite: boolean) {
+  return requestJson<{ isFavorite: boolean }>(`/groups/${groupId}/favorite`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isFavorite }),
+  });
+}
+
+export function recordGroupVisit(groupId: string) {
+  return requestJson<{ lastVisitedAt: string | null }>(`/groups/${groupId}/visit`, { method: 'POST' });
+}
+
+export function listGroupMembershipRequests(groupId: string) {
+  return requestJson<{
+    groupId: string;
+    items: Array<{
+      id: string;
+      requesterId: string;
+      message: string | null;
+      status: string;
+      createdAt: string;
+      requester: { displayName: string; avatarUrl: string | null };
+    }>;
+  }>(`/groups/${groupId}/requests`);
+}
+
+export function resolveGroupMembershipRequest(groupId: string, requestId: string, action: 'approve' | 'decline') {
+  return requestJson<{ status: 'ok' }>(`/groups/${groupId}/requests/${requestId}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function updateGroupMemberRole(groupId: string, memberUserId: string, role: 'owner' | 'admin' | 'member') {
+  return requestJson<{ userId: string; role: string }>(`/groups/${groupId}/members/${memberUserId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function createGroupInvitation(groupId: string, invitedUserId: string) {
+  return requestJson<{ id: string; groupId: string; invitedUserId: string; status: string }>(`/groups/${groupId}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ invitedUserId }),
+  });
+}
+
+export function listMyGroupInvitations() {
+  return requestJson<{ items: Array<{ id: string; groupId: string; status: string; group: { id: string; name: string; description: string | null }; invitedBy: { id: string; displayName: string; avatarUrl: string | null } }> }>('/groups/invitations/mine');
+}
+
+export function respondGroupInvitation(invitationId: string, accept: boolean) {
+  return requestJson<{ status: 'ok'; groupId: string }>(`/groups/invitations/${invitationId}/respond`, { method: 'POST', body: JSON.stringify({ accept }) });
 }
 
 export function listGroupMembers(groupId: string) {

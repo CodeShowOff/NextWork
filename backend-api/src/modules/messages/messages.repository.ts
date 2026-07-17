@@ -90,6 +90,7 @@ export interface ConversationWithRelations {
     };
     attachments: Array<{
       attachmentId: string;
+      mediaObjectId: string | null;
       mediaType: string;
       mimeType: string;
       fileName: string;
@@ -126,8 +127,9 @@ export interface MessageWithSender {
       avatarUrl: string | null;
     } | null;
   };
-  attachments: Array<{
-    attachmentId: string;
+    attachments: Array<{
+      attachmentId: string;
+      mediaObjectId: string | null;
     mediaType: string;
     mimeType: string;
     fileName: string;
@@ -271,6 +273,7 @@ export class MessagesRepository {
     messageType: string;
     attachments?: Array<{
       attachmentId: string;
+      mediaId?: string | null;
       mediaType: string;
       mimeType: string;
       fileName: string;
@@ -303,6 +306,7 @@ export class MessagesRepository {
                 createMany: {
                   data: params.attachments.map((attachment) => ({
                     attachmentId: attachment.attachmentId,
+                    ...(attachment.mediaId ? { mediaObjectId: attachment.mediaId } : {}),
                     mediaType: attachment.mediaType,
                     mimeType: attachment.mimeType,
                     fileName: attachment.fileName,

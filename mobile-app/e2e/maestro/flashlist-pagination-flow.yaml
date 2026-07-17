@@ -1,4 +1,4 @@
-appId: com.workplace.mobile
+appId: com.workplace.app
 ---
 - launchApp
 - tapOn: Feed
@@ -7,8 +7,3 @@ appId: com.workplace.mobile
 - scroll
 - scroll
 - assertVisible: Share an update
-- tapOn: Messages
-- assertVisible: Start
-- scroll
-- scroll
-- assertVisible: Sign out

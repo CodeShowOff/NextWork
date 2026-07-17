@@ -9,10 +9,22 @@
       "**/*"
     ],
     "ios": {
-      "bundleIdentifier": "com.workplace.app"
+      "bundleIdentifier": "com.workplace.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Workplace uses your camera when you join a group live room.",
+        "NSMicrophoneUsageDescription": "Workplace uses your microphone when you join a group live room.",
+        "NSCalendarsAddUsageDescription": "Workplace adds a group event to your calendar when you choose to export it."
+      }
     },
     "android": {
       "package": "com.workplace.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/ic_launcher.png",
         "backgroundColor": "#FFFFFF"
@@ -20,7 +32,12 @@
     },
     "plugins": [
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-document-picker",
+      "expo-notifications",
+      "expo-calendar",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc"
     ]
   }
 }

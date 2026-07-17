@@ -7,8 +7,9 @@ export interface Participant {
 
 export interface MessageAttachment {
   attachmentId: string;
+  mediaId?: string | null;
   mediaType: 'image' | 'video' | 'document';
-  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf' | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' | 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
   fileName: string;
   fileSizeBytes: number;
   storageKey: string;

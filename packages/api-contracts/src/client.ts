@@ -73,7 +73,8 @@ export interface SignUpResultDto {
 
 export interface FeedPostMediaDto {
   id: string;
-  url: string;
+  mediaId: string | null;
+  url: string | null;
   type: string;
   width: number | null;
   height: number | null;
@@ -131,7 +132,8 @@ export interface CreatePostRequestDto {
     }>;
   };
   media?: {
-    url: string;
+    mediaId?: string;
+    url?: string;
     type: string;
     width?: number;
     height?: number;
@@ -312,6 +314,9 @@ export function createWorkplaceApiClient(options: WorkplaceApiClientOptions) {
           { method: 'GET' },
           query as Record<string, unknown>,
         );
+      },
+      get(postId: string) {
+        return request<FeedPostDto>(`/posts/${postId}`, { method: 'GET' });
       },
       update(postId: string, payload: UpdatePostRequestDto) {
         return request<FeedPostDto>(`/posts/${postId}`, {

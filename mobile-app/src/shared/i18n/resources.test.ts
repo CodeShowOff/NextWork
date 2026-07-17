@@ -25,7 +25,7 @@ describe('i18n resources', () => {
     expect(keys).toContain('feed.composer.placeholder');
     expect(keys).toContain('groups.title.activeOrganization');
     expect(keys).toContain('search.title');
-    expect(keys).toContain('messages.setup.title');
+    expect(keys).toContain('messages.list.noMessagesYet');
     expect(keys).toContain('messages.composer.placeholder');
     expect(keys).toContain('messages.detail.typingSingle');
     expect(keys).toContain('notifications.title');

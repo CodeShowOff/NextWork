@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { GroupsRepository } from './groups.repository';
 import { GroupsService } from './groups.service';
@@ -11,6 +11,9 @@ describe('GroupsService starter onboarding', () => {
     ensureStarterGroup: jest.fn(),
     upsertOnboardingAudit: jest.fn(),
     findGroupById: jest.fn(),
+    findGroupMembership: jest.fn(),
+    joinGroup: jest.fn(),
+    createMembershipRequest: jest.fn(),
     updateGroup: jest.fn(),
     deleteGroupWithPostPolicy: jest.fn(),
   };
@@ -30,7 +33,17 @@ describe('GroupsService starter onboarding', () => {
       id: 'g1',
       organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928',
       name: 'General',
+      description: null,
+      groupType: 'Discussions',
+      groupPrivacy: 'Open',
+      photoUrl: null,
+      createdBy: 'u1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
+    groupsRepositoryMock.findGroupMembership?.mockResolvedValue(null);
+    groupsRepositoryMock.joinGroup?.mockResolvedValue(undefined);
+    groupsRepositoryMock.createMembershipRequest?.mockResolvedValue({ id: 'request-1', status: 'pending' });
     groupsRepositoryMock.findOrganizationMembershipWithRole?.mockResolvedValue({ role: 'owner' });
     groupsRepositoryMock.updateGroup?.mockResolvedValue({
       id: 'g1',
@@ -176,6 +189,34 @@ describe('GroupsService starter onboarding', () => {
         name: 'Renamed',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('joins open groups immediately', async () => {
+    const result = await service.joinGroup('u1', 'g1');
+
+    expect(result).toEqual({ status: 'joined' });
+    expect(groupsRepositoryMock.joinGroup).toHaveBeenCalledWith('u1', 'g1');
+  });
+
+  it('creates a membership request for closed groups', async () => {
+    groupsRepositoryMock.findGroupById?.mockResolvedValue({
+      id: 'g1', organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928', name: 'Closed', description: null,
+      groupType: 'Discussions', groupPrivacy: 'Closed', photoUrl: null, createdBy: 'u1', createdAt: new Date(), updatedAt: new Date(),
+    });
+
+    await expect(service.joinGroup('u1', 'g1')).resolves.toEqual({ status: 'requested' });
+    expect(groupsRepositoryMock.createMembershipRequest).toHaveBeenCalledWith({ groupId: 'g1', requesterId: 'u1' });
+    expect(groupsRepositoryMock.joinGroup).not.toHaveBeenCalled();
+  });
+
+  it('hides secret groups from non-members', async () => {
+    groupsRepositoryMock.findGroupById?.mockResolvedValue({
+      id: 'g1', organizationId: '89ce5ff7-bc2a-4df8-b56b-b8e92f93e928', name: 'Secret', description: null,
+      groupType: 'Discussions', groupPrivacy: 'Secret', photoUrl: null, createdBy: 'u1', createdAt: new Date(), updatedAt: new Date(),
+    });
+    groupsRepositoryMock.findOrganizationMembershipWithRole?.mockResolvedValue({ role: 'member' });
+
+    await expect(service.getGroupAccess('u1', 'g1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('deletes group with detach post policy by default', async () => {

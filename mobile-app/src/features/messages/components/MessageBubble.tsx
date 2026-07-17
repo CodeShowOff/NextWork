@@ -1,17 +1,20 @@
-import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 
 import { Message } from '../types';
+import { getMediaDownload } from '../../../shared/api/media.api';
 import { useSessionStore } from '../../../shared/session/session.store';
+import { type AppColors, useAppColors } from '../../../shared/ui/design-tokens';
 
-const reactionLabelByType: Record<Message['reactions'][number]['reactionType'], string> = {
-  thumbsup: '+1',
-  heart: 'Love',
-  laughing: 'Haha',
-  astonished: 'Wow',
-  cry: 'Sad',
-  angry: 'Angry',
+const reactionLabelKeyByType: Record<Message['reactions'][number]['reactionType'], string> = {
+  thumbsup: 'messages.reactions.thumbsup',
+  heart: 'messages.reactions.heart',
+  laughing: 'messages.reactions.laughing',
+  astonished: 'messages.reactions.astonished',
+  cry: 'messages.reactions.cry',
+  angry: 'messages.reactions.angry',
 };
 
 interface Props {
@@ -22,6 +25,7 @@ interface Props {
 
 function MessageBubbleView({ message, status, onLongPress }: Props) {
   const { t } = useTranslation();
+  const styles = useMessageBubbleStyles();
   const userId = useSessionStore((state) => state.userId);
   const isMine = message.senderId === userId;
   const statusLabel =
@@ -48,37 +52,7 @@ function MessageBubbleView({ message, status, onLongPress }: Props) {
         <Text style={[styles.body, isMine ? styles.mineBody : styles.theirBody]}>{message.body}</Text>
         {message.attachments.length ? (
           <View style={styles.attachmentsWrap}>
-            {message.attachments.map((attachment) => {
-              if (attachment.mediaType === 'image') {
-                return (
-                  <Image
-                    key={attachment.attachmentId}
-                    source={{ uri: attachment.publicUrl }}
-                    style={styles.imageAttachment}
-                  />
-                );
-              }
-
-              if (attachment.mediaType === 'video') {
-                return (
-                  <View key={attachment.attachmentId} style={styles.fallbackAttachment}>
-                    <Text style={styles.fallbackAttachmentTitle}>Video</Text>
-                    <Text style={styles.fallbackAttachmentMeta} numberOfLines={1}>
-                      {attachment.fileName}
-                    </Text>
-                  </View>
-                );
-              }
-
-              return (
-                <View key={attachment.attachmentId} style={styles.fallbackAttachment}>
-                  <Text style={styles.fallbackAttachmentTitle}>Document</Text>
-                  <Text style={styles.fallbackAttachmentMeta} numberOfLines={1}>
-                    {attachment.fileName}
-                  </Text>
-                </View>
-              );
-            })}
+            {message.attachments.map((attachment) => <AttachmentPreview key={attachment.attachmentId} attachment={attachment} />)}
           </View>
         ) : null}
         {message.reactions.length ? (
@@ -89,7 +63,7 @@ function MessageBubbleView({ message, status, onLongPress }: Props) {
                 style={[styles.reactionChip, reaction.reactedByMe ? styles.reactionChipMine : null]}
               >
                 <Text style={styles.reactionChipText}>
-                  {reactionLabelByType[reaction.reactionType]} {reaction.count}
+                  {t(reactionLabelKeyByType[reaction.reactionType])} {reaction.count}
                 </Text>
               </View>
             ))}
@@ -113,6 +87,7 @@ export const MessageBubble = React.memo(MessageBubbleView, (previous, next) => {
     previous.message.senderId === next.message.senderId &&
     previous.message.sender.displayName === next.message.sender.displayName &&
     previous.message.editedAt === next.message.editedAt &&
+    previous.message.attachments.map((attachment) => `${attachment.attachmentId}:${attachment.mediaId ?? ''}:${attachment.fileName}`).join('|') === next.message.attachments.map((attachment) => `${attachment.attachmentId}:${attachment.mediaId ?? ''}:${attachment.fileName}`).join('|') &&
     previous.message.reactions.length === next.message.reactions.length &&
     previous.message.reactions
       .map((reaction) => `${reaction.reactionType}:${reaction.count}:${reaction.reactedByMe ? 1 : 0}`)
@@ -125,7 +100,28 @@ export const MessageBubble = React.memo(MessageBubbleView, (previous, next) => {
   );
 });
 
-const styles = StyleSheet.create({
+function AttachmentPreview({ attachment }: { attachment: Message['attachments'][number] }) {
+  const { t } = useTranslation();
+  const styles = useMessageBubbleStyles();
+  const downloadQuery = useQuery({ queryKey: ['media', 'download', attachment.mediaId], queryFn: () => getMediaDownload(attachment.mediaId as string), enabled: Boolean(attachment.mediaId), staleTime: 240_000 });
+  const url = downloadQuery.data?.downloadUrl ?? (attachment.publicUrl || null);
+  const open = () => { if (url) void Linking.openURL(url); };
+  if (attachment.mediaType === 'image') {
+    if (!url) return <View style={styles.imageAttachment}><Text style={styles.openAttachment}>{downloadQuery.isLoading ? t('ui.states.loading') : t('ui.states.errorBody')}</Text></View>;
+    return <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={t('messages.bubble.openAttachment', { name: attachment.fileName })}><Image source={{ uri: url }} style={styles.imageAttachment} /></Pressable>;
+  }
+  if (!url) {
+    return <View style={styles.fallbackAttachment}><Text style={styles.fallbackAttachmentTitle}>{attachment.mediaType === 'video' ? t('messages.bubble.video') : t('messages.bubble.document')}</Text><Text style={styles.fallbackAttachmentMeta} numberOfLines={1}>{attachment.fileName}</Text><Text style={styles.openAttachment}>{downloadQuery.isLoading ? t('ui.states.loading') : t('ui.states.errorBody')}</Text></View>;
+  }
+  return <Pressable onPress={open} style={styles.fallbackAttachment} accessibilityRole="button" accessibilityLabel={t('messages.bubble.openAttachment', { name: attachment.fileName })}><Text style={styles.fallbackAttachmentTitle}>{attachment.mediaType === 'video' ? t('messages.bubble.video') : t('messages.bubble.document')}</Text><Text style={styles.fallbackAttachmentMeta} numberOfLines={1}>{attachment.fileName}</Text><Text style={styles.openAttachment}>{downloadQuery.isLoading ? t('ui.states.loading') : t('messages.bubble.open')}</Text></Pressable>;
+}
+
+function useMessageBubbleStyles() {
+  const colors = useAppColors();
+  return useMemo(() => createStyles(colors), [colors]);
+}
+
+const createStyles = (colors: AppColors) => StyleSheet.create({
   row: {
     paddingHorizontal: 14,
     marginBottom: 10,
@@ -147,14 +143,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   mineBubble: {
-    backgroundColor: '#E0ECFF',
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: colors.primary,
   },
   theirBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
   },
   theirAvatarCircle: {
     width: 32,
@@ -162,15 +158,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#BFDBFE',
+    backgroundColor: colors.primary,
   },
   theirAvatarText: {
-    color: '#F8FAFC',
+    color: colors.onPrimary,
     fontWeight: '800',
     fontSize: 14,
   },
   sender: {
-    color: '#334155',
+    color: colors.textMuted,
     fontSize: 11,
     marginBottom: 2,
     fontWeight: '600',
@@ -180,14 +176,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   mineBody: {
-    color: '#1F2937',
+    color: colors.text,
   },
   theirBody: {
-    color: '#1F2937',
+    color: colors.text,
   },
   statusText: {
     marginTop: 4,
-    color: '#6B7280',
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '600',
     textAlign: 'right',
@@ -209,18 +205,18 @@ const styles = StyleSheet.create({
   },
   reactionChip: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
   },
   reactionChipMine: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#DBEAFE',
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceMuted,
   },
   reactionChipText: {
-    color: '#334155',
+    color: colors.text,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -228,31 +224,37 @@ const styles = StyleSheet.create({
     width: 200,
     height: 150,
     borderRadius: 10,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.surfaceMuted,
   },
   fallbackAttachment: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceMuted,
   },
   fallbackAttachmentTitle: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '700',
     fontSize: 12,
   },
   fallbackAttachmentMeta: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 11,
     marginTop: 2,
   },
+  openAttachment: {
+    marginTop: 4,
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   mineEditedText: {
-    color: '#6B7280',
+    color: colors.textMuted,
     textAlign: 'right',
   },
   theirEditedText: {
-    color: '#64748B',
+    color: colors.textMuted,
   },
 });

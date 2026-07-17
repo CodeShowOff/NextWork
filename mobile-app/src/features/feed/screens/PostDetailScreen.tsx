@@ -1,9 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Pressable,
   Share,
   StyleSheet,
@@ -14,13 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { InfiniteData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { InfiniteData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { CommentItem, PaginatedComments, createComment, deleteComment, listComments } from '../../../shared/api/comments.api';
+import { CommentItem, PaginatedComments, createComment, deleteComment, listComments, reportComment, updateComment } from '../../../shared/api/comments.api';
 import {
   deletePost,
   FeedPost,
+  getPost,
   getPostShareLink,
   PaginatedFeed,
   updatePost,
@@ -38,7 +38,9 @@ import {
   updatePostInFeed,
 } from '../engagement-cache';
 import { canOpenLikerList } from '../likers-list.logic';
+import { PostMediaPreview } from '../components/PostMediaPreview';
 import { FeedStackParamList } from './FeedStack';
+import { type AppColors, useAppColors } from '../../../shared/ui/design-tokens';
 
 type Props = NativeStackScreenProps<FeedStackParamList, 'PostDetail'>;
 
@@ -85,6 +87,8 @@ function removeCommentFromPages(
 
 export function PostDetailScreen({ route, navigation }: Props) {
   const { t } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { post } = route.params;
   const queryClient = useQueryClient();
   const currentUserId = useSessionStore((state) => state.userId);
@@ -96,6 +100,22 @@ export function PostDetailScreen({ route, navigation }: Props) {
   const [commentCount, setCommentCount] = useState(postState.stats.commentCount);
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editingPostContent, setEditingPostContent] = useState(postState.content);
+  const canonicalPostQuery = useQuery({
+    queryKey: ['posts', post.id],
+    queryFn: () => getPost(post.id),
+    initialData: post,
+  });
+
+  useEffect(() => {
+    const canonical = canonicalPostQuery.data;
+    if (!canonical) return;
+    setPostState(canonical);
+    setLikeCount(canonical.stats.likeCount);
+    setCommentCount(canonical.stats.commentCount);
+    setEditingPostContent(canonical.content);
+  }, [canonicalPostQuery.data]);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState('');
 
   const commentsQuery = useInfiniteQuery({
     queryKey: ['comments', postState.id],
@@ -186,6 +206,21 @@ export function PostDetailScreen({ route, navigation }: Props) {
     },
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, body }: { commentId: string; body: string }) => updateComment(commentId, body),
+    onSuccess: (updated) => {
+      setEditingCommentId(null);
+      setEditingCommentBody('');
+      queryClient.setQueryData<InfiniteData<PaginatedComments>>(['comments', postState.id], (current) => current ? { ...current, pages: current.pages.map((page) => ({ ...page, items: page.items.map((item) => item.id === updated.id ? { ...item, ...updated } : item) })) } : current);
+    },
+    onError: (error) => Alert.alert(t('ui.states.errorTitle'), (error as Error).message),
+  });
+
+  const reportCommentMutation = useMutation({
+    mutationFn: (commentId: string) => reportComment(commentId, 'other'),
+    onError: (error) => Alert.alert(t('ui.states.errorTitle'), (error as Error).message),
+  });
+
   const updatePostMutation = useMutation({
     mutationFn: async (content: string) => updatePost(postState.id, { content }),
     onSuccess: (updated) => {
@@ -265,7 +300,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             )}
           </Text>
         </View>
-        <Text style={styles.commentBody}>{item.body}</Text>
+        {editingCommentId === item.id ? <><TextInput value={editingCommentBody} onChangeText={setEditingCommentBody} style={styles.editInput} multiline /><View style={styles.editActionsRow}><Pressable style={styles.secondaryButton} onPress={() => { setEditingCommentId(null); setEditingCommentBody(''); }}><Text style={styles.secondaryButtonText}>{t('common.actions.cancel')}</Text></Pressable><Pressable style={styles.actionButton} onPress={() => { const body = editingCommentBody.trim(); if (body) updateCommentMutation.mutate({ commentId: item.id, body }); }}><Text style={styles.actionButtonText}>{t('common.actions.save')}</Text></Pressable></View></> : <Text style={styles.commentBody}>{item.body}</Text>}
         <Pressable
           style={styles.replyLinkButton}
           onPress={() => setReplyingTo(item)}
@@ -274,17 +309,11 @@ export function PostDetailScreen({ route, navigation }: Props) {
           <Text style={styles.replyLinkText}>{t('feed.detail.actions.reply')}</Text>
         </Pressable>
         {item.author.id === currentUserId ? (
-          <Pressable
-            style={styles.deleteLinkButton}
-            onPress={() => deleteCommentMutation.mutate(item.id)}
-            disabled={deleteCommentMutation.isPending}
-          >
-            <Text style={styles.deleteLinkText}>{t('feed.detail.actions.delete')}</Text>
-          </Pressable>
-        ) : null}
+          <View style={styles.commentActionRow}><Pressable style={styles.replyLinkButton} onPress={() => { setEditingCommentId(item.id); setEditingCommentBody(item.body); }} disabled={updateCommentMutation.isPending}><Text style={styles.replyLinkText}>{t('common.actions.edit')}</Text></Pressable><Pressable style={styles.deleteLinkButton} onPress={() => deleteCommentMutation.mutate(item.id)} disabled={deleteCommentMutation.isPending}><Text style={styles.deleteLinkText}>{t('feed.detail.actions.delete')}</Text></Pressable></View>
+        ) : <Pressable style={styles.replyLinkButton} onPress={() => reportCommentMutation.mutate(item.id)} disabled={reportCommentMutation.isPending}><Text style={styles.replyLinkText}>{t('feed.detail.actions.report')}</Text></Pressable>}
       </View>
     ),
-    [createCommentMutation.isPending, currentUserId, deleteCommentMutation, t],
+    [createCommentMutation.isPending, currentUserId, deleteCommentMutation, editingCommentBody, editingCommentId, reportCommentMutation, styles, t, updateCommentMutation],
   );
 
   return (
@@ -359,7 +388,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
         {postState.media.length ? (
           <View style={styles.mediaColumn}>
             {postState.media.map((mediaItem: FeedPost['media'][number]) => (
-              <Image key={mediaItem.id} source={{ uri: mediaItem.url }} style={styles.mediaImage} />
+              <PostMediaPreview key={mediaItem.id} media={mediaItem} imageStyle={styles.mediaImage} />
             ))}
           </View>
         ) : null}
@@ -440,14 +469,14 @@ export function PostDetailScreen({ route, navigation }: Props) {
 
       {commentsQuery.isLoading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#0B6E4F" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : featureFlags.flashListRendering ? (
           <FlashList<CommentItem>
             data={comments}
             keyExtractor={keyExtractorComment}
             renderItem={renderCommentItem}
-            extraData={`${replyingTo?.id ?? ''}|${currentUserId}`}
+          extraData={`${replyingTo?.id ?? ''}|${currentUserId}|${editingCommentId ?? ''}|${editingCommentBody}`}
             onEndReached={() => {
               if (commentsQuery.hasNextPage && !commentsQuery.isFetchingNextPage) {
                 commentsQuery.fetchNextPage();
@@ -456,7 +485,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             onEndReachedThreshold={0.4}
             ListFooterComponent={
               commentsQuery.isFetchingNextPage ? (
-                <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+                <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
               ) : null
             }
             ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
@@ -466,7 +495,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             data={comments}
             keyExtractor={keyExtractorComment}
             renderItem={renderCommentItem}
-            extraData={`${replyingTo?.id ?? ''}|${currentUserId}`}
+          extraData={`${replyingTo?.id ?? ''}|${currentUserId}|${editingCommentId ?? ''}|${editingCommentBody}`}
             onEndReached={() => {
               if (commentsQuery.hasNextPage && !commentsQuery.isFetchingNextPage) {
                 commentsQuery.fetchNextPage();
@@ -475,7 +504,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
             onEndReachedThreshold={0.4}
             ListFooterComponent={
               commentsQuery.isFetchingNextPage ? (
-                <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+                <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
               ) : null
             }
             ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.detail.emptyComments')}</Text>}
@@ -524,10 +553,10 @@ export function PostDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   centerState: {
     flex: 1,
@@ -535,9 +564,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   postCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 14,
     margin: 12,
     padding: 12,
@@ -545,61 +574,61 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.text,
   },
   timestamp: {
     marginTop: 2,
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
   },
   content: {
     marginTop: 10,
-    color: '#0F172A',
+    color: colors.text,
     lineHeight: 20,
   },
   hashtagsText: {
     marginTop: 6,
-    color: '#0369A1',
+    color: colors.primary,
     fontWeight: '600',
   },
   pollCard: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 10,
     padding: 10,
     gap: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceMuted,
   },
   pollQuestion: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '700',
   },
   pollOptionButton: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   pollOptionButtonActive: {
-    borderColor: '#0B6E4F',
-    backgroundColor: '#DCFCE7',
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceMuted,
   },
   pollOptionText: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '600',
   },
   pollOptionVotes: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '700',
   },
   pollTotalVotes: {
-    color: '#475569',
+    color: colors.textMuted,
     fontSize: 12,
   },
   editSection: {
@@ -608,12 +637,13 @@ const styles = StyleSheet.create({
   },
   editInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     minHeight: 50,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
+    color: colors.text,
   },
   editActionsRow: {
     flexDirection: 'row',
@@ -628,7 +658,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 220,
     borderRadius: 10,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.surfaceMuted,
   },
   engagementRow: {
     marginTop: 12,
@@ -641,7 +671,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   actionButton: {
-    backgroundColor: '#0B6E4F',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -650,19 +680,19 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   actionButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontWeight: '700',
   },
   likeCountLink: {
-    color: '#0B6E4F',
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '700',
   },
   likeCountLinkDisabled: {
-    color: '#94A3B8',
+    color: colors.textMuted,
   },
   commentCountLabel: {
-    color: '#475569',
+    color: colors.textMuted,
     fontSize: 12,
   },
   postActionsRow: {
@@ -672,30 +702,30 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   secondaryButtonText: {
-    color: '#0B6E4F',
+    color: colors.primary,
     fontWeight: '700',
   },
   destructiveButton: {
     borderWidth: 1,
-    borderColor: '#B91C1C',
+    borderColor: colors.danger,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   destructiveButtonText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
   },
   commentCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 12,
     marginHorizontal: 12,
     marginBottom: 8,
@@ -708,33 +738,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   commentAuthor: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '700',
   },
   commentTime: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
   },
   commentBody: {
     marginTop: 6,
-    color: '#0F172A',
+    color: colors.text,
     lineHeight: 20,
   },
   deleteLinkButton: {
     alignSelf: 'flex-end',
     marginTop: 6,
   },
+  commentActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   replyLinkButton: {
     alignSelf: 'flex-end',
     marginTop: 6,
   },
   replyLinkText: {
-    color: '#0B6E4F',
+    color: colors.primary,
     fontWeight: '700',
     fontSize: 12,
   },
   deleteLinkText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -743,13 +777,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#64748B',
+    color: colors.textMuted,
     marginVertical: 16,
   },
   commentComposer: {
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 10,
     gap: 8,
   },
@@ -759,7 +793,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   replyContextText: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 12,
   },
@@ -768,13 +802,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   replyCancelText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 12,
   },
   commentInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -783,13 +817,13 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignSelf: 'flex-end',
-    backgroundColor: '#0B6E4F',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   sendButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontWeight: '700',
   },
 });

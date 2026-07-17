@@ -1,4 +1,4 @@
-appId: com.workplace.mobile
+appId: com.workplace.app
 ---
 - launchApp
 - assertVisible: Login

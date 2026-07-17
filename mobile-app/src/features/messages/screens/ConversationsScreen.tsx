@@ -1,310 +1,82 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlashList } from '@shopify/flash-list';
-import { MaterialIcons } from '@expo/vector-icons';
+import React, { useMemo, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
+import { createConversation } from '../../../shared/api/messages.api';
+import { searchAll } from '../../../shared/api/search.api';
+import { useSessionStore } from '../../../shared/session/session.store';
+import { AppAvatar, AppButton, AppCard, AppField, AppListRow, AppScreen, AppState } from '../../../shared/ui/AppUI';
+import { spacing, useAppColors } from '../../../shared/ui/design-tokens';
 import { Conversation } from '../types';
 import { useConversations, upsertConversation } from '../hooks/useConversations';
-import { ConversationListItem } from '../components/ConversationListItem';
-import { createConversation } from '../../../shared/api/messages.api';
-import { authSessionService } from '../../../shared/session/auth-session.service';
-import { useSessionStore } from '../../../shared/session/session.store';
-import { featureFlags } from '../../../shared/config/runtime';
 import { MessagesStackParamList } from './MessagesStack';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'Conversations'>;
 
 export function ConversationsScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const colors = useAppColors();
   const queryClient = useQueryClient();
-  const [directUserId, setDirectUserId] = useState('');
-  const [sessionUserId, setSessionUserId] = useState('');
-  const [sessionToken, setSessionToken] = useState('');
-  const [apiBaseUrl, setApiBaseUrl] = useState('');
-  const [realtimeBaseUrl, setRealtimeBaseUrl] = useState('');
-
-  const setSession = useSessionStore((state) => state.setSession);
-  const storeUserId = useSessionStore((state) => state.userId);
-  const storeToken = useSessionStore((state) => state.accessToken);
-
-  const hasSession = Boolean(storeUserId && storeToken);
-
+  const myUserId = useSessionStore((state) => state.userId);
+  const [peopleQuery, setPeopleQuery] = useState('');
   const conversationsQuery = useConversations();
-
-  const items = useMemo(
-    () => conversationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [conversationsQuery.data],
-  );
-  const ConversationsListComponent = featureFlags.flashListRendering ? FlashList : FlatList;
-  const keyExtractor = useCallback((item: Conversation) => item.id, []);
-  const renderConversationItem = useCallback(
-    ({ item }: { item: Conversation }) => (
-      <ConversationListItem
-        conversation={item}
-        onPress={() => navigation.navigate('ConversationDetail', { conversationId: item.id })}
-      />
-    ),
-    [navigation],
-  );
-
-  const createDirectMutation = useMutation({
-    mutationFn: async (targetUserId: string) =>
-      createConversation({
-        type: 'direct',
-        participantIds: [targetUserId],
-      }),
+  const peopleSearch = useQuery({
+    queryKey: ['search', 'message-people', peopleQuery.trim()],
+    queryFn: () => searchAll({ query: peopleQuery.trim(), limit: 8, scope: 'users' }),
+    enabled: peopleQuery.trim().length >= 2,
+  });
+  const createDirect = useMutation({
+    mutationFn: (userId: string) => createConversation({ type: 'direct', participantIds: [userId] }),
     onSuccess: (conversation) => {
       upsertConversation(queryClient, conversation);
-      setDirectUserId('');
-      navigation.navigate('ConversationDetail', {
-        conversationId: conversation.id,
-      });
+      setPeopleQuery('');
+      navigation.navigate('ConversationDetail', { conversationId: conversation.id });
     },
-    onError: (error) => {
-      Alert.alert(t('messages.alerts.createConversationFailed'), (error as Error).message);
-    },
+    onError: (error) => Alert.alert(t('ui.states.errorTitle'), (error as Error).message),
   });
+  const conversations = useMemo(() => conversationsQuery.data?.pages.flatMap((page) => page.items) ?? [], [conversationsQuery.data]);
 
-  if (!hasSession) {
-    return (
-      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-        <View style={styles.sessionCard}>
-          <Text style={styles.sessionTitle}>{t('messages.setup.title')}</Text>
-          <Text style={styles.helperText}>
-            {t('messages.setup.helper')}
-          </Text>
-          <TextInput
-            value={sessionUserId}
-            onChangeText={setSessionUserId}
-            placeholder={t('messages.setup.placeholders.userId')}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <TextInput
-            value={sessionToken}
-            onChangeText={setSessionToken}
-            placeholder={t('messages.setup.placeholders.accessToken')}
-            style={[styles.input, styles.tokenInput]}
-            autoCapitalize="none"
-            multiline
-          />
-          <TextInput
-            value={apiBaseUrl}
-            onChangeText={setApiBaseUrl}
-            placeholder={t('messages.setup.placeholders.apiBaseUrl')}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <TextInput
-            value={realtimeBaseUrl}
-            onChangeText={setRealtimeBaseUrl}
-            placeholder={t('messages.setup.placeholders.realtimeUrl')}
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => {
-              if (!sessionUserId.trim() || !sessionToken.trim()) {
-                Alert.alert(
-                  t('messages.alerts.missingFieldsTitle'),
-                  t('messages.alerts.missingFieldsBody'),
-                );
-                return;
-              }
-
-              setSession({
-                userId: sessionUserId.trim(),
-                accessToken: sessionToken.trim(),
-                apiBaseUrl: apiBaseUrl.trim(),
-                realtimeBaseUrl: realtimeBaseUrl.trim(),
-              });
-            }}
-          >
-            <Text style={styles.primaryButtonText}>{t('messages.setup.saveSession')}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!myUserId) return <AppScreen><AppState kind="empty" title={t('ui.messages.sessionRequired')} /></AppScreen>;
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <View style={styles.toolbar}>
-        <View style={styles.composeRow}>
-          <View style={styles.composeIconCircle}>
-            <MaterialIcons name="chat" size={20} color="#2563EB" />
+    <AppScreen contentStyle={styles.fill}>
+      <FlatList<Conversation>
+        data={conversations}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View style={styles.headerContent}>
+            <AppCard>
+              <Text style={[styles.helper, { color: colors.textMuted }]}>{t('ui.messages.selectPerson')}</Text>
+              <AppField value={peopleQuery} onChangeText={setPeopleQuery} placeholder={t('ui.fields.messagePeople')} accessibilityLabel={t('ui.fields.messagePeople')} autoCapitalize="none" />
+              {peopleSearch.isFetching ? <AppState kind="loading" title={t('ui.states.loading')} /> : null}
+              {(peopleSearch.data?.users ?? []).filter((person) => person.id !== myUserId).map((person) => (
+                <AppListRow key={person.id} title={person.displayName} subtitle={person.email} leading={<AppAvatar name={person.displayName} />} trailing={<AppButton label={t('ui.actions.message')} loading={createDirect.isPending} onPress={() => createDirect.mutate(person.id)} />} />
+              ))}
+            </AppCard>
           </View>
-          <TextInput
-            value={directUserId}
-            onChangeText={setDirectUserId}
-            placeholder={t('messages.toolbar.directPlaceholder')}
-            autoCapitalize="none"
-            style={[styles.input, styles.composeInput]}
-          />
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => {
-              const target = directUserId.trim();
-              if (!target) {
-                return;
-              }
-
-              createDirectMutation.mutate(target);
-            }}
-          >
-            <Text style={styles.primaryButtonText}>{t('messages.toolbar.start')}</Text>
-          </Pressable>
-        </View>
-        <View style={styles.toolbarBottomRow}>
-          <MaterialIcons name="forum" size={20} color="#9CA3AF" />
-          <Pressable
-            onPress={async () => {
-              await authSessionService.logout();
-            }}
-          >
-            <Text style={styles.secondaryLink}>{t('messages.toolbar.signOut')}</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {conversationsQuery.isLoading ? (
-        <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#0B6E4F" />
-        </View>
-      ) : (
-        <ConversationsListComponent<Conversation>
-          data={items}
-          keyExtractor={keyExtractor}
-          renderItem={renderConversationItem}
-          onEndReached={() => {
-            if (conversationsQuery.hasNextPage && !conversationsQuery.isFetchingNextPage) {
-              conversationsQuery.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            conversationsQuery.isFetchingNextPage ? (
-              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.centerState}>
-              <Text style={styles.helperText}>{t('messages.list.empty')}</Text>
-            </View>
-          }
-        />
-      )}
-    </SafeAreaView>
+        }
+        renderItem={({ item }) => {
+          const other = item.type === 'direct' ? item.participants.find((participant) => participant.userId !== myUserId) : null;
+          const title = other?.displayName ?? item.participants.map((participant) => participant.displayName).join(', ');
+          return <AppCard style={styles.card}><AppListRow title={title || t('ui.messages.selectPerson')} subtitle={item.lastMessage?.body ?? t('messages.list.noMessagesYet')} leading={<AppAvatar name={title || '?'} />} onPress={() => navigation.navigate('ConversationDetail', { conversationId: item.id })} trailing={item.unreadCount ? <View style={[styles.badge, { backgroundColor: colors.primary }]}><Text style={{ color: colors.onPrimary, fontWeight: '800' }}>{item.unreadCount}</Text></View> : undefined} /></AppCard>;
+        }}
+        refreshing={conversationsQuery.isFetching}
+        onRefresh={() => conversationsQuery.refetch()}
+        onEndReached={() => { if (conversationsQuery.hasNextPage && !conversationsQuery.isFetchingNextPage) void conversationsQuery.fetchNextPage(); }}
+        ListEmptyComponent={conversationsQuery.isLoading ? <AppState kind="loading" title={t('ui.states.loading')} /> : <AppState kind="empty" title={t('ui.states.emptyMessages')} />}
+      />
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ECECEC',
-  },
-  toolbar: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-  },
-  composeRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  composeIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolbarBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  composeInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  centerState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  footerSpinner: {
-    marginVertical: 14,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    marginBottom: 10,
-    fontSize: 14,
-  },
-  tokenInput: {
-    minHeight: 90,
-  },
-  primaryButton: {
-    backgroundColor: '#1877F2',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  sessionCard: {
-    margin: 16,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 16,
-  },
-  sessionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  helperText: {
-    color: '#475569',
-    lineHeight: 20,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  secondaryLink: {
-    color: '#2563EB',
-    fontWeight: '600',
-  },
+  fill: { flex: 1 },
+  content: { padding: spacing.md, gap: spacing.xs, flexGrow: 1 },
+  headerContent: { marginBottom: spacing.sm },
+  helper: { lineHeight: 20 },
+  card: { paddingVertical: 0 },
+  badge: { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
 });

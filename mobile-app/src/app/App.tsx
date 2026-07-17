@@ -3,32 +3,58 @@ import { ActivityIndicator, Alert, Linking, View, useColorScheme } from 'react-n
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { BottomTabNavigationOptions, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { registerGlobals } from '@livekit/react-native';
 
+import { AdminScreen } from '../features/admin/AdminScreen';
+import { CommentReportsScreen } from '../features/admin/CommentReportsScreen';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { FeedStack } from '../features/feed/screens/FeedStack';
-import { GroupsScreen } from '../features/groups/GroupsScreen';
+import { GroupsStack } from '../features/groups/GroupsStack';
 import { useMessagesBadgeBridge } from '../features/messages/hooks/useMessagesBadgeBridge';
 import { useMessagesBadgeStore } from '../features/messages/messages-badge.store';
 import { MessagesStack } from '../features/messages/screens/MessagesStack';
 import { useNotificationBadgeStore } from '../features/notifications/notification-badge.store';
 import { useNotificationBadgeBridge } from '../features/notifications/hooks/useNotificationBadgeBridge';
-import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
+import { usePushDeviceRegistration } from '../features/notifications/hooks/usePushDeviceRegistration';
+import { NotificationsStack } from '../features/notifications/screens/NotificationsStack';
 import { ProfileStack } from '../features/profile/screens/ProfileStack';
 import { SearchScreen } from '../features/search/SearchScreen';
+import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { acceptInvite } from '../shared/api/invites.api';
 import { switchOrganization } from '../shared/api/organizations.api';
+import { i18n } from '../shared/i18n/i18n';
 import { extractInviteToken } from '../shared/linking/invite-linking';
 import { useInviteLinkStore } from '../shared/session/invite-link.store';
-import { useSessionStore } from '../shared/session/session.store';
 import { authSessionService } from '../shared/session/auth-session.service';
-import { i18n } from '../shared/i18n/i18n';
+import { useSessionStore } from '../shared/session/session.store';
 import { resolveAppTheme, useThemeStore } from '../shared/theme/theme.store';
-import { SharedTopBarBrand, SharedTopBarSearchAction, sharedHeaderBaseOptions } from '../shared/ui/SharedTopBar';
+import { useAppColors } from '../shared/ui/design-tokens';
+import { AppStackHeader } from './AppStackHeader';
 
-const Tab = createBottomTabNavigator();
+registerGlobals();
+
+export type MainTabsParamList = {
+  Feed: undefined;
+  Groups: undefined;
+  Messages: undefined;
+  Notifications: undefined;
+};
+
+export type RootStackParamList = {
+  MainTabs: undefined;
+  Search: undefined;
+  Profile: undefined;
+  Settings: undefined;
+  Admin: undefined;
+  CommentReports: undefined;
+};
+
+const Tab = createBottomTabNavigator<MainTabsParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 const queryClient = new QueryClient();
 
 function InviteLinkBridge() {
@@ -42,159 +68,75 @@ function InviteLinkBridge() {
   useEffect(() => {
     const handleUrl = ({ url }: { url: string }) => {
       const token = extractInviteToken(url);
-      if (token) {
-        setPendingInviteToken(token);
-      }
+      if (token) setPendingInviteToken(token);
     };
-
     const subscription = Linking.addEventListener('url', handleUrl);
-    Linking.getInitialURL()
-      .then((url) => {
-        if (!url) {
-          return;
-        }
-
-        const token = extractInviteToken(url);
-        if (token) {
-          setPendingInviteToken(token);
-        }
-      })
-      .catch(() => {
-        // Initial URL is optional.
-      });
-
-    return () => {
-      subscription.remove();
-    };
+    void Linking.getInitialURL().then((url) => {
+      const token = url ? extractInviteToken(url) : null;
+      if (token) setPendingInviteToken(token);
+    }).catch(() => undefined);
+    return () => subscription.remove();
   }, [setPendingInviteToken]);
 
   useEffect(() => {
-    if (!accessToken || !pendingInviteToken) {
-      return;
-    }
-
-    acceptInvite(pendingInviteToken)
+    if (!accessToken || !pendingInviteToken) return;
+    void acceptInvite(pendingInviteToken)
       .then(async (result) => {
-        await switchOrganization(result.organizationId).catch(() => {
-          // Some backends may already activate on accept; ignore explicit switch failure.
-        });
+        await switchOrganization(result.organizationId).catch(() => undefined);
         clearPendingInviteToken();
         queryClientBridge.invalidateQueries({ queryKey: ['users', 'me'] });
         queryClientBridge.invalidateQueries({ queryKey: ['organizations', 'me'] });
         queryClientBridge.invalidateQueries({ queryKey: ['groups'] });
-        Alert.alert(
-          t('app.alerts.inviteAcceptedTitle'),
-          t('app.alerts.inviteAcceptedBody'),
-        );
+        Alert.alert(t('app.alerts.inviteAcceptedTitle'), t('app.alerts.inviteAcceptedBody'));
       })
-      .catch((error) => {
-        Alert.alert(t('app.alerts.inviteAcceptFailedTitle'), (error as Error).message);
-      });
+      .catch((error) => Alert.alert(t('app.alerts.inviteAcceptFailedTitle'), (error as Error).message));
   }, [accessToken, clearPendingInviteToken, pendingInviteToken, queryClientBridge, t]);
-
   return null;
 }
 
-function AuthenticatedTabs() {
+function MainTabs() {
   const { t } = useTranslation();
+  const colors = useAppColors();
   const unreadMessages = useMessagesBadgeStore((state) => state.unreadCount);
-  const unreadCount = useNotificationBadgeStore((state) => state.unreadCount);
-  const systemScheme = useColorScheme();
-  const normalizedScheme = systemScheme === 'light' || systemScheme === 'dark' ? systemScheme : null;
-  const themePreference = useThemeStore((state) => state.preference);
-  const appTheme = resolveAppTheme(themePreference, normalizedScheme);
-  useMessagesBadgeBridge();
-  useNotificationBadgeBridge();
-
+  const unreadNotifications = useNotificationBadgeStore((state) => state.unreadCount);
   return (
     <Tab.Navigator
       initialRouteName="Feed"
-      screenOptions={
-        ({ navigation, route }: { navigation: any; route: { name: string } }): BottomTabNavigationOptions => ({
-        tabBarActiveTintColor: appTheme.dark ? '#3B82F6' : '#3B82F6',
-        tabBarInactiveTintColor: appTheme.dark ? '#9CA3AF' : '#9CA3AF',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#D1D5DB',
-          borderTopWidth: 1,
-        },
-        ...sharedHeaderBaseOptions,
-        headerTitle: () => <SharedTopBarBrand />,
-        headerRight: () => (
-          <SharedTopBarSearchAction
-            onPress={() => navigation.navigate('Search')}
-            accessibilityLabel={t('app.tabs.search')}
-          />
-        ),
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => {
-          const iconNameByRoute: Record<string, keyof typeof MaterialIcons.glyphMap> = {
-            Feed: 'home-filled',
-            Groups: 'groups',
-            Search: 'search',
-            Messages: 'chat-bubble-outline',
-            Notifications: 'notifications-none',
-            Profile: 'menu',
+      screenOptions={({ route }: { route: { name: keyof MainTabsParamList } }): BottomTabNavigationOptions => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: { backgroundColor: colors.tab, borderTopColor: colors.border },
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => {
+          const iconByRoute: Record<keyof MainTabsParamList, keyof typeof MaterialIcons.glyphMap> = {
+            Feed: 'home-filled', Groups: 'groups', Messages: 'chat-bubble-outline', Notifications: 'notifications-none',
           };
-          const iconName = iconNameByRoute[route.name] ?? 'circle';
-          return <MaterialIcons name={iconName} size={size} color={color} />;
+          return <MaterialIcons name={iconByRoute[route.name]} size={size} color={color} />;
         },
-        })
-      }
+      })}
     >
-      <Tab.Screen
-        name="Feed"
-        component={FeedStack}
-        options={{
-          headerShown: false,
-          tabBarLabel: t('app.tabs.feed'),
-          title: t('app.tabs.feed'),
-        }}
-      />
-      <Tab.Screen
-        name="Groups"
-        component={GroupsScreen}
-        options={{
-          tabBarLabel: t('app.tabs.groups'),
-          title: t('app.tabs.groups'),
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          tabBarLabel: t('app.tabs.search'),
-          title: t('app.tabs.search'),
-        }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesStack}
-        options={{
-          headerShown: false,
-          tabBarLabel: t('app.tabs.messages'),
-          title: t('app.tabs.messages'),
-          tabBarBadge: unreadMessages > 0 ? unreadMessages : undefined,
-        }}
-      />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={{
-          tabBarLabel: t('app.tabs.notifications'),
-          title: t('app.tabs.notifications'),
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileStack}
-        options={{
-          headerShown: false,
-          tabBarLabel: t('app.tabs.profile'),
-          title: t('app.tabs.profile'),
-        }}
-      />
+      <Tab.Screen name="Feed" component={FeedStack} options={{ title: t('app.tabs.feed'), tabBarLabel: t('app.tabs.feed') }} />
+      <Tab.Screen name="Groups" component={GroupsStack} options={{ title: t('app.tabs.groups'), tabBarLabel: t('app.tabs.groups') }} />
+      <Tab.Screen name="Messages" component={MessagesStack} options={{ title: t('app.tabs.messages'), tabBarLabel: t('app.tabs.messages'), tabBarBadge: unreadMessages || undefined }} />
+      <Tab.Screen name="Notifications" component={NotificationsStack} options={{ title: t('app.tabs.notifications'), tabBarLabel: t('app.tabs.notifications'), tabBarBadge: unreadNotifications || undefined }} />
     </Tab.Navigator>
+  );
+}
+
+function AuthenticatedApp() {
+  const { t } = useTranslation();
+  useMessagesBadgeBridge();
+  useNotificationBadgeBridge();
+  usePushDeviceRegistration();
+  return (
+    <RootStack.Navigator screenOptions={{ header: AppStackHeader }}>
+      <RootStack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <RootStack.Screen name="Search" component={SearchScreen} options={{ title: t('ui.headers.search') }} />
+      <RootStack.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
+      <RootStack.Screen name="Settings" component={SettingsScreen} options={{ title: t('ui.headers.settings') }} />
+      <RootStack.Screen name="Admin" component={AdminScreen} options={{ title: t('ui.headers.admin') }} />
+      <RootStack.Screen name="CommentReports" component={CommentReportsScreen} options={{ title: t('ui.admin.commentReports') }} />
+    </RootStack.Navigator>
   );
 }
 
@@ -206,18 +148,10 @@ export default function App() {
   const themePreference = useThemeStore((state) => state.preference);
   const appTheme = resolveAppTheme(themePreference, normalizedScheme);
 
-  useEffect(() => {
-    authSessionService.hydrateSessionFromStorage();
-  }, []);
+  useEffect(() => { void authSessionService.hydrateSessionFromStorage(); }, []);
 
   if (!hydrated) {
-    return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#0B6E4F" />
-        </View>
-      </SafeAreaProvider>
-    );
+    return <SafeAreaProvider><View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" /></View></SafeAreaProvider>;
   }
 
   return (
@@ -225,9 +159,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <InviteLinkBridge />
-          <NavigationContainer theme={appTheme}>
-            {accessToken ? <AuthenticatedTabs /> : <AuthScreen />}
-          </NavigationContainer>
+          <NavigationContainer theme={appTheme}>{accessToken ? <AuthenticatedApp /> : <AuthScreen />}</NavigationContainer>
         </I18nextProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

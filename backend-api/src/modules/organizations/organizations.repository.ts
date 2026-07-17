@@ -309,4 +309,12 @@ export class OrganizationsRepository {
       };
     });
   }
+
+  async listMediaStorageKeysForOrganization(organizationId: string): Promise<string[]> {
+    const rows = await this.orm.mediaObject.findMany({
+      where: { group: { organizationId } },
+      select: { storageKey: true },
+    });
+    return rows.map((row) => row.storageKey);
+  }
 }

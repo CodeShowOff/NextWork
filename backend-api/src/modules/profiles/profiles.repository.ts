@@ -59,4 +59,38 @@ export class ProfilesRepository {
   countGroupsFollowedByUserId(userId: string): Promise<number> {
     return this.prisma.groupMember.count({ where: { userId } });
   }
+
+  listSkillsByUserId(userId: string) {
+    return this.prisma.profileSkill.findMany({
+      where: { profileUserId: userId },
+      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
+      select: { id: true, name: true, normalizedName: true },
+    });
+  }
+
+  async replaceSkills(userId: string, skills: Array<{ name: string; normalizedName: string }>) {
+    await this.prisma.$transaction([
+      this.prisma.profileSkill.deleteMany({ where: { profileUserId: userId } }),
+      ...skills.map((skill) =>
+        this.prisma.profileSkill.create({
+          data: {
+            profileUserId: userId,
+            name: skill.name,
+            normalizedName: skill.normalizedName,
+          },
+        }),
+      ),
+    ]);
+    return this.listSkillsByUserId(userId);
+  }
+
+  searchSkills(query: string) {
+    return this.prisma.profileSkill.findMany({
+      where: { normalizedName: { startsWith: query } },
+      distinct: ['normalizedName'],
+      orderBy: [{ normalizedName: 'asc' }],
+      take: 20,
+      select: { name: true, normalizedName: true },
+    });
+  }
 }

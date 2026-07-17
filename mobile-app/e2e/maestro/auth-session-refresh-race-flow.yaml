@@ -1,10 +1,11 @@
-appId: com.workplace.mobile
+appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Profile
+- tapOn:
+    id: header-settings
 - tapOn: Sign out
-- tapOn: Feed
-- tapOn: Sign in
+- assertVisible: Login
+- tapOn: Login
 - inputText: qa-user@example.com
 - tapOn: Password
 - inputText: qa-password-123

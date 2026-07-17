@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -26,6 +26,7 @@ import { getCurrentUser } from '../../shared/api/users.api';
 import { useSessionStore } from '../../shared/session/session.store';
 import { authSessionService } from '../../shared/session/auth-session.service';
 import { defaultApiBaseUrl } from '../../shared/config/runtime';
+import { type AppColors, useAppColors } from '../../shared/ui/design-tokens';
 
 type SignUpStep = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -41,7 +42,10 @@ const signUpStepLabelKeys: Record<SignUpStep, string> = {
 };
 
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
+// Metro resolves bundled image assets through `require` at build time.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const logoImage = require('../../../assets/images/logo.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const authHeroImage = require('../../../assets/images/group_company_announcements.jpg');
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -63,7 +67,9 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
 }
 
 export function AuthScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'verify' | 'forgot' | 'reset'>('credentials');
   const [signUpStep, setSignUpStep] = useState<SignUpStep>(0);
@@ -227,7 +233,7 @@ export function AuthScreen() {
 
       const expiryText = result.expiresAt
         ? t('auth.alerts.resetRequestedWithExpiryBody', {
-            expiresAt: new Date(result.expiresAt).toLocaleString(),
+            expiresAt: new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(result.expiresAt)),
           })
         : t('auth.alerts.resetRequestedBody');
       const debugText = result.debugCode
@@ -317,11 +323,11 @@ export function AuthScreen() {
             ...(isInviteSignup ? { inviteToken } : {}),
           }),
           AUTH_REQUEST_TIMEOUT_MS,
-          `Request timeout after ${AUTH_REQUEST_TIMEOUT_MS / 1000}s`,
+          t('auth.alerts.requestTimeout', { seconds: AUTH_REQUEST_TIMEOUT_MS / 1000 }),
         );
 
         const expiryText = t('auth.alerts.verificationRequiredBody', {
-          expiresAt: new Date(signupResult.expiresAt).toLocaleString(),
+          expiresAt: new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(signupResult.expiresAt)),
         });
         const debugText = signupResult.debugCode
           ? `\n${t('auth.alerts.debugCodeLabel')}: ${signupResult.debugCode}`
@@ -344,7 +350,7 @@ export function AuthScreen() {
           password: password.trim(),
         }),
         AUTH_REQUEST_TIMEOUT_MS,
-        `Request timeout after ${AUTH_REQUEST_TIMEOUT_MS / 1000}s`,
+        t('auth.alerts.requestTimeout', { seconds: AUTH_REQUEST_TIMEOUT_MS / 1000 }),
       );
 
       const previous = useSessionStore.getState();
@@ -371,8 +377,11 @@ export function AuthScreen() {
       });
       if (message.toLowerCase().includes('network request failed') || message.toLowerCase().includes('timeout')) {
         const renderHint = effectiveApiBaseUrl.includes('.onrender.com')
-          ? `Cannot reach backend at ${effectiveApiBaseUrl}. Confirm https:// URL, keep Render service awake, and test ${effectiveApiBaseUrl.replace('/api/v1', '/api/v1/health')} in phone browser.`
-          : `Cannot reach backend at ${effectiveApiBaseUrl}. Open optional API URLs and set your PC LAN IP (example: http://192.168.x.x:4000/api/v1).`;
+          ? t('auth.hints.hostedApiUnreachable', {
+            apiUrl: effectiveApiBaseUrl,
+            healthUrl: effectiveApiBaseUrl.replace('/api/v1', '/api/v1/health'),
+          })
+          : t('auth.hints.localApiUnreachable', { apiUrl: effectiveApiBaseUrl });
         setAuthHint(renderHint);
       }
       if (message.toLowerCase().includes('email not verified')) {
@@ -455,7 +464,7 @@ export function AuthScreen() {
                       const result = await resendVerification({ email: email.trim() });
                       const expiryText = result.expiresAt
                         ? t('auth.alerts.verificationRequiredBody', {
-                            expiresAt: new Date(result.expiresAt).toLocaleString(),
+                            expiresAt: new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(result.expiresAt)),
                           })
                         : t('auth.alerts.resendDoneBody');
                       const debugText = result.debugCode
@@ -740,7 +749,7 @@ export function AuthScreen() {
 
           <Pressable style={styles.advancedToggleButton} onPress={() => setShowAdvancedUrls((current) => !current)}>
             <Text style={styles.advancedToggleText}>
-              {showAdvancedUrls ? 'Hide optional URLs' : 'Set optional API URLs'}
+              {showAdvancedUrls ? t('auth.buttons.hideOptionalUrls') : t('auth.buttons.setOptionalUrls')}
             </Text>
           </Pressable>
 
@@ -765,7 +774,7 @@ export function AuthScreen() {
             </>
           ) : null}
 
-          <Text style={styles.endpointHintText}>Backend: {apiBaseUrl.trim() || sessionApiBaseUrl}</Text>
+          <Text style={styles.endpointHintText}>{t('auth.hints.backend', { url: apiBaseUrl.trim() || sessionApiBaseUrl })}</Text>
 
           <Pressable
             style={[
@@ -789,10 +798,10 @@ export function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECECEC',
+    backgroundColor: colors.background,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -801,10 +810,10 @@ const styles = StyleSheet.create({
   },
   brandHeader: {
     marginBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#D4D4D8',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   brandLogo: {
@@ -819,43 +828,43 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#D4D4D8',
+    borderColor: colors.border,
     padding: 20,
     gap: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#171717',
+    color: colors.text,
   },
   subtitle: {
-    color: '#52525B',
+    color: colors.textMuted,
     fontSize: 14,
     lineHeight: 21,
   },
   hintText: {
-    color: '#0F766E',
+    color: colors.success,
     fontSize: 12,
-    backgroundColor: '#ECFEFF',
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#A5F3FC',
+    borderColor: colors.border,
     borderRadius: 10,
     padding: 8,
   },
   inviteHintText: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontSize: 12,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: colors.primary,
     borderRadius: 10,
     padding: 8,
   },
   linkText: {
-    color: '#0369A1',
+    color: colors.primary,
     fontWeight: '600',
     fontSize: 12,
   },
@@ -866,23 +875,23 @@ const styles = StyleSheet.create({
   modeButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
   modeActive: {
-    backgroundColor: '#1877F2',
-    borderColor: '#1877F2',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   modeText: {
-    color: '#374151',
+    color: colors.text,
     fontWeight: '700',
     fontSize: 13,
   },
   modeTextActive: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   stepHeaderRow: {
     flexDirection: 'row',
@@ -891,27 +900,27 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   stepHeaderTitle: {
-    color: '#1F2937',
+    color: colors.text,
     fontWeight: '700',
     fontSize: 15,
   },
   stepHeaderLabel: {
-    color: '#475569',
+    color: colors.textMuted,
     fontSize: 12,
   },
   inputLabel: {
-    color: '#374151',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D4D4D8',
+    borderColor: colors.border,
     borderRadius: 14,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    color: '#171717',
+    color: colors.text,
     fontSize: 14,
   },
   wizardActionsRow: {
@@ -923,36 +932,36 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: colors.primary,
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   secondaryWizardButtonText: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontWeight: '700',
   },
   secondaryWizardButtonDisabled: {
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   secondaryWizardButtonTextDisabled: {
-    color: '#64748B',
+    color: colors.textMuted,
   },
   submitButton: {
     marginTop: 6,
     borderRadius: 14,
-    backgroundColor: '#1877F2',
+    backgroundColor: colors.primary,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabledButton: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: colors.surfaceMuted,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -961,12 +970,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   advancedToggleText: {
-    color: '#0369A1',
+    color: colors.primary,
     fontWeight: '600',
     fontSize: 12,
   },
   endpointHintText: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 11,
   },
 });

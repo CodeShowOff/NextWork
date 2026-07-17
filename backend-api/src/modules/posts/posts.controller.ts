@@ -103,6 +103,14 @@ export class PostsController {
     return this.postsService.deletePost(user.sub, postId);
   }
 
+  @Get(':postId')
+  @ApiOperation({ summary: 'Get canonical post detail' })
+  @ApiParam({ name: 'postId', type: String, format: 'uuid' })
+  @ApiOkResponse({ description: 'Canonical post payload' })
+  getPost(@CurrentUser() user: JwtPayload, @Param('postId') postId: string): Promise<PostView> {
+    return this.postsService.getPost(user.sub, postId);
+  }
+
   @Get(':postId/share-link')
   @ApiOperation({ summary: 'Get post share link', description: 'Returns web and app links for post sharing.' })
   @ApiParam({ name: 'postId', type: String, format: 'uuid' })

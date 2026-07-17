@@ -68,7 +68,11 @@ export class CommentsController {
   }
 
   @Get('posts/:postId')
-  listComments(@Param('postId') postId: string, @Query() query: ListCommentsQueryDto) {
-    return this.commentsService.listComments(postId, query);
+  listComments(
+    @CurrentUser() user: JwtPayload,
+    @Param('postId') postId: string,
+    @Query() query: ListCommentsQueryDto,
+  ) {
+    return this.commentsService.listComments(user.sub, postId, query);
   }
 }

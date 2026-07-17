@@ -1,20 +1,15 @@
-appId: com.workplace.mobile
+appId: com.workplace.app
 ---
 - launchApp
 - tapOn: Messages
 - assertVisible: Messages
-- tapOn: Sign out
-- assertVisible: Messaging setup
-- inputText: ${USER_A_ID}
-- tapOn: Access token
-- inputText: ${USER_A_TOKEN}
-- tapOn: Save session
-- assertVisible: Messages
-- tapOn: ${CONVERSATION_TITLE}
-- assertVisible: No messages yet. Say hi.
+- tapOn: Search people
+- inputText: ${USER_B_NAME}
+- tapOn: Message
+- assertVisible: Type a message
 # Manual setup step: while User A app is backgrounded, send a message from User B to this conversation.
 - pressKey: home
 - launchApp
 - tapOn: Messages
-- tapOn: ${CONVERSATION_TITLE}
+- tapOn: ${USER_B_NAME}
 - assertVisible: ${USER_B_OFFLINE_MESSAGE}

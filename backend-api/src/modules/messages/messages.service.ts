@@ -55,6 +55,7 @@ export interface MessageReactionSummaryView {
 
 export interface MessageAttachmentView {
   attachmentId: string;
+  mediaId: string | null;
   mediaType: string;
   mimeType: string;
   fileName: string;
@@ -129,7 +130,16 @@ interface MessageAttachmentLifecycleEvent {
   reason?: string;
 }
 
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'application/pdf']);
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
 const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 const MAX_BYTES_BY_MIME: Record<string, number> = {
@@ -280,7 +290,7 @@ export class MessagesService {
 
     let normalizedAttachments: MessageAttachmentView[];
     try {
-      normalizedAttachments = this.normalizeAndValidateAttachments(userId, payload.attachments ?? []);
+      normalizedAttachments = await this.normalizeAndValidateAttachments(userId, payload.attachments ?? []);
     } catch (error) {
       await this.publishAttachmentLifecycle(this.attachmentFailedChannel, {
         conversationId,
@@ -578,6 +588,7 @@ export class MessagesService {
       messageType: message.messageType,
       attachments: message.attachments.map((attachment) => ({
         attachmentId: attachment.attachmentId,
+        mediaId: attachment.mediaObjectId,
         mediaType: attachment.mediaType,
         mimeType: attachment.mimeType,
         fileName: attachment.fileName,
@@ -608,7 +619,7 @@ export class MessagesService {
     await this.cacheService.deleteByPrefix(`conversation-summary:${userId}:`);
   }
 
-  private normalizeAndValidateAttachments(userId: string, attachments: MessageAttachmentDto[]): MessageAttachmentView[] {
+  private async normalizeAndValidateAttachments(userId: string, attachments: MessageAttachmentDto[]): Promise<MessageAttachmentView[]> {
     if (!attachments.length) {
       return [];
     }
@@ -618,7 +629,7 @@ export class MessagesService {
     }
 
     let totalBytes = 0;
-    return attachments.map((attachment) => {
+    return Promise.all(attachments.map(async (attachment) => {
       if (!ALLOWED_MIME_TYPES.has(attachment.mimeType)) {
         throw new BadRequestException(`Unsupported attachment mime type: ${attachment.mimeType}`);
       }
@@ -633,24 +644,37 @@ export class MessagesService {
         throw new BadRequestException('Total attachment payload exceeds 50MB limit.');
       }
 
-      if (!this.mediaService.isPublicMediaUrlAllowed(userId, attachment.publicUrl)) {
+      if (attachment.mediaId) {
+        const media = await this.mediaService.assertMediaObjectAvailableForMessage(userId, attachment.mediaId);
+        if (
+          media.storageKey !== attachment.storageKey ||
+          media.originalFileName !== attachment.fileName ||
+          media.contentType !== attachment.mimeType ||
+          media.sizeBytes !== attachment.fileSizeBytes
+        ) {
+          throw new ForbiddenException('Attachment metadata does not match the scanned upload.');
+        }
+      } else if (!attachment.publicUrl || !this.mediaService.isPublicMediaUrlAllowed(userId, attachment.publicUrl)) {
         throw new ForbiddenException('Attachment URL is not allowed for this user.');
       }
 
       return {
         attachmentId: attachment.attachmentId ?? randomUUID(),
+        mediaId: attachment.mediaId ?? null,
         mediaType: attachment.mediaType,
         mimeType: attachment.mimeType,
         fileName: attachment.fileName,
         fileSizeBytes: attachment.fileSizeBytes,
         storageKey: attachment.storageKey,
-        publicUrl: attachment.publicUrl,
+        // A MediaObject is resolved through a scoped download URL when rendered.
+        // Keep the legacy column non-null until its historical data is migrated.
+        publicUrl: attachment.mediaId ? '' : attachment.publicUrl!,
         width: attachment.width ?? null,
         height: attachment.height ?? null,
         durationMs: attachment.durationMs ?? null,
         thumbnailKey: attachment.thumbnailKey ?? null,
       };
-    });
+    }));
   }
 
   private async publishAttachmentLifecycle(

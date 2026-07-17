@@ -3,6 +3,7 @@ import { Profile } from '@prisma/client';
 
 import { CacheService } from '../../common/cache/cache.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ReplaceProfileSkillsDto } from './dto/replace-profile-skills.dto';
 import { ProfilesRepository } from './profiles.repository';
 
 export interface ProfileView {
@@ -25,6 +26,10 @@ export interface ProfileView {
   relationship: {
     isFollowing: boolean;
   };
+  skills: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 interface ProfileSummary {
@@ -34,6 +39,10 @@ interface ProfileSummary {
   followingCount: number;
   groupsFollowedCount: number;
   skillsEntriesCount: number;
+  skills: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 @Injectable()
@@ -67,6 +76,7 @@ export class ProfilesService {
       relationship: {
         isFollowing,
       },
+      skills: summary.skills ?? [],
     };
   }
 
@@ -88,6 +98,36 @@ export class ProfilesService {
     return updated;
   }
 
+  async replaceMySkills(userId: string, payload: ReplaceProfileSkillsDto) {
+    const profile = await this.profilesRepository.findByUserId(userId);
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+    const unique = new Map<string, string>();
+    for (const rawSkill of payload.skills) {
+      const name = rawSkill.trim().replace(/\s+/g, ' ');
+      const normalizedName = name.toLocaleLowerCase();
+      if (name) {
+        unique.set(normalizedName, name);
+      }
+    }
+    const skills = await this.profilesRepository.replaceSkills(
+      userId,
+      [...unique.entries()].map(([normalizedName, name]) => ({ normalizedName, name })),
+    );
+    await this.cacheService.deleteByKey(`profile:${userId}`);
+    return { items: skills.map((skill) => ({ id: skill.id, name: skill.name })) };
+  }
+
+  async searchSkills(query?: string) {
+    const normalized = query?.trim().toLocaleLowerCase() ?? '';
+    if (!normalized) {
+      return { items: [] };
+    }
+    const items = await this.profilesRepository.searchSkills(normalized);
+    return { items: items.map((item) => ({ name: item.name })) };
+  }
+
   private async getProfileSummary(userId: string): Promise<ProfileSummary> {
     const cacheKey = `profile:${userId}`;
     const cached = await this.cacheService.getJson<ProfileSummary>(cacheKey);
@@ -100,10 +140,12 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found');
     }
 
-    const [postCount, [followersCount, followingCount], groupsFollowedCount] = await Promise.all([
+    const listSkillsByUserId = (this.profilesRepository as Partial<ProfilesRepository>).listSkillsByUserId;
+    const [postCount, [followersCount, followingCount], groupsFollowedCount, skills] = await Promise.all([
       this.profilesRepository.countPostsByUserId(userId),
       this.profilesRepository.getFollowCounts(userId),
       this.profilesRepository.countGroupsFollowedByUserId(userId),
+      listSkillsByUserId ? listSkillsByUserId.call(this.profilesRepository, userId) : Promise.resolve([]),
     ]);
 
     const summary: ProfileSummary = {
@@ -112,7 +154,8 @@ export class ProfilesService {
       followersCount,
       followingCount,
       groupsFollowedCount,
-      skillsEntriesCount: 0,
+      skillsEntriesCount: skills.length,
+      skills: skills.map((skill) => ({ id: skill.id, name: skill.name })),
     };
 
     await this.cacheService.setJson(cacheKey, summary, 120);

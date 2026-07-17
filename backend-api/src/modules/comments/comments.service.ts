@@ -74,6 +74,10 @@ export class CommentsService {
       throw new NotFoundException('Post not found');
     }
 
+    if (post.groupId && !(await this.commentsRepository.canAccessGroupPost(userId, post.groupId))) {
+      throw new ForbiddenException('Not allowed to comment on this group post');
+    }
+
     if (payload.parentCommentId) {
       const parent = await this.commentsRepository.getCommentById(payload.parentCommentId);
       if (!parent || parent.postId !== postId) {
@@ -153,10 +157,13 @@ export class CommentsService {
     return { deleted: true };
   }
 
-  async listComments(postId: string, query: ListCommentsQueryDto): Promise<PaginatedComments> {
+  async listComments(userId: string, postId: string, query: ListCommentsQueryDto): Promise<PaginatedComments> {
     const post = await this.commentsRepository.getPostById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
+    }
+    if (post.groupId && !(await this.commentsRepository.canAccessGroupPost(userId, post.groupId))) {
+      throw new ForbiddenException('Not allowed to view comments on this group post');
     }
 
     const pageSize = query.limit ?? 20;
@@ -185,6 +192,11 @@ export class CommentsService {
     const comment = await this.commentsRepository.getCommentById(commentId);
     if (!comment) {
       throw new NotFoundException('Comment not found');
+    }
+
+    const post = await this.commentsRepository.getPostById(comment.postId);
+    if (post?.groupId && !(await this.commentsRepository.canAccessGroupPost(userId, post.groupId))) {
+      throw new ForbiddenException('Not allowed to report a comment on this group post');
     }
 
     if (comment.authorId === userId) {
@@ -269,7 +281,13 @@ export class CommentsService {
       throw new NotFoundException('Report not found');
     }
 
-    if (report.comment.post.authorId !== userId) {
+    const canModerateAsOrganizationAdmin = report.comment.post.group
+      ? await this.commentsRepository.isOrganizationModerator(
+          userId,
+          report.comment.post.group.organizationId,
+        )
+      : false;
+    if (report.comment.post.authorId !== userId && !canModerateAsOrganizationAdmin) {
       throw new ForbiddenException('Not allowed to resolve this report');
     }
 

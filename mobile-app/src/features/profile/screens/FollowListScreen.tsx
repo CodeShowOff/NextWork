@@ -5,6 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { FollowUserItem, listFollowers, listFollowing } from '../../../shared/api/follows.api';
+import { type AppColors, useAppColors } from '../../../shared/ui/design-tokens';
 interface Props {
   navigation: {
     navigate: (screen: string, params?: unknown) => void;
@@ -21,7 +22,9 @@ interface Props {
 const pageSize = 20;
 
 export function FollowListScreen({ navigation, route }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { userId, mode } = route.params;
 
   const query = useInfiniteQuery({
@@ -39,7 +42,7 @@ export function FollowListScreen({ navigation, route }: Props) {
   if (query.isLoading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0B6E4F" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -55,7 +58,7 @@ export function FollowListScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('UserProfile', { userId: item.userId })}
           >
             <Text style={styles.userName}>{item.displayName}</Text>
-            <Text style={styles.userMeta}>{new Date(item.followedAt).toLocaleString()}</Text>
+            <Text style={styles.userMeta}>{new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.followedAt))}</Text>
           </Pressable>
         )}
         onEndReached={() => {
@@ -66,7 +69,7 @@ export function FollowListScreen({ navigation, route }: Props) {
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           query.isFetchingNextPage ? (
-            <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+            <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
           ) : null
         }
         ListEmptyComponent={<Text style={styles.emptyText}>{t('profile.followList.empty')}</Text>}
@@ -75,10 +78,10 @@ export function FollowListScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     padding: 12,
   },
   centerState: {
@@ -87,21 +90,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   userCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
   },
   userName: {
-    color: '#0F172A',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
   userMeta: {
     marginTop: 4,
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
   },
   footerSpinner: {
@@ -110,6 +113,6 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
-    color: '#64748B',
+    color: colors.textMuted,
   },
 });

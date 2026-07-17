@@ -1,0 +1,16 @@
+appId: com.workplace.app
+---
+- launchApp
+- tapOn: Groups
+- assertVisible: Groups
+# Seeded test data supplies an open group where the signed-in user is a member.
+- tapOn: ${GROUP_NAME}
+- assertVisible: Group
+- tapOn: Files
+- assertVisible: Upload file
+- tapOn: Albums
+- assertVisible: Create album
+- tapOn: Events
+- assertVisible: Create event
+- tapOn: Live room
+- assertVisible: Start room

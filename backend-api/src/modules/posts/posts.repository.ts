@@ -39,6 +39,7 @@ export interface PostWithRelations {
   };
   media: Array<{
     id: string;
+    mediaObjectId: string | null;
     mediaUrl: string;
     mediaType: string;
     width: number | null;
@@ -166,6 +167,27 @@ export class PostsRepository {
     });
 
     return Boolean(row);
+  }
+
+  async isGroupMemberOrOrganizationAdmin(userId: string, groupId: string): Promise<boolean> {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { organizationId: true },
+    });
+    if (!group) {
+      return false;
+    }
+    const [member, organizationMembership] = await Promise.all([
+      this.prisma.groupMember.findUnique({
+        where: { groupId_userId: { groupId, userId } },
+        select: { userId: true },
+      }),
+      this.prisma.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId: group.organizationId, userId } },
+        select: { role: true },
+      }),
+    ]);
+    return Boolean(member) || organizationMembership?.role === 'owner' || organizationMembership?.role === 'admin';
   }
 
   async listGroupMemberIds(groupId: string): Promise<string[]> {

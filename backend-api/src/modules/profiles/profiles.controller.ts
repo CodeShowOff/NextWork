@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Put, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -12,6 +12,8 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import type { JwtPayload } from '../../common/auth/jwt-payload.interface';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ReplaceProfileSkillsDto } from './dto/replace-profile-skills.dto';
+import { SearchProfileSkillsQueryDto } from './dto/search-profile-skills-query.dto';
 import { ProfilesService } from './profiles.service';
 
 @Controller('profiles')
@@ -19,6 +21,18 @@ import { ProfilesService } from './profiles.service';
 @ApiBearerAuth('access-token')
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
+
+  @Get('skills/search')
+  @UseGuards(JwtAuthGuard)
+  searchSkills(@Query() query: SearchProfileSkillsQueryDto) {
+    return this.profilesService.searchSkills(query.q);
+  }
+
+  @Put('me/skills')
+  @UseGuards(JwtAuthGuard)
+  replaceMySkills(@CurrentUser() user: JwtPayload, @Body() payload: ReplaceProfileSkillsDto) {
+    return this.profilesService.replaceMySkills(user.sub, payload);
+  }
 
   @Get(':userId')
   @UseGuards(JwtAuthGuard)

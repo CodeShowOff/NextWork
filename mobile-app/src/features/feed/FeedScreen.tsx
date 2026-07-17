@@ -4,7 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
-  ImageSourcePropType,
+  Modal,
   Share,
   ScrollView,
   RefreshControl,
@@ -34,7 +34,7 @@ import {
 } from '../../shared/api/feed.api';
 import { listGroups } from '../../shared/api/groups.api';
 import { getLikeState, likePost, unlikePost } from '../../shared/api/likes.api';
-import { uploadImageWithContract } from '../../shared/api/media.api';
+import { getMediaStatus, uploadImageWithContract } from '../../shared/api/media.api';
 import { listMyOrganizations } from '../../shared/api/organizations.api';
 import { searchAll, SearchUserItem } from '../../shared/api/search.api';
 import { getCurrentUser } from '../../shared/api/users.api';
@@ -49,16 +49,10 @@ import {
   updatePostInFeed,
 } from './engagement-cache';
 import { canOpenLikerList } from './likers-list.logic';
+import { PostMediaPreview } from './components/PostMediaPreview';
+import { type AppColors, useAppColors } from '../../shared/ui/design-tokens';
 
 const pageSize = 20;
-
-const groupArtworkByKeyword: { keyword: string; source: ImageSourcePropType }[] = [
-  { keyword: 'announcement', source: require('../../../assets/images/group_company_announcements.jpg') },
-  { keyword: 'marketing', source: require('../../../assets/images/group_marketing_team.jpg') },
-  { keyword: 'project', source: require('../../../assets/images/group_project_updates.jpg') },
-  { keyword: 'general', source: require('../../../assets/images/group_general.jpg') },
-  { keyword: 'social', source: require('../../../assets/images/group_company_social.jpg') },
-];
 
 interface ComposerImage {
   uri: string;
@@ -85,10 +79,24 @@ function inferContentType(fileName: string | undefined, mimeType: string | null)
   return 'image/jpeg';
 }
 
+async function waitForPostMediaScan(mediaId: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const status = await getMediaStatus(mediaId);
+    if (status.status === 'available') return;
+    if (status.status === 'quarantined' || status.status === 'rejected' || status.status === 'deleted') {
+      throw new Error(status.scanDetail ?? i18n.t('feed.alerts.mediaScanRejected'));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(i18n.t('feed.alerts.mediaScanPending'));
+}
+
 type Props = NativeStackScreenProps<FeedStackParamList, 'FeedHome'>;
 
 export function FeedScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const [composerText, setComposerText] = useState('');
   const [composerImage, setComposerImage] = useState<ComposerImage | null>(null);
@@ -104,6 +112,7 @@ export function FeedScreen({ navigation }: Props) {
   const [composerValidationMessage, setComposerValidationMessage] = useState('');
   const [showTagComposer, setShowTagComposer] = useState(false);
   const [showPollComposer, setShowPollComposer] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -152,10 +161,11 @@ export function FeedScreen({ navigation }: Props) {
     [groupsQuery.data?.items],
   );
 
+  const feedKey = ['feed', selectedGroupId || 'all'] as const;
   const feedQuery = useInfiniteQuery({
-    queryKey: ['feed'],
+    queryKey: feedKey,
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => listFeed({ limit: pageSize, before: pageParam }),
+    queryFn: ({ pageParam }) => listFeed({ limit: pageSize, before: pageParam, ...(selectedGroupId ? { groupId: selectedGroupId } : {}) }),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
@@ -206,7 +216,7 @@ export function FeedScreen({ navigation }: Props) {
 
       let mediaPayload:
         | {
-            url: string;
+            mediaId: string;
             type: string;
             width?: number;
             height?: number;
@@ -219,11 +229,13 @@ export function FeedScreen({ navigation }: Props) {
           fileName: composerImage.fileName,
           contentType: composerImage.contentType,
           sizeBytes: composerImage.sizeBytes,
+          groupId: selectedGroupId || undefined,
         });
+        await waitForPostMediaScan(contract.mediaId);
 
         mediaPayload = [
           {
-            url: contract.publicUrl,
+            mediaId: contract.mediaId,
             type: composerImage.contentType,
             width: composerImage.width,
             height: composerImage.height,
@@ -252,8 +264,9 @@ export function FeedScreen({ navigation }: Props) {
       setDebouncedTagSearch('');
       setPollQuestion('');
       setPollOptions(['', '']);
+      setComposerOpen(false);
       queryClient.setQueryData(
-        ['feed'],
+        feedKey,
         (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) => {
           if (!current || current.pages.length === 0) {
             return {
@@ -358,7 +371,7 @@ export function FeedScreen({ navigation }: Props) {
     },
     onMutate: async (postId) => {
       await queryClient.cancelQueries({ queryKey: ['feed'] });
-      const previousFeed = queryClient.getQueryData<{ pageParams: unknown[]; pages: PaginatedFeed[] }>(['feed']);
+      const previousFeed = queryClient.getQueryData<{ pageParams: unknown[]; pages: PaginatedFeed[] }>(feedKey);
 
       const likedByMeBefore = likedByMeMap[postId] ?? false;
       const previousLikedByMe = likedByMeMap[postId];
@@ -371,7 +384,7 @@ export function FeedScreen({ navigation }: Props) {
         ...current,
         [postId]: optimistic.nextLikedByMe,
       }));
-      queryClient.setQueryData(['feed'], optimistic.nextFeed);
+      queryClient.setQueryData(feedKey, optimistic.nextFeed);
 
       return {
         postId,
@@ -385,7 +398,7 @@ export function FeedScreen({ navigation }: Props) {
         [postId]: result.liked,
       }));
 
-      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+      queryClient.setQueryData(feedKey, (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
         reconcileLikeCountInFeed(current, {
           postId,
           likeCount: result.likeCount,
@@ -399,7 +412,7 @@ export function FeedScreen({ navigation }: Props) {
       }
 
       if (context.previousFeed) {
-        queryClient.setQueryData(['feed'], context.previousFeed);
+        queryClient.setQueryData(feedKey, context.previousFeed);
       }
 
       if (context.previousLikedByMe === undefined) {
@@ -425,7 +438,7 @@ export function FeedScreen({ navigation }: Props) {
     onSuccess: (updated) => {
       setEditingPostId(null);
       setEditingContent('');
-      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+      queryClient.setQueryData(feedKey, (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
         updatePostInFeed(current, {
           postId: updated.id,
           content: updated.content,
@@ -449,7 +462,7 @@ export function FeedScreen({ navigation }: Props) {
         setEditingContent('');
       }
 
-      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+      queryClient.setQueryData(feedKey, (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
         removePostFromFeed(current, postId),
       );
     },
@@ -475,7 +488,7 @@ export function FeedScreen({ navigation }: Props) {
     mutationFn: async (params: { postId: string; optionId: string }) =>
       votePostPoll(params.postId, params.optionId),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['feed'], (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
+      queryClient.setQueryData(feedKey, (current: { pageParams: unknown[]; pages: PaginatedFeed[] } | undefined) =>
         reconcilePollInFeed(current, {
           postId: updated.id,
           poll: updated.poll,
@@ -501,22 +514,12 @@ export function FeedScreen({ navigation }: Props) {
         .join('|'),
     [likedByMeMap],
   );
-  const groupTilePalette = useMemo(
-    () => ['#4338CA', '#FACC15', '#FF5A4A', '#F3C5CF', '#E5D4C5'],
-    [],
-  );
-  const groupTileIcons = useMemo<(keyof typeof MaterialIcons.glyphMap)[]>(
-    () => ['star', 'back-hand', 'bolt', 'add-comment', 'public'],
-    [],
-  );
   const feedListHeader = useMemo(
     () => (
       <View style={styles.groupTargetSection}>
         <Text style={styles.groupTargetLabel}>{t('groups.title.yourGroups')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTilesRow}>
-          {(groupsQuery.data?.items ?? []).slice(0, 6).map((group, index) => {
-            const tileColor = groupTilePalette[index % groupTilePalette.length];
-            const iconName = groupTileIcons[index % groupTileIcons.length];
+          {(groupsQuery.data?.items ?? []).slice(0, 6).map((group) => {
             const isActive = selectedGroupId === group.id;
             return (
               <Pressable
@@ -527,11 +530,11 @@ export function FeedScreen({ navigation }: Props) {
                 <View
                   style={[
                     styles.groupTile,
-                    { backgroundColor: tileColor },
+                    { backgroundColor: isActive ? colors.primary : colors.surfaceMuted },
                     isActive ? styles.groupTileActive : null,
                   ]}
                 >
-                  <MaterialIcons name={iconName} size={25} color={tileColor === '#FACC15' ? '#111827' : '#FFFFFF'} />
+                  <Text style={[styles.cardAvatarText, { color: isActive ? colors.onPrimary : colors.text }]}>{group.name.slice(0, 1).toUpperCase()}</Text>
                 </View>
                 <Text numberOfLines={2} style={styles.groupTileLabel}>
                   {group.name}
@@ -542,7 +545,7 @@ export function FeedScreen({ navigation }: Props) {
         </ScrollView>
       </View>
     ),
-    [groupTileIcons, groupTilePalette, groupsQuery.data?.items, selectedGroupId, t],
+    [colors, groupsQuery.data?.items, selectedGroupId, styles, t],
   );
 
   const hasPollDraft = useMemo(
@@ -550,40 +553,39 @@ export function FeedScreen({ navigation }: Props) {
     [pollOptions, pollQuestion],
   );
 
-  const resolveGroupArtwork = useCallback(
-    (groupId: string | null): ImageSourcePropType | null => {
-      if (!groupId) {
-        return null;
-      }
-
-      const groupName = (groupNameById[groupId] ?? '').toLowerCase();
-      for (const artwork of groupArtworkByKeyword) {
-        if (groupName.includes(artwork.keyword)) {
-          return artwork.source;
-        }
-      }
-
-      return require('../../../assets/images/group_general.jpg');
-    },
-    [groupNameById],
-  );
-
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <View style={styles.composer}>
-        <View style={styles.composerTopRow}>
-          <View style={styles.composerAvatarCircle}>
-            <Text style={styles.composerAvatarText}>{(meQuery.data?.id ?? 'U').slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <TextInput
-            value={composerText}
-            onChangeText={setComposerText}
-            placeholder={t('feed.composer.placeholder')}
-            style={styles.composerInput}
-            multiline
-            accessibilityLabel={t('feed.composer.placeholder')}
-          />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['left', 'right', 'bottom']}>
+      <Pressable style={[styles.composerLauncher, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => setComposerOpen(true)} accessibilityRole="button" accessibilityLabel={t('feed.composer.placeholder')}>
+        <View style={styles.composerAvatarCircle}>
+          <Text style={styles.composerAvatarText}>{(meQuery.data?.id ?? 'U').slice(0, 1).toUpperCase()}</Text>
         </View>
+        <Text style={[styles.composerLauncherText, { color: colors.textMuted }]}>{t('feed.composer.placeholder')}</Text>
+      </Pressable>
+      <Modal visible={composerOpen} animationType="slide" onRequestClose={() => setComposerOpen(false)}>
+        <SafeAreaView style={[styles.composerModal, { backgroundColor: colors.background }]} edges={['top', 'left', 'right', 'bottom']}>
+          <ScrollView contentContainerStyle={styles.composerModalContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.composer}>
+              <View style={styles.composerModalHeader}>
+                <Text style={styles.composerModalTitle}>{t('feed.composer.placeholder')}</Text>
+                <Pressable onPress={() => setComposerOpen(false)} accessibilityRole="button" accessibilityLabel={t('ui.actions.close')}>
+                  <Text style={styles.composerClose}>{t('ui.actions.close')}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.composerTopRow}>
+                <View style={styles.composerAvatarCircle}>
+                  <Text style={styles.composerAvatarText}>{(meQuery.data?.id ?? 'U').slice(0, 1).toUpperCase()}</Text>
+                </View>
+                <TextInput
+                  value={composerText}
+                  onChangeText={setComposerText}
+                  placeholder={t('feed.composer.placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.composerInput}
+                  multiline
+                  autoFocus
+                  accessibilityLabel={t('feed.composer.placeholder')}
+                />
+              </View>
 
         <View style={styles.composerQuickActionsRow}>
           <Pressable
@@ -592,8 +594,8 @@ export function FeedScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t('feed.composer.attachImage')}
           >
-            <MaterialIcons name="photo" size={20} color="#16A34A" />
-            <Text style={styles.quickActionText}>Photo</Text>
+            <MaterialIcons name="photo" size={20} color={colors.success} />
+            <Text style={styles.quickActionText}>{t('feed.composer.attachImage')}</Text>
           </Pressable>
           <Pressable
             style={[styles.quickActionChip, showTagComposer ? styles.quickActionChipActive : null]}
@@ -601,8 +603,8 @@ export function FeedScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t('feed.composer.tagPeople')}
           >
-            <MaterialIcons name="videocam" size={20} color="#EF4444" />
-            <Text style={styles.quickActionText}>Live</Text>
+            <MaterialIcons name="person-add-alt-1" size={20} color={colors.primary} />
+            <Text style={styles.quickActionText}>{t('feed.composer.tagPeople')}</Text>
           </Pressable>
           <Pressable
             style={[styles.quickActionChip, showPollComposer ? styles.quickActionChipActive : null]}
@@ -610,8 +612,8 @@ export function FeedScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t('feed.composer.pollOptional')}
           >
-            <MaterialIcons name="poll" size={20} color="#111827" />
-            <Text style={styles.quickActionText}>Poll</Text>
+            <MaterialIcons name="poll" size={20} color={colors.text} />
+            <Text style={styles.quickActionText}>{t('feed.composer.pollOptional')}</Text>
           </Pressable>
           <Pressable
             style={styles.postButton}
@@ -667,7 +669,7 @@ export function FeedScreen({ navigation }: Props) {
               autoCapitalize="none"
               accessibilityLabel={t('feed.composer.searchPeopleToTag')}
             />
-            {tagSearchQuery.isFetching ? <ActivityIndicator size="small" color="#3B82F6" /> : null}
+            {tagSearchQuery.isFetching ? <ActivityIndicator size="small" color={colors.primary} /> : null}
             {availableTagUsers.length ? (
               <View style={styles.tagResultsList}>
                 {availableTagUsers.map((user) => (
@@ -724,11 +726,14 @@ export function FeedScreen({ navigation }: Props) {
         {composerValidationMessage ? (
           <Text style={styles.validationMessage}>{composerValidationMessage}</Text>
         ) : null}
-      </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       {feedQuery.isLoading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#0B6E4F" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FeedListComponent<FeedPost>
@@ -740,11 +745,7 @@ export function FeedScreen({ navigation }: Props) {
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardAvatarCircle}>
-                  {item.groupId && resolveGroupArtwork(item.groupId) ? (
-                    <Image source={resolveGroupArtwork(item.groupId) as ImageSourcePropType} style={styles.cardAvatarImage} />
-                  ) : (
-                    <Text style={styles.cardAvatarText}>{item.author.displayName.slice(0, 1).toUpperCase()}</Text>
-                  )}
+                  <Text style={styles.cardAvatarText}>{item.author.displayName.slice(0, 1).toUpperCase()}</Text>
                 </View>
                 <View style={styles.cardHeaderTextColumn}>
                   <Pressable
@@ -769,7 +770,6 @@ export function FeedScreen({ navigation }: Props) {
                     <Text style={styles.groupBadgeText}>{t('feed.targeting.globalPost')}</Text>
                   )}
                 </View>
-                <MaterialIcons name="more-horiz" size={24} color="#9CA3AF" />
               </View>
               {editingPostId === item.id ? (
                 <View style={styles.editSection}>
@@ -836,22 +836,7 @@ export function FeedScreen({ navigation }: Props) {
                       </Text>
                 </View>
               ) : null}
-              {item.media.length ? (
-                <>
-                  <View style={styles.liveMetaRow}>
-                    <Text style={styles.liveBadgeText}>LIVE</Text>
-                    <View style={styles.liveViewersPill}>
-                      <MaterialIcons name="visibility" size={15} color="#FFFFFF" />
-                      <Text style={styles.liveViewersText}>{(item.stats.likeCount * 125).toLocaleString()}</Text>
-                    </View>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
-                    {item.media.map((mediaItem) => (
-                      <Image key={mediaItem.id} source={{ uri: mediaItem.url }} style={styles.mediaImage} />
-                    ))}
-                  </ScrollView>
-                </>
-              ) : null}
+              {item.media.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>{item.media.map((mediaItem) => <PostMediaPreview key={mediaItem.id} media={mediaItem} imageStyle={styles.mediaImage} />)}</ScrollView> : null}
               <Text style={styles.stats}>
                 {t('feed.stats', {
                   likes: item.stats.likeCount,
@@ -867,7 +852,7 @@ export function FeedScreen({ navigation }: Props) {
                   <MaterialIcons
                     name={likedByMeMap[item.id] ? 'thumb-up' : 'thumb-up-off-alt'}
                     size={20}
-                    color={likedByMeMap[item.id] ? '#2563EB' : '#9CA3AF'}
+                    color={likedByMeMap[item.id] ? colors.primary : colors.textMuted}
                   />
                   <Text style={styles.feedActionChipText}>
                     {likedByMeMap[item.id] ? t('feed.actions.unlike') : t('feed.actions.like')}
@@ -881,7 +866,7 @@ export function FeedScreen({ navigation }: Props) {
                     })
                   }
                 >
-                  <MaterialIcons name="chat-bubble-outline" size={20} color="#9CA3AF" />
+                  <MaterialIcons name="chat-bubble-outline" size={20} color={colors.textMuted} />
                   <Text style={styles.feedActionChipText}>{t('feed.actions.comments')}</Text>
                 </Pressable>
                 <Pressable
@@ -889,7 +874,7 @@ export function FeedScreen({ navigation }: Props) {
                   onPress={() => sharePostMutation.mutate(item.id)}
                   disabled={sharePostMutation.isPending}
                 >
-                  <MaterialIcons name="share" size={20} color="#9CA3AF" />
+                  <MaterialIcons name="share" size={20} color={colors.textMuted} />
                   <Text style={styles.feedActionChipText}>{t('common.actions.share')}</Text>
                 </Pressable>
               </View>
@@ -957,7 +942,7 @@ export function FeedScreen({ navigation }: Props) {
               onRefresh={() => {
                 feedQuery.refetch();
               }}
-              tintColor="#0B6E4F"
+              tintColor={colors.primary}
             />
           }
           onEndReached={() => {
@@ -968,7 +953,7 @@ export function FeedScreen({ navigation }: Props) {
           onEndReachedThreshold={0.4}
           ListFooterComponent={
             feedQuery.isFetchingNextPage ? (
-              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+              <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
             ) : null
           }
           ListEmptyComponent={
@@ -982,15 +967,32 @@ export function FeedScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECECEC',
   },
+  composerLauncher: {
+    minHeight: 74,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 2,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  composerLauncherText: { flex: 1, fontSize: 15 },
+  composerModal: { flex: 1 },
+  composerModalContent: { padding: 12, flexGrow: 1 },
+  composerModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  composerModalTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  composerClose: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   composer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#D1D5DB',
+    borderBottomColor: colors.border,
     padding: 14,
     gap: 10,
   },
@@ -1005,22 +1007,23 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#BFDBFE',
+    backgroundColor: colors.primary,
   },
   composerAvatarText: {
-    color: '#F8FAFC',
+    color: colors.onPrimary,
     fontWeight: '800',
     fontSize: 22,
   },
   composerInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 9,
     minHeight: 46,
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceMuted,
+    color: colors.text,
     fontSize: 14,
   },
   composerQuickActionsRow: {
@@ -1031,7 +1034,7 @@ const styles = StyleSheet.create({
   },
   quickActionChip: {
     borderRadius: 999,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 13,
     paddingVertical: 8,
     flexDirection: 'row',
@@ -1039,10 +1042,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickActionChipActive: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   quickActionText: {
-    color: '#374151',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1053,35 +1058,36 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     borderRadius: 12,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.surfaceMuted,
   },
   removeImageButton: {
     alignSelf: 'flex-start',
   },
   removeImageButtonText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 12,
   },
   composerSectionCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 12,
     gap: 8,
   },
   metaInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.surfaceMuted,
+    color: colors.text,
     fontSize: 14,
   },
   metaSectionLabel: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '700',
     marginTop: 4,
   },
@@ -1092,34 +1098,34 @@ const styles = StyleSheet.create({
   },
   taggedUserChip: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: colors.success,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.surfaceMuted,
   },
   taggedUserChipText: {
-    color: '#166534',
+    color: colors.success,
     fontWeight: '700',
   },
   tagResultsList: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   tagResultItem: {
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.border,
   },
   tagResultName: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '700',
   },
   tagResultMeta: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
   },
   pollOptionRow: {
@@ -1132,39 +1138,39 @@ const styles = StyleSheet.create({
   },
   pollOptionRemoveButton: {
     borderWidth: 1,
-    borderColor: '#B91C1C',
+    borderColor: colors.danger,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   pollOptionRemoveText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 12,
   },
   validationMessage: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '600',
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   secondaryButtonText: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontWeight: '700',
   },
   postButton: {
-    backgroundColor: '#1877F2',
+    backgroundColor: colors.primary,
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
   postButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontWeight: '700',
   },
   centerState: {
@@ -1173,9 +1179,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 12,
     marginHorizontal: 12,
     marginTop: 10,
@@ -1190,7 +1196,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#BFDBFE',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -1201,7 +1207,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   cardAvatarText: {
-    color: '#F8FAFC',
+    color: colors.onPrimary,
     fontWeight: '800',
     fontSize: 19,
   },
@@ -1211,68 +1217,68 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.text,
   },
   timestamp: {
     marginTop: 2,
-    color: '#9CA3AF',
+    color: colors.textMuted,
     fontSize: 12,
   },
   groupBadgeText: {
     marginTop: 3,
-    color: '#6B7280',
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: '500',
   },
   content: {
     marginTop: 10,
-    color: '#0F172A',
+    color: colors.text,
     fontSize: 15,
     lineHeight: 22,
   },
   hashtagsText: {
     marginTop: 6,
-    color: '#0369A1',
+    color: colors.primary,
     fontWeight: '600',
   },
   pollCard: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 10,
     padding: 10,
     gap: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceMuted,
   },
   pollQuestion: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '700',
   },
   pollOptionButton: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   pollOptionButtonActive: {
-    borderColor: '#0B6E4F',
-    backgroundColor: '#DCFCE7',
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceMuted,
   },
   pollOptionText: {
-    color: '#0F172A',
+    color: colors.text,
     fontWeight: '600',
   },
   pollOptionVotes: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '700',
   },
   pollTotalVotes: {
-    color: '#475569',
+    color: colors.textMuted,
     fontSize: 12,
   },
   editSection: {
@@ -1281,12 +1287,13 @@ const styles = StyleSheet.create({
   },
   editInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     minHeight: 44,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
+    color: colors.text,
   },
   editActionsRow: {
     flexDirection: 'row',
@@ -1297,45 +1304,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingRight: 8,
   },
-  liveMetaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  liveBadgeText: {
-    backgroundColor: '#EF4444',
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  liveViewersPill: {
-    backgroundColor: '#6B7280',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  liveViewersText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 12,
-  },
   mediaImage: {
     width: 180,
     height: 150,
     borderRadius: 8,
     marginRight: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.surfaceMuted,
   },
   stats: {
     marginTop: 10,
-    color: '#475569',
+    color: colors.textMuted,
     fontSize: 13,
   },
   actionsRow: {
@@ -1351,10 +1329,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceMuted,
   },
   feedActionChipText: {
-    color: '#374151',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1365,59 +1343,59 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   actionButton: {
-    backgroundColor: '#0B6E4F',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   actionButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontWeight: '700',
   },
   commentButton: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   commentButtonDisabled: {
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   commentButtonText: {
-    color: '#0B6E4F',
+    color: colors.primary,
     fontWeight: '700',
   },
   commentButtonTextDisabled: {
-    color: '#94A3B8',
+    color: colors.textMuted,
   },
   dangerButton: {
     borderWidth: 1,
-    borderColor: '#B91C1C',
+    borderColor: colors.danger,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   dangerButtonText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontWeight: '700',
   },
   footerSpinner: {
     marginVertical: 14,
   },
   emptyText: {
-    color: '#64748B',
+    color: colors.textMuted,
   },
   groupTargetSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   groupTargetLabel: {
-    color: '#111827',
+    color: colors.text,
     fontWeight: '800',
     fontSize: 18,
     marginBottom: 10,
@@ -1439,11 +1417,11 @@ const styles = StyleSheet.create({
   },
   groupTileActive: {
     borderWidth: 3,
-    borderColor: '#BFDBFE',
+    borderColor: colors.primary,
   },
   groupTileLabel: {
     marginTop: 8,
-    color: '#111827',
+    color: colors.text,
     fontWeight: '500',
     fontSize: 12,
     lineHeight: 15,

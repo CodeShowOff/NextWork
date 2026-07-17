@@ -3,9 +3,11 @@ import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { listLikers, LikersResponse } from '../../../shared/api/likes.api';
 import { i18n } from '../../../shared/i18n/i18n';
+import { type AppColors, useAppColors } from '../../../shared/ui/design-tokens';
 import { FeedStackParamList } from './FeedStack';
 import { LIKER_PAGE_SIZE, shouldFetchNextLikersPage } from '../likers-list.logic';
 
@@ -15,6 +17,9 @@ type LikerListItem = LikersResponse['items'][number];
 
 export function LikerListScreen({ navigation, route }: Props) {
   const { postId } = route.params;
+  const { t } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const query = useInfiniteQuery({
     queryKey: ['likes', 'post', postId, 'users'],
@@ -28,7 +33,7 @@ export function LikerListScreen({ navigation, route }: Props) {
   if (query.isLoading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0B6E4F" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -43,7 +48,7 @@ export function LikerListScreen({ navigation, route }: Props) {
             style={styles.userCard}
             onPress={() => navigation.navigate('UserProfile', { userId: item.userId })}
             accessibilityRole="button"
-            accessibilityLabel={`Open profile for ${item.displayName}`}
+            accessibilityLabel={t('feed.likers.openProfile', { name: item.displayName })}
           >
             {item.avatarUrl ? <Image source={{ uri: item.avatarUrl }} style={styles.avatar} /> : <View style={styles.avatarPlaceholder} />}
             <View style={styles.userCopy}>
@@ -64,19 +69,19 @@ export function LikerListScreen({ navigation, route }: Props) {
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           query.isFetchingNextPage ? (
-            <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+            <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
           ) : null
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No likes yet.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>{t('feed.likers.empty')}</Text>}
       />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     padding: 12,
   },
   centerState: {
@@ -85,9 +90,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   userCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -99,25 +104,25 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.surfaceMuted,
   },
   avatarPlaceholder: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: colors.primary,
   },
   userCopy: {
     flex: 1,
   },
   userName: {
-    color: '#0F172A',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
   userMeta: {
     marginTop: 4,
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
   },
   footerSpinner: {
@@ -126,6 +131,6 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
-    color: '#64748B',
+    color: colors.textMuted,
   },
 });

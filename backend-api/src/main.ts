@@ -11,7 +11,7 @@ import { ApiResponseInterceptor } from './common/http/api-response.interceptor';
 import { GlobalExceptionFilter } from './common/http/global-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableShutdownHooks();
   const redisService = app.get(RedisService);
   app.useWebSocketAdapter(new RedisIoAdapter(app, redisService));

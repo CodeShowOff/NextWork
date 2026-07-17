@@ -100,16 +100,18 @@ model Post {
 }
 
 model PostMedia {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  postId    String   @db.Uuid @map("post_id")
-  mediaUrl  String   @map("media_url")
-  mediaType String   @map("media_type")
-  width     Int?
-  height    Int?
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid(7)) @db.Uuid
+  postId        String   @db.Uuid @map("post_id")
+  mediaObjectId String?  @unique @db.Uuid @map("media_object_id")
+  mediaUrl      String   @map("media_url")
+  mediaType     String   @map("media_type")
+  width         Int?
+  height        Int?
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post        Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  mediaObject MediaObject? @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
 
   @@index([postId, sortOrder])
   @@map("post_media")
@@ -255,6 +257,7 @@ model MessageReaction {
 model MessageAttachment {
   id            String   @id @default(uuid(7)) @db.Uuid
   messageId     String   @db.Uuid @map("message_id")
+  mediaObjectId String?  @unique @db.Uuid @map("media_object_id")
   attachmentId  String   @db.Uuid @default(uuid(7)) @map("attachment_id")
   mediaType     String   @map("media_type")
   mimeType      String   @map("mime_type")
@@ -268,7 +271,8 @@ model MessageAttachment {
   thumbnailKey  String?  @map("thumbnail_key")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message     Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mediaObject MediaObject? @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
 
   @@index([messageId, createdAt])
   @@index([attachmentId])
@@ -348,6 +352,7 @@ model Organization {
   members OrganizationMember[]
   groups Group[]
   invites InviteLink[]
+  onboardingAudit OrganizationOnboardingAudit?
   activeUsers User[] @relation("user_active_organization")
 
   @@index([createdBy])
@@ -411,6 +416,18 @@ model GroupMember {
   @@id([groupId, userId])
   @@index([userId])
   @@map("group_members")
+}
+
+model OrganizationOnboardingAudit {
+  organizationId String   @id @db.Uuid @map("organization_id")
+  initializedBy  String   @db.Uuid @map("initialized_by")
+  initializedAt  DateTime @default(now()) @map("initialized_at")
+  skipped        Boolean  @default(false)
+  selectedKeys   String[] @default([]) @map("selected_keys")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_onboarding_audits")
 }
 
 enum GroupRole {
@@ -511,6 +528,8 @@ model MediaObject {
   group      Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupFile  GroupFile?
   albumPhoto GroupAlbumPhoto?
+  messageAttachment MessageAttachment?
+  postMedia PostMedia?
 
   @@index([ownerId, status, createdAt(sort: Desc)])
   @@index([groupId, status, createdAt(sort: Desc)])

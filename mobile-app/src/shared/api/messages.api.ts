@@ -3,12 +3,13 @@ import { requestJson } from './http';
 
 export interface SendMessageAttachmentPayload {
   attachmentId?: string;
+  mediaId?: string;
   mediaType: 'image' | 'video' | 'document';
-  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf';
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'application/pdf' | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' | 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
   fileName: string;
   fileSizeBytes: number;
   storageKey: string;
-  publicUrl: string;
+  publicUrl?: string;
   width?: number;
   height?: number;
   durationMs?: number;

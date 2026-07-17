@@ -11,7 +11,8 @@ import { PostWithRelations, PostsRepository } from './posts.repository';
 
 export interface PostMediaView {
   id: string;
-  url: string;
+  mediaId: string | null;
+  url: string | null;
   type: string;
   width: number | null;
   height: number | null;
@@ -87,19 +88,19 @@ export class PostsService {
   ) {}
 
   async createPost(userId: string, payload: CreatePostDto): Promise<PostView> {
-    this.assertMediaUrlsBelongToAuthor(userId, payload.media);
-
     if (payload.groupId) {
       const group = await this.postsRepository.findGroupById(payload.groupId);
       if (!group) {
         throw new NotFoundException('Group not found');
       }
 
-      const isMember = await this.postsRepository.isGroupMember(userId, payload.groupId);
+      const isMember = await this.postsRepository.isGroupMemberOrOrganizationAdmin(userId, payload.groupId);
       if (!isMember) {
         throw new ForbiddenException('Not a member of this group');
       }
     }
+
+    await this.assertPostMediaBelongToAuthor(userId, payload.groupId, payload.media);
 
     const data: Prisma.PostCreateInput = {
       author: {
@@ -118,7 +119,14 @@ export class PostsService {
         ? {
             media: {
               create: payload.media.map((item, index) => ({
-                mediaUrl: item.url,
+                mediaUrl: item.mediaId ? `media://${item.mediaId}` : item.url!,
+                ...(item.mediaId
+                  ? {
+                      mediaObject: {
+                        connect: { id: item.mediaId },
+                      },
+                    }
+                  : {}),
                 mediaType: item.type,
                 width: item.width,
                 height: item.height,
@@ -275,8 +283,21 @@ export class PostsService {
     }
 
     await this.postsRepository.deleteById(postId);
+    await this.mediaService.deleteOwnedMediaObjects(
+      userId,
+      existing.media.flatMap((item) => (item.mediaObjectId ? [item.mediaObjectId] : [])),
+    );
     await this.invalidateImpactedFeeds(existing);
     return { status: 'ok' };
+  }
+
+  async getPost(viewerId: string, postId: string): Promise<PostView> {
+    const post = await this.postsRepository.findById(postId);
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+    await this.assertCanViewPost(viewerId, post);
+    return this.toPostView(post, viewerId);
   }
 
   async getPostShareLink(viewerId: string, postId: string): Promise<PostShareLinkView> {
@@ -324,17 +345,26 @@ export class PostsService {
     return this.toPostView(updated, userId);
   }
 
-  private assertMediaUrlsBelongToAuthor(userId: string, media?: { url: string }[]): void {
+  private async assertPostMediaBelongToAuthor(
+    userId: string,
+    groupId: string | undefined,
+    media?: Array<{ mediaId?: string; url?: string }>,
+  ): Promise<void> {
     if (!media?.length) {
       return;
     }
 
-    const hasInvalidUrl = media.some(
-      (item) => !this.mediaService.isPublicMediaUrlAllowed(userId, item.url),
+    await Promise.all(
+      media.map(async (item) => {
+        if (item.mediaId) {
+          await this.mediaService.assertMediaObjectAvailableForPost(userId, groupId, item.mediaId);
+          return;
+        }
+        if (!item.url || !this.mediaService.isPublicMediaUrlAllowed(userId, item.url)) {
+          throw new ForbiddenException('Media URL is not permitted for this author');
+        }
+      }),
     );
-    if (hasInvalidUrl) {
-      throw new ForbiddenException('Media URL is not permitted for this author');
-    }
   }
 
   private toPaginatedResult(
@@ -388,7 +418,8 @@ export class PostsService {
       updatedAt: post.updatedAt.toISOString(),
       media: media.map((mediaItem) => ({
         id: mediaItem.id,
-        url: mediaItem.mediaUrl,
+        mediaId: mediaItem.mediaObjectId,
+        url: mediaItem.mediaObjectId ? null : mediaItem.mediaUrl,
         type: mediaItem.mediaType,
         width: mediaItem.width,
         height: mediaItem.height,
@@ -465,7 +496,7 @@ export class PostsService {
     }
 
     if (post.groupId) {
-      const isMember = await this.postsRepository.isGroupMember(viewerId, post.groupId);
+      const isMember = await this.postsRepository.isGroupMemberOrOrganizationAdmin(viewerId, post.groupId);
       if (!isMember) {
         throw new ForbiddenException('Not allowed to view this post');
       }

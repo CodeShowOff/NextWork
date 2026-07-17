@@ -31,6 +31,7 @@ import {
 } from '../../../shared/api/messages.api';
 import { messagesKeys } from '../hooks/keys';
 import { featureFlags } from '../../../shared/config/runtime';
+import { type AppColors, useAppColors } from '../../../shared/ui/design-tokens';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ConversationDetail'>;
 
@@ -43,17 +44,19 @@ const reactionPickerOrder: MessageReactionType[] = [
   'angry',
 ];
 
-const reactionLabelByType: Record<MessageReactionType, string> = {
-  thumbsup: '+1',
-  heart: 'Love',
-  laughing: 'Haha',
-  astonished: 'Wow',
-  cry: 'Sad',
-  angry: 'Angry',
+const reactionLabelKeyByType: Record<MessageReactionType, string> = {
+  thumbsup: 'messages.reactions.thumbsup',
+  heart: 'messages.reactions.heart',
+  laughing: 'messages.reactions.laughing',
+  astonished: 'messages.reactions.astonished',
+  cry: 'messages.reactions.cry',
+  angry: 'messages.reactions.angry',
 };
 
 export function ConversationDetailScreen({ route }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const colors = useAppColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { conversationId } = route.params;
   const currentUserId = useSessionStore((state) => state.userId);
   const messagesQuery = useMessages(conversationId);
@@ -257,13 +260,15 @@ export function ConversationDetailScreen({ route }: Props) {
       return t('messages.detail.typingSingle', { name: names[0] });
     }
 
-    return t('messages.detail.typingMultiple', { names: names.slice(0, 2).join(' and ') });
-  }, [currentUserId, messagesQuery.typingUserIds, senderNames, t]);
+    const visibleNames = names.slice(0, 2);
+    const formattedNames = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(visibleNames);
+    return t('messages.detail.typingMultiple', { names: formattedNames });
+  }, [currentUserId, i18n.language, messagesQuery.typingUserIds, senderNames, t]);
 
   if (messagesQuery.isLoading) {
     return (
       <View style={styles.centerState}>
-        <ActivityIndicator size="large" color="#0B6E4F" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -289,7 +294,7 @@ export function ConversationDetailScreen({ route }: Props) {
           onStartReachedThreshold={0.5}
           ListFooterComponent={
             messagesQuery.isFetchingNextPage ? (
-              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+              <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
             ) : null
           }
           ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
@@ -310,7 +315,7 @@ export function ConversationDetailScreen({ route }: Props) {
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             messagesQuery.isFetchingNextPage ? (
-              <ActivityIndicator size="small" color="#0B6E4F" style={styles.footerSpinner} />
+              <ActivityIndicator size="small" color={colors.primary} style={styles.footerSpinner} />
             ) : null
           }
           ListEmptyComponent={<Text style={styles.emptyText}>{t('messages.detail.empty')}</Text>}
@@ -324,6 +329,7 @@ export function ConversationDetailScreen({ route }: Props) {
             onChangeText={setEditingBody}
             style={styles.editInput}
             placeholder={t('messages.detail.editMessagePlaceholder')}
+            placeholderTextColor={colors.textMuted}
             accessibilityLabel={t('messages.detail.editMessagePlaceholder')}
           />
           <Pressable
@@ -377,9 +383,9 @@ export function ConversationDetailScreen({ route }: Props) {
                 setReactionTargetMessageId(null);
               }}
               accessibilityRole="button"
-              accessibilityLabel={reactionLabelByType[reactionType]}
+              accessibilityLabel={t(reactionLabelKeyByType[reactionType])}
             >
-              <Text style={styles.reactionPickerChipText}>{reactionLabelByType[reactionType]}</Text>
+              <Text style={styles.reactionPickerChipText}>{t(reactionLabelKeyByType[reactionType])}</Text>
             </Pressable>
           ))}
           {messages.find((message) => message.id === reactionTargetMessageId)?.senderId === currentUserId ? (
@@ -438,10 +444,10 @@ export function ConversationDetailScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECECEC',
+    backgroundColor: colors.background,
   },
   listContent: {
     paddingVertical: 10,
@@ -458,10 +464,10 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
-    color: '#6B7280',
+    color: colors.textMuted,
   },
   typingText: {
-    color: '#2563EB',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '600',
     paddingHorizontal: 16,
@@ -469,49 +475,50 @@ const styles = StyleSheet.create({
   },
   editBar: {
     borderTopWidth: 1,
-    borderTopColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingTop: 11,
     gap: 8,
   },
   editInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceMuted,
+    color: colors.text,
     fontSize: 14,
   },
   editActionButton: {
     borderRadius: 999,
-    backgroundColor: '#1877F2',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
   editActionText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontWeight: '700',
   },
   editCancelButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
     marginBottom: 6,
   },
   editCancelText: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '600',
   },
   reactionPickerBar: {
     borderTopWidth: 1,
-    borderTopColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -521,38 +528,38 @@ const styles = StyleSheet.create({
   },
   reactionPickerChip: {
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: colors.primary,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.surfaceMuted,
   },
   reactionPickerChipText: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontWeight: '700',
     fontSize: 13,
   },
   reactionPickerClose: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   reactionPickerCloseText: {
-    color: '#334155',
+    color: colors.text,
     fontWeight: '600',
   },
   reactionPickerEdit: {
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: colors.primary,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.surfaceMuted,
   },
   reactionPickerEditText: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontWeight: '700',
   },
 });

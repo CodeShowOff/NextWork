@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 
+import { MediaService } from '../media/media.service';
 import { OrganizationsRepository } from './organizations.repository';
 import { OrganizationsService } from './organizations.service';
 
@@ -9,11 +10,14 @@ describe('OrganizationsService lifecycle', () => {
     updateOrganization: jest.fn(),
     deactivateOrganization: jest.fn(),
     findById: jest.fn(),
+    listMediaStorageKeysForOrganization: jest.fn(),
     deleteOrganizationCascadeSafe: jest.fn(),
   };
 
+  const mediaServiceMock = { deleteStoredObjects: jest.fn() };
   const service = new OrganizationsService(
     organizationsRepositoryMock as unknown as OrganizationsRepository,
+    mediaServiceMock as unknown as MediaService,
   );
 
   beforeEach(() => {
@@ -38,6 +42,7 @@ describe('OrganizationsService lifecycle', () => {
       name: 'Updated Org',
       slug: 'updated-org',
     });
+    organizationsRepositoryMock.listMediaStorageKeysForOrganization?.mockResolvedValue([]);
     organizationsRepositoryMock.deleteOrganizationCascadeSafe?.mockResolvedValue({
       deletedPostCount: 7,
     });
@@ -81,5 +86,19 @@ describe('OrganizationsService lifecycle', () => {
 
     expect(result.deleted).toBe(true);
     expect(result.deletedPostCount).toBe(7);
+  });
+
+  it('removes group-scoped objects from storage before deleting the organization', async () => {
+    organizationsRepositoryMock.listMediaStorageKeysForOrganization?.mockResolvedValue([
+      'private/u1/group-file.pdf',
+      'private/u2/album-photo.jpg',
+    ]);
+
+    await service.deleteOrganization('u1', 'org-1');
+
+    expect(mediaServiceMock.deleteStoredObjects).toHaveBeenCalledWith([
+      'private/u1/group-file.pdf',
+      'private/u2/album-photo.jpg',
+    ]);
   });
 });

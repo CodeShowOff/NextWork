@@ -1,4 +1,4 @@
-appId: com.workplace.mobile
+appId: com.workplace.app
 ---
 - launchApp
 - tapOn: Messages
@@ -9,7 +9,7 @@ appId: com.workplace.mobile
 # Manual step: select an image or video attachment from device picker.
 - tapOn: Send
 # Manual step: disable network briefly to force retry/failure state if needed.
-# Verify attachment chip transitions through pending/uploading and, on failure, shows continue action.
+# Verify attachment chip transitions through pending/uploading and, on failure, shows Retry.
 - assertVisible: Send
-# Manual step: re-enable network and tap continue on failed attachment then Send.
+# Manual step: re-enable network, tap Retry on a failed attachment, then Send.
 # Verify sent attachment appears in conversation and is visible on receiver device.

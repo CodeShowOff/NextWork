@@ -381,6 +381,54 @@
         ]
       }
     },
+    "/profiles/skills/search": {
+      "get": {
+        "operationId": "ProfilesController_searchSkills",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/me/skills": {
+      "put": {
+        "operationId": "ProfilesController_replaceMySkills",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceProfileSkillsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
     "/profiles/{userId}": {
       "get": {
         "operationId": "ProfilesController_getByUserId",
@@ -658,6 +706,34 @@
         "tags": [
           "posts"
         ]
+      },
+      "get": {
+        "operationId": "PostsController_getPost",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canonical post payload"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get canonical post detail",
+        "tags": [
+          "posts"
+        ]
       }
     },
     "/posts/{postId}/share-link": {
@@ -749,7 +825,7 @@
         },
         "responses": {
           "200": {
-            "description": "Upload contract payload containing upload and public URLs"
+            "description": "Upload contract payload containing a scoped upload URL"
           }
         },
         "security": [
@@ -758,6 +834,94 @@
           }
         ],
         "summary": "Create upload contract",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/uploads/complete": {
+      "post": {
+        "operationId": "MediaController_completeUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Validate upload and enqueue malware scan",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/{mediaId}/download": {
+      "get": {
+        "operationId": "MediaController_createDownloadUrl",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a scoped private media download URL",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/media/{mediaId}": {
+      "get": {
+        "operationId": "MediaController_getMediaStatus",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get private media scan status",
         "tags": [
           "media"
         ]
@@ -1783,6 +1947,278 @@
         ]
       }
     },
+    "/groups/{groupId}/requests": {
+      "post": {
+        "operationId": "GroupsController_requestMembership",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestGroupMembershipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      },
+      "get": {
+        "operationId": "GroupsController_listMembershipRequests",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/{groupId}/requests/{requestId}/resolve": {
+      "post": {
+        "operationId": "GroupsController_resolveMembershipRequest",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveGroupMembershipRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/{groupId}/invitations": {
+      "post": {
+        "operationId": "GroupsController_createInvitation",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/invitations/mine": {
+      "get": {
+        "operationId": "GroupsController_listMyInvitations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/invitations/{invitationId}/respond": {
+      "post": {
+        "operationId": "GroupsController_respondToInvitation",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondGroupInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/{groupId}/members/{memberUserId}/role": {
+      "patch": {
+        "operationId": "GroupsController_updateMemberRole",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberUserId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupMemberRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/{groupId}/favorite": {
+      "patch": {
+        "operationId": "GroupsController_setFavorite",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupFavoriteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/groups/{groupId}/visit": {
+      "post": {
+        "operationId": "GroupsController_recordVisit",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
     "/groups/{groupId}": {
       "patch": {
         "operationId": "GroupsController_updateGroup",
@@ -1837,6 +2273,27 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Groups"
+        ]
+      },
+      "get": {
+        "operationId": "GroupsController_getGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -1905,6 +2362,628 @@
         },
         "tags": [
           "Groups"
+        ]
+      }
+    },
+    "/groups/live/webhook": {
+      "post": {
+        "operationId": "GroupCollaborationController_reconcileLiveKitWebhook",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/files": {
+      "get": {
+        "operationId": "GroupCollaborationController_listFiles",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      },
+      "post": {
+        "operationId": "GroupCollaborationController_createFile",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupFileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/files/{fileId}/download": {
+      "get": {
+        "operationId": "GroupCollaborationController_getFileDownload",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/files/{fileId}": {
+      "delete": {
+        "operationId": "GroupCollaborationController_deleteFile",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/albums": {
+      "get": {
+        "operationId": "GroupCollaborationController_listAlbums",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      },
+      "post": {
+        "operationId": "GroupCollaborationController_createAlbum",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupAlbumDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/albums/{albumId}": {
+      "get": {
+        "operationId": "GroupCollaborationController_getAlbum",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/albums/{albumId}/photos": {
+      "post": {
+        "operationId": "GroupCollaborationController_addAlbumPhoto",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroupAlbumPhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/albums/{albumId}/photos/{photoId}/download": {
+      "get": {
+        "operationId": "GroupCollaborationController_getAlbumPhotoDownload",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/albums/{albumId}/photos/{photoId}": {
+      "delete": {
+        "operationId": "GroupCollaborationController_deleteAlbumPhoto",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/events": {
+      "get": {
+        "operationId": "GroupCollaborationController_listEvents",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      },
+      "post": {
+        "operationId": "GroupCollaborationController_createEvent",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/events/{eventId}": {
+      "patch": {
+        "operationId": "GroupCollaborationController_updateEvent",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      },
+      "delete": {
+        "operationId": "GroupCollaborationController_deleteEvent",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/events/{eventId}/rsvp": {
+      "put": {
+        "operationId": "GroupCollaborationController_setEventRsvp",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertGroupEventRsvpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/events/{eventId}/calendar": {
+      "get": {
+        "operationId": "GroupCollaborationController_exportEventCalendar",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/live": {
+      "get": {
+        "operationId": "GroupCollaborationController_getLiveSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/live/start": {
+      "post": {
+        "operationId": "GroupCollaborationController_startLiveSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/live/join": {
+      "post": {
+        "operationId": "GroupCollaborationController_joinLiveSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
+        ]
+      }
+    },
+    "/groups/{groupId}/live/end": {
+      "post": {
+        "operationId": "GroupCollaborationController_endLiveSession",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GroupCollaboration"
         ]
       }
     },
@@ -2293,6 +3372,10 @@
         "type": "object",
         "properties": {}
       },
+      "ReplaceProfileSkillsDto": {
+        "type": "object",
+        "properties": {}
+      },
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
@@ -2320,7 +3403,38 @@
       },
       "PostMediaInputDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A scanned private MediaObject uploaded by the post author."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Legacy media URL. New clients must send mediaId."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 12000
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 12000
+          }
+        },
+        "required": [
+          "type"
+        ]
       },
       "CreatePostPollOptionDto": {
         "type": "object",
@@ -2440,18 +3554,38 @@
               "image/png",
               "image/webp",
               "video/mp4",
-              "application/pdf"
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             ]
           },
           "sizeBytes": {
             "type": "number",
             "minimum": 1,
             "maximum": 52428800
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Optional group scope for a collaboration upload",
+            "format": "uuid"
           }
         },
         "required": [
           "fileName",
           "contentType"
+        ]
+      },
+      "CompleteUploadDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "mediaId"
         ]
       },
       "UpdateNotificationPreferencesDto": {
@@ -2502,6 +3636,55 @@
         "type": "object",
         "properties": {}
       },
+      "RequestGroupMembershipDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 280
+          }
+        }
+      },
+      "ResolveGroupMembershipRequestDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateGroupInvitationDto": {
+        "type": "object",
+        "properties": {
+          "invitedUserId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "invitedUserId"
+        ]
+      },
+      "RespondGroupInvitationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateGroupMemberRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "UpdateGroupFavoriteDto": {
+        "type": "object",
+        "properties": {}
+      },
       "UpdateGroupDto": {
         "type": "object",
         "properties": {}
@@ -2514,13 +3697,235 @@
         "type": "object",
         "properties": {}
       },
+      "CreateGroupFileDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A scanned MediaObject scoped to this group."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "mediaId"
+        ]
+      },
+      "CreateGroupAlbumDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "AddGroupAlbumPhotoDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A scanned image MediaObject scoped to this group."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "mediaId"
+        ]
+      },
+      "CreateGroupEventDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Kolkata",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "title",
+          "startsAt",
+          "timezone"
+        ]
+      },
+      "UpdateGroupEventDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Kolkata",
+            "maxLength": 80
+          }
+        }
+      },
+      "UpsertGroupEventRsvpDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "going",
+              "maybe",
+              "declined"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "CreateConversationDto": {
         "type": "object",
         "properties": {}
       },
+      "MessageAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A scanned MediaObject. Required for new attachments."
+          },
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "document"
+            ]
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "video/mp4",
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "fileSizeBytes": {
+            "type": "number",
+            "maximum": 52428800
+          },
+          "storageKey": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "publicUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Legacy URL. New clients send mediaId instead."
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "thumbnailKey": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "mediaType",
+          "mimeType",
+          "fileName",
+          "fileSizeBytes",
+          "storageKey"
+        ]
+      },
       "SendMessageDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "messageType": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "attachments": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageAttachmentDto"
+            }
+          }
+        }
       },
       "UpdateMessageDto": {
         "type": "object",

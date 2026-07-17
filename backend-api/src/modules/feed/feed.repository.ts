@@ -16,11 +16,22 @@ export class FeedRepository {
   }
 
   async getGroupIdsForUser(userId: string): Promise<string[]> {
-    const rows = await this.prisma.groupMember.findMany({
-      where: { userId },
-      select: { groupId: true },
+    const rows = await this.prisma.group.findMany({
+      where: {
+        OR: [
+          { members: { some: { userId } } },
+          {
+            organization: {
+              members: {
+                some: { userId, role: { in: ['owner', 'admin'] } },
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
     });
 
-    return rows.map((row: { groupId: string }) => row.groupId);
+    return rows.map((row: { id: string }) => row.id);
   }
 }

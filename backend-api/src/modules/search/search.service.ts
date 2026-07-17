@@ -127,6 +127,19 @@ export class SearchService {
                     { description: { contains: q, mode: 'insensitive' } },
                   ],
                 },
+                {
+                  OR: [
+                    { groupPrivacy: { not: 'Secret' } },
+                    { members: { some: { userId } } },
+                    {
+                      organization: {
+                        members: {
+                          some: { userId, role: { in: ['owner', 'admin'] } },
+                        },
+                      },
+                    },
+                  ],
+                },
               ],
             },
             orderBy: [
@@ -186,11 +199,22 @@ export class SearchService {
                     },
                     {
                       group: {
-                        members: {
-                          some: {
-                            userId,
+                        OR: [
+                          {
+                            members: {
+                              some: {
+                                userId,
+                              },
+                            },
                           },
-                        },
+                          {
+                            organization: {
+                              members: {
+                                some: { userId, role: { in: ['owner', 'admin'] } },
+                              },
+                            },
+                          },
+                        ],
                       },
                     },
                   ],
