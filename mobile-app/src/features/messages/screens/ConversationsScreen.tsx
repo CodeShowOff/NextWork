@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
+import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -79,7 +80,7 @@ export function ConversationsScreen({ navigation }: Props) {
 
   if (!hasSession) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <View style={styles.sessionCard}>
           <Text style={styles.sessionTitle}>{t('messages.setup.title')}</Text>
           <Text style={styles.helperText}>
@@ -141,9 +142,12 @@ export function ConversationsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.toolbar}>
         <View style={styles.composeRow}>
+          <View style={styles.composeIconCircle}>
+            <MaterialIcons name="chat" size={20} color="#2563EB" />
+          </View>
           <TextInput
             value={directUserId}
             onChangeText={setDirectUserId}
@@ -165,13 +169,16 @@ export function ConversationsScreen({ navigation }: Props) {
             <Text style={styles.primaryButtonText}>{t('messages.toolbar.start')}</Text>
           </Pressable>
         </View>
-        <Pressable
-          onPress={async () => {
-            await authSessionService.logout();
-          }}
-        >
-          <Text style={styles.secondaryLink}>{t('messages.toolbar.signOut')}</Text>
-        </Pressable>
+        <View style={styles.toolbarBottomRow}>
+          <MaterialIcons name="forum" size={20} color="#9CA3AF" />
+          <Pressable
+            onPress={async () => {
+              await authSessionService.logout();
+            }}
+          >
+            <Text style={styles.secondaryLink}>{t('messages.toolbar.signOut')}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {conversationsQuery.isLoading ? (
@@ -208,21 +215,34 @@ export function ConversationsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
   },
   toolbar: {
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#D1D5DB',
     backgroundColor: '#FFFFFF',
   },
   composeRow: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
+  },
+  composeIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolbarBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   composeInput: {
     flex: 1,
@@ -239,21 +259,22 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 999,
+    paddingHorizontal: 13,
     paddingVertical: 10,
     marginBottom: 10,
+    fontSize: 14,
   },
   tokenInput: {
     minHeight: 90,
   },
   primaryButton: {
-    backgroundColor: '#0B6E4F',
-    borderRadius: 12,
+    backgroundColor: '#1877F2',
+    borderRadius: 999,
     paddingHorizontal: 14,
-    height: 44,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -280,9 +301,10 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 20,
     marginBottom: 10,
+    textAlign: 'center',
   },
   secondaryLink: {
-    color: '#1D4ED8',
+    color: '#2563EB',
     fontWeight: '600',
   },
 });

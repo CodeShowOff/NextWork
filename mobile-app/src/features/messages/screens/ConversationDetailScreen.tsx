@@ -269,7 +269,7 @@ export function ConversationDetailScreen({ route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       {featureFlags.flashListRendering ? (
         <FlashList<Message>
           data={messages}
@@ -441,10 +441,11 @@ export function ConversationDetailScreen({ route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
   },
   listContent: {
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
   centerState: {
     flex: 1,
@@ -457,34 +458,35 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
-    color: '#64748B',
+    color: '#6B7280',
   },
   typingText: {
-    color: '#0B6E4F',
-    fontSize: 12,
+    color: '#2563EB',
+    fontSize: 11,
     fontWeight: '600',
-    paddingHorizontal: 14,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
   editBar: {
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#D1D5DB',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    paddingTop: 11,
     gap: 8,
   },
   editInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderColor: '#D1D5DB',
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#F8FAFC',
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    fontSize: 14,
   },
   editActionButton: {
-    borderRadius: 10,
-    backgroundColor: '#0B6E4F',
+    borderRadius: 999,
+    backgroundColor: '#1877F2',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
@@ -494,9 +496,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   editCancelButton: {
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
@@ -508,10 +510,10 @@ const styles = StyleSheet.create({
   },
   reactionPickerBar: {
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#D1D5DB',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
@@ -519,21 +521,21 @@ const styles = StyleSheet.create({
   },
   reactionPickerChip: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: '#3B82F6',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#DBEAFE',
   },
   reactionPickerChipText: {
-    color: '#166534',
+    color: '#1D4ED8',
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 13,
   },
   reactionPickerClose: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderColor: '#D1D5DB',
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -543,14 +545,14 @@ const styles = StyleSheet.create({
   },
   reactionPickerEdit: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
-    borderRadius: 10,
+    borderColor: '#3B82F6',
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#DBEAFE',
   },
   reactionPickerEditText: {
-    color: '#166534',
+    color: '#1D4ED8',
     fontWeight: '700',
   },
 });

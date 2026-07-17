@@ -43,7 +43,19 @@ model User {
   organizationMemberships OrganizationMember[]
   createdOrganizations Organization[] @relation("organization_creator")
   groupMemberships GroupMember[]
+  requestedGroupMemberships GroupMembershipRequest[] @relation("group_membership_requester")
+  resolvedGroupMembershipRequests GroupMembershipRequest[] @relation("group_membership_request_resolver")
+  sentGroupInvitations GroupInvitation[] @relation("group_invitation_sender")
+  receivedGroupInvitations GroupInvitation[] @relation("group_invitation_recipient")
   createdGroups Group[] @relation("group_creator")
+  mediaObjects MediaObject[] @relation("media_object_owner")
+  uploadedGroupFiles GroupFile[] @relation("group_file_uploader")
+  createdGroupAlbums GroupAlbum[] @relation("group_album_creator")
+  uploadedGroupAlbumPhotos GroupAlbumPhoto[] @relation("group_album_photo_uploader")
+  createdGroupEvents GroupEvent[] @relation("group_event_creator")
+  groupEventRsvps GroupEventRsvp[]
+  startedLiveSessions LiveSession[] @relation("live_session_starter")
+  endedLiveSessions LiveSession[] @relation("live_session_ender")
   generatedInvites InviteLink[] @relation("invite_creator")
 
   @@map("users")
@@ -60,6 +72,7 @@ model Profile {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills ProfileSkill[]
 
   @@index([displayName])
   @@map("profiles")
@@ -370,7 +383,14 @@ model Group {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   creator      User?        @relation("group_creator", fields: [createdBy], references: [id], onDelete: SetNull)
   members      GroupMember[]
+  membershipRequests GroupMembershipRequest[]
+  invitations GroupInvitation[]
   posts        Post[]
+  mediaObjects MediaObject[]
+  files GroupFile[]
+  albums GroupAlbum[]
+  events GroupEvent[]
+  liveSessions LiveSession[]
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([name])
@@ -380,6 +400,9 @@ model Group {
 model GroupMember {
   groupId   String   @db.Uuid @map("group_id")
   userId    String   @db.Uuid @map("user_id")
+  role      GroupRole @default(member)
+  isFavorite Boolean @default(false) @map("is_favorite")
+  lastVisitedAt DateTime? @map("last_visited_at")
   joinedAt  DateTime @default(now()) @map("joined_at")
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -388,6 +411,228 @@ model GroupMember {
   @@id([groupId, userId])
   @@index([userId])
   @@map("group_members")
+}
+
+enum GroupRole {
+  owner
+  admin
+  member
+}
+
+enum GroupMembershipRequestStatus {
+  pending
+  approved
+  declined
+  cancelled
+}
+
+enum GroupInvitationStatus {
+  pending
+  accepted
+  declined
+  revoked
+}
+
+enum MediaObjectStatus {
+  pending_upload
+  scanning
+  available
+  quarantined
+  rejected
+  deleted
+}
+
+enum GroupEventRsvpStatus {
+  going
+  maybe
+  declined
+}
+
+enum LiveSessionStatus {
+  active
+  ended
+}
+
+model GroupMembershipRequest {
+  id          String                       @id @default(uuid(7)) @db.Uuid
+  groupId     String                       @db.Uuid @map("group_id")
+  requesterId String                       @db.Uuid @map("requester_id")
+  message     String?
+  status      GroupMembershipRequestStatus @default(pending)
+  resolvedById String?                     @db.Uuid @map("resolved_by_id")
+  resolvedAt  DateTime?                    @map("resolved_at")
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  updatedAt   DateTime                     @updatedAt @map("updated_at")
+
+  group      Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  requester  User  @relation("group_membership_requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("group_membership_request_resolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, requesterId])
+  @@index([groupId, status, createdAt(sort: Desc)])
+  @@index([requesterId, status])
+  @@map("group_membership_requests")
+}
+
+model GroupInvitation {
+  id          String                @id @default(uuid(7)) @db.Uuid
+  groupId     String                @db.Uuid @map("group_id")
+  invitedUserId String               @db.Uuid @map("invited_user_id")
+  invitedById String                 @db.Uuid @map("invited_by_id")
+  status      GroupInvitationStatus @default(pending)
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  group       Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedUser User  @relation("group_invitation_recipient", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedBy   User  @relation("group_invitation_sender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, invitedUserId])
+  @@index([invitedUserId, status, createdAt(sort: Desc)])
+  @@map("group_invitations")
+}
+
+model MediaObject {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  ownerId          String            @db.Uuid @map("owner_id")
+  groupId          String?           @db.Uuid @map("group_id")
+  storageKey       String            @unique @map("storage_key")
+  originalFileName String            @map("original_file_name")
+  contentType      String            @map("content_type")
+  sizeBytes        Int               @map("size_bytes")
+  status           MediaObjectStatus @default(pending_upload)
+  scanDetail       String?           @map("scan_detail")
+  uploadedAt       DateTime?         @map("uploaded_at")
+  availableAt      DateTime?         @map("available_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  owner      User             @relation("media_object_owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  group      Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupFile  GroupFile?
+  albumPhoto GroupAlbumPhoto?
+
+  @@index([ownerId, status, createdAt(sort: Desc)])
+  @@index([groupId, status, createdAt(sort: Desc)])
+  @@map("media_objects")
+}
+
+model GroupFile {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  groupId       String      @db.Uuid @map("group_id")
+  mediaObjectId String      @unique @db.Uuid @map("media_object_id")
+  uploadedById  String      @db.Uuid @map("uploaded_by_id")
+  title         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mediaObject MediaObject @relation(fields: [mediaObjectId], references: [id], onDelete: Cascade)
+  uploadedBy  User        @relation("group_file_uploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("group_files")
+}
+
+model GroupAlbum {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  groupId     String   @db.Uuid @map("group_id")
+  createdById String   @db.Uuid @map("created_by_id")
+  title       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User              @relation("group_album_creator", fields: [createdById], references: [id], onDelete: Cascade)
+  photos    GroupAlbumPhoto[]
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("group_albums")
+}
+
+model GroupAlbumPhoto {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  albumId       String      @db.Uuid @map("album_id")
+  mediaObjectId String      @unique @db.Uuid @map("media_object_id")
+  uploadedById  String      @db.Uuid @map("uploaded_by_id")
+  caption       String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  album       GroupAlbum  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  mediaObject MediaObject @relation(fields: [mediaObjectId], references: [id], onDelete: Cascade)
+  uploadedBy  User        @relation("group_album_photo_uploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([albumId, createdAt(sort: Desc)])
+  @@map("group_album_photos")
+}
+
+model GroupEvent {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  groupId     String   @db.Uuid @map("group_id")
+  createdById String   @db.Uuid @map("created_by_id")
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  timezone    String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  group     Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User             @relation("group_event_creator", fields: [createdById], references: [id], onDelete: Cascade)
+  rsvps     GroupEventRsvp[]
+
+  @@index([groupId, startsAt])
+  @@map("group_events")
+}
+
+model GroupEventRsvp {
+  eventId   String               @db.Uuid @map("event_id")
+  userId    String               @db.Uuid @map("user_id")
+  status    GroupEventRsvpStatus
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  event GroupEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([eventId, status])
+  @@map("group_event_rsvps")
+}
+
+model LiveSession {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  groupId     String            @db.Uuid @map("group_id")
+  roomName    String            @unique @map("room_name")
+  startedById String            @db.Uuid @map("started_by_id")
+  endedById   String?           @db.Uuid @map("ended_by_id")
+  status      LiveSessionStatus @default(active)
+  startedAt   DateTime          @default(now()) @map("started_at")
+  endedAt     DateTime?         @map("ended_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  startedBy User  @relation("live_session_starter", fields: [startedById], references: [id], onDelete: Cascade)
+  endedBy   User? @relation("live_session_ender", fields: [endedById], references: [id], onDelete: SetNull)
+
+  @@index([groupId, status, startedAt(sort: Desc)])
+  @@map("live_sessions")
+}
+
+model ProfileSkill {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  profileUserId  String   @db.Uuid @map("profile_user_id")
+  name           String
+  normalizedName String   @map("normalized_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  profile Profile @relation(fields: [profileUserId], references: [userId], onDelete: Cascade)
+
+  @@unique([profileUserId, normalizedName])
+  @@index([normalizedName])
+  @@map("profile_skills")
 }
 
 model InviteLink {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -40,6 +41,8 @@ const signUpStepLabelKeys: Record<SignUpStep, string> = {
 };
 
 const AUTH_REQUEST_TIMEOUT_MS = 15000;
+const logoImage = require('../../../assets/images/logo.png');
+const authHeroImage = require('../../../assets/images/group_company_announcements.jpg');
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -389,6 +392,10 @@ export function AuthScreen() {
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <View style={styles.brandHeader}>
+          <Image source={logoImage} style={styles.brandLogo} resizeMode="contain" />
+          <Image source={authHeroImage} style={styles.brandHero} resizeMode="cover" />
+        </View>
         <View style={styles.card}>
           <Text style={styles.title}>{t('auth.title')}</Text>
           <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
@@ -785,29 +792,49 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
   },
   keyboardAvoidingView: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
+  brandHeader: {
+    marginBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D4D4D8',
+    overflow: 'hidden',
+  },
+  brandLogo: {
+    width: 180,
+    height: 56,
+    marginTop: 10,
+    marginLeft: 12,
+  },
+  brandHero: {
+    width: '100%',
+    height: 108,
+    marginTop: 4,
+  },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 16,
-    gap: 10,
+    borderColor: '#D4D4D8',
+    padding: 20,
+    gap: 12,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#171717',
   },
   subtitle: {
-    color: '#475569',
-    lineHeight: 20,
+    color: '#52525B',
+    fontSize: 14,
+    lineHeight: 21,
   },
   hintText: {
     color: '#0F766E',
@@ -839,19 +866,20 @@ const styles = StyleSheet.create({
   modeButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#D1D5DB',
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
   modeActive: {
-    backgroundColor: '#0B6E4F',
-    borderColor: '#0B6E4F',
+    backgroundColor: '#1877F2',
+    borderColor: '#1877F2',
   },
   modeText: {
-    color: '#0F172A',
+    color: '#374151',
     fontWeight: '700',
+    fontSize: 13,
   },
   modeTextActive: {
     color: '#FFFFFF',
@@ -863,26 +891,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   stepHeaderTitle: {
-    color: '#0F172A',
+    color: '#1F2937',
     fontWeight: '700',
+    fontSize: 15,
   },
   stepHeaderLabel: {
     color: '#475569',
     fontSize: 12,
   },
   inputLabel: {
-    color: '#0F172A',
+    color: '#374151',
     fontSize: 12,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderColor: '#D4D4D8',
+    borderRadius: 14,
+    backgroundColor: '#F5F5F5',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#0F172A',
+    paddingVertical: 11,
+    color: '#171717',
+    fontSize: 14,
   },
   wizardActionsRow: {
     flexDirection: 'row',
@@ -893,14 +923,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: '#3B82F6',
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
   secondaryWizardButtonText: {
-    color: '#0B6E4F',
+    color: '#1D4ED8',
     fontWeight: '700',
   },
   secondaryWizardButtonDisabled: {
@@ -911,19 +941,19 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   submitButton: {
-    marginTop: 4,
-    borderRadius: 12,
-    backgroundColor: '#0B6E4F',
-    height: 44,
+    marginTop: 6,
+    borderRadius: 14,
+    backgroundColor: '#1877F2',
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabledButton: {
-    backgroundColor: '#7DB6A5',
+    backgroundColor: '#9CA3AF',
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   advancedToggleButton: {

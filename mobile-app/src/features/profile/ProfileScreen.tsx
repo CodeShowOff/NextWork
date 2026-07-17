@@ -47,7 +47,7 @@ export function ProfileScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.card}>
         <Text style={styles.title}>{t('profile.edit.title')}</Text>
         <Text style={styles.subtitle}>

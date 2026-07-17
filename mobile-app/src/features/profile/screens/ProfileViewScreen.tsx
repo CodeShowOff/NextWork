@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { createPost } from '../../../shared/api/feed.api';
 import { getRelationship, followUser, unfollowUser } from '../../../shared/api/follows.api';
@@ -242,6 +244,8 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
     : relationshipQuery.data?.isFollowing
       ? t('profile.relationship.following')
       : t('profile.relationship.notFollowing');
+  const profileName = profileQuery.data?.displayName ?? (displayName.trim() || t('profile.subtitle.hidden'));
+  const avatarInitial = profileName.slice(0, 1).toUpperCase();
 
   if (loadingProfile) {
     return (
@@ -252,34 +256,86 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.card}>
-        <Text style={styles.title}>{isOwnProfile ? t('profile.title.mine') : t('profile.title.other')}</Text>
-        <Text style={styles.subtitle}>
-          {t('profile.subtitle.email', {
-            email: profileQuery.data?.email ?? meQuery.data?.email ?? t('profile.subtitle.hidden'),
-          })}
-        </Text>
-        <View style={styles.relationshipBadge}>
-          <Text style={styles.relationshipBadgeText}>{relationshipLabel}</Text>
+        <View style={styles.topBarRow}>
+          <View style={styles.topBarActions}>
+            <MaterialIcons name="chevron-left" size={22} color="#111827" />
+          </View>
+          <Text style={styles.topBarName} numberOfLines={1}>{profileName}</Text>
+          <View style={styles.topBarActions}>
+            <MaterialIcons name="search" size={22} color="#111827" />
+          </View>
         </View>
 
-        <View style={styles.profileSectionCard}>
-          <Text style={styles.profileSectionSubtitle}>
-            {t('profile.details.worksAt', {
-              organizationName: activeOrganizationName ?? t('profile.details.unknownOrganization'),
-            })}
-          </Text>
-          <Text style={styles.profileSectionSubtitle}>
-            {t('profile.details.email', {
-              email: profileQuery.data?.email ?? meQuery.data?.email ?? t('profile.subtitle.hidden'),
-            })}
-          </Text>
-          <Text style={styles.profileSectionSubtitle}>
-            {t('profile.details.about', {
-              name: profileQuery.data?.displayName ?? '',
-            })}
-          </Text>
+        <View style={styles.heroCard}>
+          <Image
+            source={require('../../../../assets/images/group_general.jpg')}
+            style={styles.heroCover}
+            resizeMode="cover"
+          />
+          <View style={styles.avatarWrap}>
+            {avatarUrl.trim().length ? (
+              <Image source={{ uri: avatarUrl.trim() }} style={styles.avatarImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.avatarFallbackCircle}>
+                <Text style={styles.avatarFallbackText}>{avatarInitial || 'U'}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.heroName}>{profileName}</Text>
+
+          <View style={styles.heroActionsRow}>
+            <Pressable
+              style={styles.heroPrimaryButton}
+              onPress={() => {
+                if (isOwnProfile) {
+                  updateMutation.mutate({
+                    displayName: displayName.trim() || undefined,
+                    bio: bio.trim() || undefined,
+                    avatarUrl: avatarUrl.trim() || undefined,
+                    jobTitle: jobTitle.trim() || undefined,
+                    organizationSize: organizationSize.trim() || undefined,
+                  });
+                  return;
+                }
+
+                thanksMutation.mutate();
+              }}
+              disabled={thanksMutation.isPending || updateMutation.isPending}
+            >
+              <Text style={styles.heroPrimaryButtonText}>{isOwnProfile ? t('profile.buttons.saveProfile') : t('profile.buttons.sendThanks')}</Text>
+            </Pressable>
+            <View style={styles.heroIconButton}><MaterialIcons name="photo-camera" size={16} color="#111827" /></View>
+            <View style={styles.heroIconButton}><MaterialIcons name="more-horiz" size={16} color="#111827" /></View>
+          </View>
+
+          <View style={styles.profileInfoList}>
+            <View style={styles.profileInfoRow}>
+              <MaterialIcons name="work-outline" size={16} color="#9CA3AF" />
+              <Text style={styles.profileInfoText}>{jobTitle.trim() || t('profile.details.worksAt', { organizationName: activeOrganizationName ?? t('profile.details.unknownOrganization') })}</Text>
+            </View>
+            <View style={styles.profileInfoRow}>
+              <MaterialIcons name="location-on" size={16} color="#9CA3AF" />
+              <Text style={styles.profileInfoText}>{organizationSize.trim() || 'London, UK'}</Text>
+            </View>
+            <View style={styles.profileInfoRow}>
+              <MaterialIcons name="translate" size={16} color="#9CA3AF" />
+              <Text style={styles.profileInfoText}>English, Spanish</Text>
+            </View>
+            <View style={styles.profileInfoRow}>
+              <MaterialIcons name="email" size={16} color="#9CA3AF" />
+              <Text style={styles.profileInfoText}>{profileQuery.data?.email ?? meQuery.data?.email ?? t('profile.subtitle.hidden')}</Text>
+            </View>
+            <View style={styles.profileInfoRow}>
+              <MaterialIcons name="group" size={16} color="#9CA3AF" />
+              <Text style={styles.profileInfoText}>{`Followed by ${followersCount} people`}</Text>
+            </View>
+          </View>
+
+          <View style={styles.relationshipBadge}>
+            <Text style={styles.relationshipBadgeText}>{relationshipLabel}</Text>
+          </View>
         </View>
 
         {isOwnProfile && featureFlags.i18n ? (
@@ -595,7 +651,7 @@ export function ProfileViewScreen({ navigation, userId }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
     padding: 12,
   },
   centerState: {
@@ -608,8 +664,120 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 14,
-    padding: 12,
+    padding: 10,
     marginBottom: 10,
+  },
+  topBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  topBarName: {
+    color: '#111827',
+    fontSize: 19,
+    fontWeight: '700',
+    textAlign: 'center',
+    flex: 1,
+  },
+  topBarActions: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  heroCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  heroCover: {
+    width: '100%',
+    height: 122,
+  },
+  avatarWrap: {
+    alignItems: 'center',
+    marginTop: -38,
+  },
+  avatarImage: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#E5E7EB',
+  },
+  avatarFallbackCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '800',
+  },
+  heroName: {
+    marginTop: 7,
+    textAlign: 'center',
+    color: '#111827',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  heroActionsRow: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroPrimaryButton: {
+    flex: 1,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1877F2',
+  },
+  heroPrimaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  heroIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  profileInfoList: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    gap: 7,
+  },
+  profileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  profileInfoText: {
+    color: '#374151',
+    fontSize: 12,
+    flex: 1,
   },
   title: {
     fontSize: 24,
@@ -622,16 +790,18 @@ const styles = StyleSheet.create({
   },
   relationshipBadge: {
     marginTop: 10,
+    marginBottom: 12,
+    marginHorizontal: 12,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#86EFAC',
-    backgroundColor: '#DCFCE7',
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   relationshipBadgeText: {
-    color: '#166534',
+    color: '#1D4ED8',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -735,16 +905,16 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#D1D5DB',
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginTop: 10,
   },
   primaryButton: {
     marginTop: 12,
-    backgroundColor: '#0B6E4F',
+    backgroundColor: '#1877F2',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',

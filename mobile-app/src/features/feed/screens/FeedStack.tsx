@@ -8,6 +8,7 @@ import { UserProfileScreen } from '../../profile/screens/UserProfileScreen';
 import { FeedScreen } from '../FeedScreen';
 import { LikerListScreen } from './LikerListScreen';
 import { PostDetailScreen } from './PostDetailScreen';
+import { SharedTopBarBrand, SharedTopBarSearchAction, sharedHeaderBaseOptions } from '../../../shared/ui/SharedTopBar';
 
 export type FeedStackParamList = {
   FeedHome: undefined;
@@ -34,8 +35,24 @@ export function FeedStack() {
   const { t } = useTranslation();
 
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="FeedHome" component={FeedScreen} options={{ title: t('app.tabs.feed') }} />
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        ...sharedHeaderBaseOptions,
+        headerRight: () => (
+          <SharedTopBarSearchAction
+            onPress={() => navigation.getParent()?.navigate('Search' as never)}
+            accessibilityLabel={t('app.tabs.search')}
+          />
+        ),
+      })}
+    >
+      <Stack.Screen
+        name="FeedHome"
+        component={FeedScreen}
+        options={{
+          headerTitle: () => <SharedTopBarBrand />,
+        }}
+      />
       <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: t('app.stack.post') }} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: t('app.tabs.profile') }} />
       <Stack.Screen

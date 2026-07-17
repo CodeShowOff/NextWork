@@ -1,4 +1,5 @@
 import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -21,17 +22,28 @@ function ConversationListItemView({ conversation, onPress }: Props) {
 
   return (
     <Pressable style={styles.root} onPress={onPress}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{title}</Text>
-        {conversation.unreadCount > 0 ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{conversation.unreadCount}</Text>
+      <View style={styles.itemRow}>
+        <View style={styles.avatarCircle}>
+          {conversation.type === 'direct' ? (
+            <Text style={styles.avatarText}>{title.slice(0, 1).toUpperCase()}</Text>
+          ) : (
+            <MaterialIcons name="groups" size={22} color="#6B7280" />
+          )}
+        </View>
+        <View style={styles.titleColumn}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{title}</Text>
+            {conversation.unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{conversation.unreadCount}</Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
+          <Text numberOfLines={1} style={styles.preview}>
+            {conversation.lastMessage?.body ?? t('messages.list.noMessagesYet')}
+          </Text>
+        </View>
       </View>
-      <Text numberOfLines={1} style={styles.preview}>
-        {conversation.lastMessage?.body ?? t('messages.list.noMessagesYet')}
-      </Text>
     </Pressable>
   );
 }
@@ -57,11 +69,32 @@ export const ConversationListItem = React.memo(ConversationListItemView, (previo
 
 const styles = StyleSheet.create({
   root: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#F8FAFC',
+    fontWeight: '800',
+    fontSize: 19,
+  },
+  titleColumn: {
+    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
@@ -70,15 +103,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1F2937',
     flex: 1,
   },
   preview: {
-    marginTop: 6,
-    fontSize: 14,
-    color: '#475569',
+    marginTop: 4,
+    fontSize: 13,
+    color: '#6B7280',
   },
   badge: {
     minWidth: 22,

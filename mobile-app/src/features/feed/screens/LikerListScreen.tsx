@@ -34,7 +34,7 @@ export function LikerListScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <FlatList<LikerListItem>
         data={items}
         keyExtractor={(item) => `${item.userId}:${item.likedAt}`}

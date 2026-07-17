@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
 import { ComposerAttachment } from '../hooks/useSendMessage';
@@ -192,15 +193,15 @@ export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
           ))}
         </View>
       ) : null}
-      <Pressable
-        style={styles.attachButton}
-        onPress={pickAttachment}
-        accessibilityRole="button"
-        accessibilityLabel={t('messages.composer.attach')}
-      >
-        <Text style={styles.attachButtonText}>{t('messages.composer.attach')}</Text>
-      </Pressable>
       <View style={styles.inputRow}>
+        <Pressable
+          style={styles.attachButton}
+          onPress={pickAttachment}
+          accessibilityRole="button"
+          accessibilityLabel={t('messages.composer.attach')}
+        >
+          <MaterialIcons name="attach-file" size={20} color="#2563EB" />
+        </Pressable>
         <TextInput
           value={value}
           onChangeText={handleChangeText}
@@ -215,6 +216,7 @@ export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('messages.composer.send')}
         >
+          <MaterialIcons name="send" size={18} color="#FFFFFF" />
           <Text style={styles.buttonText}>{isSending ? t('messages.composer.sending') : t('messages.composer.send')}</Text>
         </Pressable>
       </View>
@@ -225,10 +227,12 @@ export function MessageComposer({ isSending, onSend, onTypingChange }: Props) {
 const styles = StyleSheet.create({
   root: {
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    padding: 10,
+    borderTopColor: '#D1D5DB',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
     flexDirection: 'column',
-    gap: 8,
+    gap: 10,
     backgroundColor: '#FFFFFF',
   },
   attachmentsWrap: {
@@ -238,13 +242,13 @@ const styles = StyleSheet.create({
   },
   attachmentChip: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 6,
     gap: 2,
     maxWidth: '100%',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
   },
   attachmentName: {
     color: '#0F172A',
@@ -270,39 +274,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   attachButton: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#0B6E4F',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  attachButtonText: {
-    color: '#0B6E4F',
-    fontWeight: '700',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'center',
     gap: 8,
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
+    borderColor: '#D1D5DB',
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
     maxHeight: 120,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
+    fontSize: 14,
   },
   button: {
-    backgroundColor: '#0B6E4F',
-    borderRadius: 12,
-    minWidth: 68,
+    backgroundColor: '#1877F2',
+    borderRadius: 999,
+    minWidth: 92,
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    height: 42,
   },
   disabledButton: {
     opacity: 0.6,
@@ -310,5 +314,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontSize: 13,
   },
 });

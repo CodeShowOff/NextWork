@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ImageSourcePropType,
   Share,
   ScrollView,
   RefreshControl,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
+import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -49,6 +51,14 @@ import {
 import { canOpenLikerList } from './likers-list.logic';
 
 const pageSize = 20;
+
+const groupArtworkByKeyword: { keyword: string; source: ImageSourcePropType }[] = [
+  { keyword: 'announcement', source: require('../../../assets/images/group_company_announcements.jpg') },
+  { keyword: 'marketing', source: require('../../../assets/images/group_marketing_team.jpg') },
+  { keyword: 'project', source: require('../../../assets/images/group_project_updates.jpg') },
+  { keyword: 'general', source: require('../../../assets/images/group_general.jpg') },
+  { keyword: 'social', source: require('../../../assets/images/group_company_social.jpg') },
+];
 
 interface ComposerImage {
   uri: string;
@@ -92,6 +102,8 @@ export function FeedScreen({ navigation }: Props) {
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [composerValidationMessage, setComposerValidationMessage] = useState('');
+  const [showTagComposer, setShowTagComposer] = useState(false);
+  const [showPollComposer, setShowPollComposer] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -489,43 +501,133 @@ export function FeedScreen({ navigation }: Props) {
         .join('|'),
     [likedByMeMap],
   );
+  const groupTilePalette = useMemo(
+    () => ['#4338CA', '#FACC15', '#FF5A4A', '#F3C5CF', '#E5D4C5'],
+    [],
+  );
+  const groupTileIcons = useMemo<(keyof typeof MaterialIcons.glyphMap)[]>(
+    () => ['star', 'back-hand', 'bolt', 'add-comment', 'public'],
+    [],
+  );
   const feedListHeader = useMemo(
     () => (
       <View style={styles.groupTargetSection}>
-        <Text style={styles.groupTargetLabel}>{t('feed.targeting.label')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupChipsRow}>
-          <Pressable
-            style={[styles.groupChip, !selectedGroupId ? styles.groupChipActive : null]}
-            onPress={() => setSelectedGroupId('')}
-          >
-            <Text style={styles.groupChipText}>{t('feed.targeting.global')}</Text>
-          </Pressable>
-          {(groupsQuery.data?.items ?? []).map((group) => (
-            <Pressable
-              key={group.id}
-              style={[styles.groupChip, selectedGroupId === group.id ? styles.groupChipActive : null]}
-              onPress={() => setSelectedGroupId(group.id)}
-            >
-              <Text style={styles.groupChipText}>{group.name}</Text>
-            </Pressable>
-          ))}
+        <Text style={styles.groupTargetLabel}>{t('groups.title.yourGroups')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTilesRow}>
+          {(groupsQuery.data?.items ?? []).slice(0, 6).map((group, index) => {
+            const tileColor = groupTilePalette[index % groupTilePalette.length];
+            const iconName = groupTileIcons[index % groupTileIcons.length];
+            const isActive = selectedGroupId === group.id;
+            return (
+              <Pressable
+                key={group.id}
+                style={styles.groupTileWrap}
+                onPress={() => setSelectedGroupId((current) => (current === group.id ? '' : group.id))}
+              >
+                <View
+                  style={[
+                    styles.groupTile,
+                    { backgroundColor: tileColor },
+                    isActive ? styles.groupTileActive : null,
+                  ]}
+                >
+                  <MaterialIcons name={iconName} size={25} color={tileColor === '#FACC15' ? '#111827' : '#FFFFFF'} />
+                </View>
+                <Text numberOfLines={2} style={styles.groupTileLabel}>
+                  {group.name}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
     ),
-    [groupsQuery.data?.items, selectedGroupId, t],
+    [groupTileIcons, groupTilePalette, groupsQuery.data?.items, selectedGroupId, t],
+  );
+
+  const hasPollDraft = useMemo(
+    () => Boolean(pollQuestion.trim()) || pollOptions.some((option) => option.trim().length > 0),
+    [pollOptions, pollQuestion],
+  );
+
+  const resolveGroupArtwork = useCallback(
+    (groupId: string | null): ImageSourcePropType | null => {
+      if (!groupId) {
+        return null;
+      }
+
+      const groupName = (groupNameById[groupId] ?? '').toLowerCase();
+      for (const artwork of groupArtworkByKeyword) {
+        if (groupName.includes(artwork.keyword)) {
+          return artwork.source;
+        }
+      }
+
+      return require('../../../assets/images/group_general.jpg');
+    },
+    [groupNameById],
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.composer}>
-        <TextInput
-          value={composerText}
-          onChangeText={setComposerText}
-          placeholder={t('feed.composer.placeholder')}
-          style={styles.composerInput}
-          multiline
-          accessibilityLabel={t('feed.composer.placeholder')}
-        />
+        <View style={styles.composerTopRow}>
+          <View style={styles.composerAvatarCircle}>
+            <Text style={styles.composerAvatarText}>{(meQuery.data?.id ?? 'U').slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <TextInput
+            value={composerText}
+            onChangeText={setComposerText}
+            placeholder={t('feed.composer.placeholder')}
+            style={styles.composerInput}
+            multiline
+            accessibilityLabel={t('feed.composer.placeholder')}
+          />
+        </View>
+
+        <View style={styles.composerQuickActionsRow}>
+          <Pressable
+            style={styles.quickActionChip}
+            onPress={pickComposerImage}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.composer.attachImage')}
+          >
+            <MaterialIcons name="photo" size={20} color="#16A34A" />
+            <Text style={styles.quickActionText}>Photo</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.quickActionChip, showTagComposer ? styles.quickActionChipActive : null]}
+            onPress={() => setShowTagComposer((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.composer.tagPeople')}
+          >
+            <MaterialIcons name="videocam" size={20} color="#EF4444" />
+            <Text style={styles.quickActionText}>Live</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.quickActionChip, showPollComposer ? styles.quickActionChipActive : null]}
+            onPress={() => setShowPollComposer((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.composer.pollOptional')}
+          >
+            <MaterialIcons name="poll" size={20} color="#111827" />
+            <Text style={styles.quickActionText}>Poll</Text>
+          </Pressable>
+          <Pressable
+            style={styles.postButton}
+            onPress={() => {
+              createPostMutation.mutate();
+            }}
+            disabled={createPostMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel={t('feed.composer.post')}
+          >
+            <Text style={styles.postButtonText}>
+              {createPostMutation.isPending ? t('feed.composer.posting') : t('feed.composer.post')}
+            </Text>
+          </Pressable>
+        </View>
+
         {composerImage ? (
           <View style={styles.composerImageContainer}>
             <Image source={{ uri: composerImage.uri }} style={styles.composerImagePreview} />
@@ -539,100 +641,86 @@ export function FeedScreen({ navigation }: Props) {
             </Pressable>
           </View>
         ) : null}
-        <View style={styles.composerActionsRow}>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={pickComposerImage}
-            accessibilityRole="button"
-            accessibilityLabel={t('feed.composer.attachImage')}
-          >
-            <Text style={styles.secondaryButtonText}>{t('feed.composer.attachImage')}</Text>
-          </Pressable>
-        <Pressable
-          style={styles.postButton}
-          onPress={() => {
-            createPostMutation.mutate();
-          }}
-          disabled={createPostMutation.isPending}
-          accessibilityRole="button"
-          accessibilityLabel={t('feed.composer.post')}
-        >
-          <Text style={styles.postButtonText}>
-            {createPostMutation.isPending ? t('feed.composer.posting') : t('feed.composer.post')}
-          </Text>
-        </Pressable>
-        </View>
-        <Text style={styles.metaSectionLabel}>{t('feed.composer.tagPeople')}</Text>
-        {selectedTaggedUsers.length ? (
-          <View style={styles.taggedUsersWrap}>
-            {selectedTaggedUsers.map((user) => (
-              <Pressable
-                key={user.id}
-                style={styles.taggedUserChip}
-                onPress={() => removeTaggedUser(user.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('common.actions.remove')} ${user.displayName}`}
-              >
-                <Text style={styles.taggedUserChipText}>{user.displayName} x</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        <TextInput
-          value={tagSearchInput}
-          onChangeText={setTagSearchInput}
-          placeholder={t('feed.composer.searchPeopleToTag')}
-          style={styles.metaInput}
-          autoCapitalize="none"
-          accessibilityLabel={t('feed.composer.searchPeopleToTag')}
-        />
-        {tagSearchQuery.isFetching ? <ActivityIndicator size="small" color="#0B6E4F" /> : null}
-        {availableTagUsers.length ? (
-          <View style={styles.tagResultsList}>
-            {availableTagUsers.map((user) => (
-              <Pressable key={user.id} style={styles.tagResultItem} onPress={() => addTaggedUser(user)}>
-                <Text style={styles.tagResultName}>{user.displayName}</Text>
-                <Text style={styles.tagResultMeta}>{user.email}</Text>
-              </Pressable>
-            ))}
+        {(showTagComposer || selectedTaggedUsers.length > 0 || tagSearchInput.trim().length > 0) ? (
+          <View style={styles.composerSectionCard}>
+            <Text style={styles.metaSectionLabel}>{t('feed.composer.tagPeople')}</Text>
+            {selectedTaggedUsers.length ? (
+              <View style={styles.taggedUsersWrap}>
+                {selectedTaggedUsers.map((user) => (
+                  <Pressable
+                    key={user.id}
+                    style={styles.taggedUserChip}
+                    onPress={() => removeTaggedUser(user.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('common.actions.remove')} ${user.displayName}`}
+                  >
+                    <Text style={styles.taggedUserChipText}>{user.displayName} x</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <TextInput
+              value={tagSearchInput}
+              onChangeText={setTagSearchInput}
+              placeholder={t('feed.composer.searchPeopleToTag')}
+              style={styles.metaInput}
+              autoCapitalize="none"
+              accessibilityLabel={t('feed.composer.searchPeopleToTag')}
+            />
+            {tagSearchQuery.isFetching ? <ActivityIndicator size="small" color="#3B82F6" /> : null}
+            {availableTagUsers.length ? (
+              <View style={styles.tagResultsList}>
+                {availableTagUsers.map((user) => (
+                  <Pressable key={user.id} style={styles.tagResultItem} onPress={() => addTaggedUser(user)}>
+                    <Text style={styles.tagResultName}>{user.displayName}</Text>
+                    <Text style={styles.tagResultMeta}>{user.email}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
-        <Text style={styles.metaSectionLabel}>{t('feed.composer.pollOptional')}</Text>
-        <TextInput
-          value={pollQuestion}
-          onChangeText={setPollQuestion}
-          placeholder={t('feed.composer.pollQuestionOptional')}
-          style={styles.metaInput}
-          accessibilityLabel={t('feed.composer.pollQuestionOptional')}
-        />
-        {pollOptions.map((option, index) => (
-          <View key={`poll-option-${index}`} style={styles.pollOptionRow}>
+        {(showPollComposer || hasPollDraft) ? (
+          <View style={styles.composerSectionCard}>
+            <Text style={styles.metaSectionLabel}>{t('feed.composer.pollOptional')}</Text>
             <TextInput
-              value={option}
-              onChangeText={(value) => setPollOptionAt(index, value)}
-              placeholder={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
-              style={[styles.metaInput, styles.pollOptionInput]}
-              accessibilityLabel={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
+              value={pollQuestion}
+              onChangeText={setPollQuestion}
+              placeholder={t('feed.composer.pollQuestionOptional')}
+              style={styles.metaInput}
+              accessibilityLabel={t('feed.composer.pollQuestionOptional')}
             />
+            {pollOptions.map((option, index) => (
+              <View key={`poll-option-${index}`} style={styles.pollOptionRow}>
+                <TextInput
+                  value={option}
+                  onChangeText={(value) => setPollOptionAt(index, value)}
+                  placeholder={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
+                  style={[styles.metaInput, styles.pollOptionInput]}
+                  accessibilityLabel={t('feed.composer.pollOptionPlaceholder', { index: index + 1 })}
+                />
+                <Pressable
+                  style={styles.pollOptionRemoveButton}
+                  onPress={() => removePollOption(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.actions.remove')}
+                >
+                  <Text style={styles.pollOptionRemoveText}>{t('common.actions.remove')}</Text>
+                </Pressable>
+              </View>
+            ))}
             <Pressable
-              style={styles.pollOptionRemoveButton}
-              onPress={() => removePollOption(index)}
+              style={styles.secondaryButton}
+              onPress={addPollOption}
               accessibilityRole="button"
-              accessibilityLabel={t('common.actions.remove')}
+              accessibilityLabel={t('feed.composer.addOption')}
             >
-              <Text style={styles.pollOptionRemoveText}>{t('common.actions.remove')}</Text>
+              <Text style={styles.secondaryButtonText}>{t('feed.composer.addOption')}</Text>
             </Pressable>
           </View>
-        ))}
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={addPollOption}
-          accessibilityRole="button"
-          accessibilityLabel={t('feed.composer.addOption')}
-        >
-          <Text style={styles.secondaryButtonText}>{t('feed.composer.addOption')}</Text>
-        </Pressable>
+        ) : null}
+
         {composerValidationMessage ? (
           <Text style={styles.validationMessage}>{composerValidationMessage}</Text>
         ) : null}
@@ -650,27 +738,39 @@ export function FeedScreen({ navigation }: Props) {
           ListHeaderComponent={feedListHeader}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <Pressable
-                onPress={() => {
-                  navigation.navigate('UserProfile', { userId: item.author.id });
-                }}
-              >
-                <Text style={styles.authorName}>{item.author.displayName}</Text>
-              </Pressable>
-              <Text style={styles.timestamp}>
-                {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
-                  new Date(item.createdAt),
-                )}
-              </Text>
-              {item.groupId ? (
-                <Text style={styles.groupBadgeText}>
-                  {t('feed.targeting.groupLabel', {
-                    groupName: groupNameById[item.groupId] ?? t('feed.targeting.unknownGroup'),
-                  })}
-                </Text>
-              ) : (
-                <Text style={styles.groupBadgeText}>{t('feed.targeting.globalPost')}</Text>
-              )}
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardAvatarCircle}>
+                  {item.groupId && resolveGroupArtwork(item.groupId) ? (
+                    <Image source={resolveGroupArtwork(item.groupId) as ImageSourcePropType} style={styles.cardAvatarImage} />
+                  ) : (
+                    <Text style={styles.cardAvatarText}>{item.author.displayName.slice(0, 1).toUpperCase()}</Text>
+                  )}
+                </View>
+                <View style={styles.cardHeaderTextColumn}>
+                  <Pressable
+                    onPress={() => {
+                      navigation.navigate('UserProfile', { userId: item.author.id });
+                    }}
+                  >
+                    <Text style={styles.authorName}>{item.author.displayName}</Text>
+                  </Pressable>
+                  <Text style={styles.timestamp}>
+                    {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
+                      new Date(item.createdAt),
+                    )}
+                  </Text>
+                  {item.groupId ? (
+                    <Text style={styles.groupBadgeText}>
+                      {t('feed.targeting.groupLabel', {
+                        groupName: groupNameById[item.groupId] ?? t('feed.targeting.unknownGroup'),
+                      })}
+                    </Text>
+                  ) : (
+                    <Text style={styles.groupBadgeText}>{t('feed.targeting.globalPost')}</Text>
+                  )}
+                </View>
+                <MaterialIcons name="more-horiz" size={24} color="#9CA3AF" />
+              </View>
               {editingPostId === item.id ? (
                 <View style={styles.editSection}>
                   <TextInput
@@ -737,11 +837,20 @@ export function FeedScreen({ navigation }: Props) {
                 </View>
               ) : null}
               {item.media.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
-                  {item.media.map((mediaItem) => (
-                    <Image key={mediaItem.id} source={{ uri: mediaItem.url }} style={styles.mediaImage} />
-                  ))}
-                </ScrollView>
+                <>
+                  <View style={styles.liveMetaRow}>
+                    <Text style={styles.liveBadgeText}>LIVE</Text>
+                    <View style={styles.liveViewersPill}>
+                      <MaterialIcons name="visibility" size={15} color="#FFFFFF" />
+                      <Text style={styles.liveViewersText}>{(item.stats.likeCount * 125).toLocaleString()}</Text>
+                    </View>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
+                    {item.media.map((mediaItem) => (
+                      <Image key={mediaItem.id} source={{ uri: mediaItem.url }} style={styles.mediaImage} />
+                    ))}
+                  </ScrollView>
+                </>
               ) : null}
               <Text style={styles.stats}>
                 {t('feed.stats', {
@@ -750,6 +859,41 @@ export function FeedScreen({ navigation }: Props) {
                 })}
               </Text>
               <View style={styles.actionsRow}>
+                <Pressable
+                  style={styles.feedActionChipPrimary}
+                  onPress={() => toggleLikeMutation.mutate(item.id)}
+                  disabled={toggleLikeMutation.isPending}
+                >
+                  <MaterialIcons
+                    name={likedByMeMap[item.id] ? 'thumb-up' : 'thumb-up-off-alt'}
+                    size={20}
+                    color={likedByMeMap[item.id] ? '#2563EB' : '#9CA3AF'}
+                  />
+                  <Text style={styles.feedActionChipText}>
+                    {likedByMeMap[item.id] ? t('feed.actions.unlike') : t('feed.actions.like')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.feedActionChipPrimary}
+                  onPress={() =>
+                    navigation.navigate('PostDetail', {
+                      post: item,
+                    })
+                  }
+                >
+                  <MaterialIcons name="chat-bubble-outline" size={20} color="#9CA3AF" />
+                  <Text style={styles.feedActionChipText}>{t('feed.actions.comments')}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.feedActionChipPrimary}
+                  onPress={() => sharePostMutation.mutate(item.id)}
+                  disabled={sharePostMutation.isPending}
+                >
+                  <MaterialIcons name="share" size={20} color="#9CA3AF" />
+                  <Text style={styles.feedActionChipText}>{t('common.actions.share')}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.actionsRowSecondary}>
                 <Pressable
                   style={[styles.commentButton, !canOpenLikerList(item.stats.likeCount) ? styles.commentButtonDisabled : null]}
                   onPress={() =>
@@ -770,32 +914,6 @@ export function FeedScreen({ navigation }: Props) {
                   >
                     {t('feed.actions.like')} ({item.stats.likeCount})
                   </Text>
-                </Pressable>
-                <Pressable
-                  style={styles.actionButton}
-                  onPress={() => toggleLikeMutation.mutate(item.id)}
-                  disabled={toggleLikeMutation.isPending}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {likedByMeMap[item.id] ? t('feed.actions.unlike') : t('feed.actions.like')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={styles.commentButton}
-                  onPress={() =>
-                    navigation.navigate('PostDetail', {
-                      post: item,
-                    })
-                  }
-                >
-                  <Text style={styles.commentButtonText}>{t('feed.actions.comments')}</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.commentButton}
-                  onPress={() => sharePostMutation.mutate(item.id)}
-                  disabled={sharePostMutation.isPending}
-                >
-                  <Text style={styles.commentButtonText}>{t('common.actions.share')}</Text>
                 </Pressable>
                 {item.authorId === meQuery.data?.id ? (
                   <>
@@ -867,23 +985,66 @@ export function FeedScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
   },
   composer: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    padding: 12,
-    gap: 8,
+    borderBottomColor: '#D1D5DB',
+    padding: 14,
+    gap: 10,
+  },
+  composerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  composerAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#BFDBFE',
+  },
+  composerAvatarText: {
+    color: '#F8FAFC',
+    fontWeight: '800',
+    fontSize: 22,
   },
   composerInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 60,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 9,
+    minHeight: 46,
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    fontSize: 14,
+  },
+  composerQuickActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  quickActionChip: {
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickActionChipActive: {
+    backgroundColor: '#E0E7FF',
+  },
+  quickActionText: {
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 13,
   },
   composerImageContainer: {
     gap: 8,
@@ -902,18 +1063,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
-  composerActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  composerSectionCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    gap: 8,
   },
   metaInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#D1D5DB',
     borderRadius: 10,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 9,
+    backgroundColor: '#F9FAFB',
+    fontSize: 14,
   },
   metaSectionLabel: {
     color: '#334155',
@@ -983,21 +1148,20 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
+    borderColor: '#3B82F6',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   secondaryButtonText: {
-    color: '#0B6E4F',
+    color: '#1D4ED8',
     fontWeight: '700',
   },
   postButton: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#0B6E4F',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: '#1877F2',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
   postButtonText: {
     color: '#FFFFFF',
@@ -1011,32 +1175,60 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     marginHorizontal: 12,
-    marginTop: 12,
-    padding: 12,
+    marginTop: 10,
+    padding: 14,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  cardAvatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  cardAvatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  cardAvatarText: {
+    color: '#F8FAFC',
+    fontWeight: '800',
+    fontSize: 19,
+  },
+  cardHeaderTextColumn: {
+    flex: 1,
   },
   authorName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1F2937',
   },
   timestamp: {
     marginTop: 2,
-    color: '#64748B',
+    color: '#9CA3AF',
     fontSize: 12,
   },
   groupBadgeText: {
-    marginTop: 6,
-    color: '#0B6E4F',
+    marginTop: 3,
+    color: '#6B7280',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   content: {
     marginTop: 10,
     color: '#0F172A',
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   hashtagsText: {
     marginTop: 6,
@@ -1102,25 +1294,75 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mediaRow: {
-    marginTop: 10,
+    marginTop: 8,
     paddingRight: 8,
+  },
+  liveMetaRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveBadgeText: {
+    backgroundColor: '#EF4444',
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  liveViewersPill: {
+    backgroundColor: '#6B7280',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  liveViewersText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
   },
   mediaImage: {
     width: 180,
-    height: 140,
-    borderRadius: 10,
+    height: 150,
+    borderRadius: 8,
     marginRight: 8,
     backgroundColor: '#E2E8F0',
   },
   stats: {
     marginTop: 10,
     color: '#475569',
-    fontSize: 12,
+    fontSize: 13,
   },
   actionsRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  feedActionChipPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+  },
+  feedActionChipText: {
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  actionsRowSecondary: {
     marginTop: 10,
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   actionButton: {
     backgroundColor: '#0B6E4F',
@@ -1171,31 +1413,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   groupTargetLabel: {
-    color: '#334155',
-    fontWeight: '700',
-    marginBottom: 8,
+    color: '#111827',
+    fontWeight: '800',
+    fontSize: 18,
+    marginBottom: 10,
   },
-  groupChipsRow: {
-    paddingRight: 8,
+  groupTilesRow: {
+    paddingRight: 10,
+    gap: 12,
   },
-  groupChip: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
+  groupTileWrap: {
+    width: 86,
+    alignItems: 'center',
   },
-  groupChipActive: {
-    borderColor: '#0B6E4F',
-    backgroundColor: '#DCFCE7',
+  groupTile: {
+    width: 74,
+    height: 74,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  groupChipText: {
-    color: '#0F172A',
-    fontWeight: '600',
+  groupTileActive: {
+    borderWidth: 3,
+    borderColor: '#BFDBFE',
+  },
+  groupTileLabel: {
+    marginTop: 8,
+    color: '#111827',
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 15,
+    textAlign: 'center',
   },
 });

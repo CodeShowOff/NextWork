@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ImageSourcePropType,
   Pressable,
   Share,
   StyleSheet,
@@ -30,6 +31,7 @@ import {
   updateGroup,
   deleteGroup,
 } from '../../shared/api/groups.api';
+import { GroupDetailPage } from './GroupDetailPage';
 import { createInviteLink, getInviteByToken, acceptInvite } from '../../shared/api/invites.api';
 import {
   deactivateOrganization,
@@ -69,6 +71,14 @@ const groupSortFilterOptions: GroupSortFilterOption[] = [
 const groupTypeOptions = ['Teams & Projects', 'Discussions', 'Announcements', 'Social & More'];
 const groupPrivacyOptions = ['Open', 'Closed', 'Secret'];
 
+const cloneGroupArtwork: Record<string, ImageSourcePropType> = {
+  companyAnnouncements: require('../../../assets/images/group_company_announcements.jpg'),
+  marketingTeam: require('../../../assets/images/group_marketing_team.jpg'),
+  projectUpdates: require('../../../assets/images/group_project_updates.jpg'),
+  general: require('../../../assets/images/group_general.jpg'),
+  social: require('../../../assets/images/group_company_social.jpg'),
+};
+
 export function GroupsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -99,6 +109,8 @@ export function GroupsScreen() {
   const [favoriteGroupIds, setFavoriteGroupIds] = useState<string[]>([]);
   const [visitedGroupIds, setVisitedGroupIds] = useState<string[]>([]);
   const [lastActivityByGroupId, setLastActivityByGroupId] = useState<Record<string, number>>({});
+  const [activeGroupDetailId, setActiveGroupDetailId] = useState('');
+  const [activeGroupDetailSnapshot, setActiveGroupDetailSnapshot] = useState<Group | null>(null);
 
   const routeParams = (route.params ?? {}) as GroupsRouteParams;
 
@@ -598,6 +610,75 @@ export function GroupsScreen() {
     });
   }, [favoriteGroupIds, groupSortFilter, groupsQuery.data?.items, lastActivityByGroupId, visitedGroupIds]);
 
+  const homeGroupPreview = useMemo(() => sortedAndFilteredGroups.slice(0, 5), [sortedAndFilteredGroups]);
+
+  const activeGroupDetail = useMemo(() => {
+    if (!activeGroupDetailId) {
+      return null;
+    }
+
+    const liveGroup = groupsQuery.data?.items.find((group) => group.id === activeGroupDetailId);
+    if (liveGroup) {
+      return liveGroup;
+    }
+
+    if (activeGroupDetailSnapshot?.id === activeGroupDetailId) {
+      return activeGroupDetailSnapshot;
+    }
+
+    return null;
+  }, [activeGroupDetailId, activeGroupDetailSnapshot, groupsQuery.data?.items]);
+
+  const resolveGroupArtwork = useCallback((group: Group): ImageSourcePropType | null => {
+    const normalizedName = group.name.toLowerCase();
+    if (normalizedName.includes('announcement')) {
+      return cloneGroupArtwork.companyAnnouncements;
+    }
+    if (normalizedName.includes('marketing')) {
+      return cloneGroupArtwork.marketingTeam;
+    }
+    if (normalizedName.includes('project') || normalizedName.includes('update')) {
+      return cloneGroupArtwork.projectUpdates;
+    }
+    if (normalizedName.includes('general')) {
+      return cloneGroupArtwork.general;
+    }
+    if (normalizedName.includes('social')) {
+      return cloneGroupArtwork.social;
+    }
+
+    return cloneGroupArtwork.general;
+  }, []);
+
+  const openGroupDetail = useCallback(
+    (group: Group) => {
+      markGroupVisited(group.id);
+      markGroupActivity(group.id);
+      setActiveGroupDetailId(group.id);
+      setActiveGroupDetailSnapshot(group);
+    },
+    [markGroupActivity],
+  );
+
+  const renderGroupAvatar = useCallback(
+    (group: Group) => {
+      const fallbackArtwork = resolveGroupArtwork(group);
+      if (group.photoUrl) {
+        return <Image source={{ uri: group.photoUrl }} style={styles.groupPhoto} />;
+      }
+      if (fallbackArtwork) {
+        return <Image source={fallbackArtwork} style={styles.groupPhoto} />;
+      }
+
+      return (
+        <View style={styles.groupPhotoPlaceholder}>
+          <Text style={styles.groupPhotoPlaceholderText}>{group.name.slice(0, 1).toUpperCase()}</Text>
+        </View>
+      );
+    },
+    [resolveGroupArtwork],
+  );
+
   const keyExtractorOrganization = useCallback((item: OrganizationMembership) => item.organizationId, []);
   const keyExtractorFilter = useCallback((item: GroupSortFilterOption) => item, []);
   const keyExtractorGroup = useCallback((item: Group) => item.id, []);
@@ -659,6 +740,19 @@ export function GroupsScreen() {
     [t],
   );
 
+  if (activeGroupDetail) {
+    return (
+      <GroupDetailPage
+        group={activeGroupDetail}
+        fallbackArtwork={resolveGroupArtwork(activeGroupDetail)}
+        onBack={() => {
+          setActiveGroupDetailId('');
+          setActiveGroupDetailSnapshot(null);
+        }}
+      />
+    );
+  }
+
   if (organizationsQuery.isLoading) {
     return (
       <View style={styles.centerState}>
@@ -669,7 +763,7 @@ export function GroupsScreen() {
 
   if (organizations.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('groups.title.createOrganization')}</Text>
           <Text style={styles.subtitle}>{t('groups.subtitle.createOrganization')}</Text>
@@ -740,7 +834,7 @@ export function GroupsScreen() {
     const catalog = starterGroupsConfigQuery.data?.catalog ?? [];
 
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('groups.title.chooseStarterGroups')}</Text>
           <Text style={styles.subtitle}>{t('groups.subtitle.chooseStarterGroups')}</Text>
@@ -833,7 +927,7 @@ export function GroupsScreen() {
 
   if (showPostOnboardingInviteStep) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('groups.firstRun.title')}</Text>
           <Text style={styles.subtitle}>{t('groups.firstRun.subtitle')}</Text>
@@ -885,7 +979,7 @@ export function GroupsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.headerCard}>
         <Text style={styles.orgName}>{activeOrganization?.organization.name}</Text>
         <Text style={styles.activeOrgLabel}>{t('groups.title.activeOrganization')}</Text>
@@ -1029,6 +1123,32 @@ export function GroupsScreen() {
         {inlineError ? <Text style={styles.inlineError}>{inlineError}</Text> : null}
       </View>
 
+      <View style={styles.homeSectionCard}>
+        <View style={styles.homeSectionHeaderRow}>
+          <Text style={styles.homeSectionTitle}>{t('groups.title.yourGroups')}</Text>
+          <View style={styles.homeFilterPill}>
+            <Text style={styles.homeFilterPillText}>{t(`groups.filters.${groupSortFilter}`)}</Text>
+          </View>
+        </View>
+        {homeGroupPreview.map((group) => (
+          <Pressable
+            key={`home-preview-${group.id}`}
+            style={styles.homeListRow}
+            onPress={() => {
+              markGroupVisited(group.id);
+              markGroupActivity(group.id);
+              setMembersGroupId((current) => (current === group.id ? '' : group.id));
+            }}
+          >
+            {renderGroupAvatar(group)}
+            <View style={styles.homeListTextColumn}>
+              <Text style={styles.homeListName}>{group.name}</Text>
+              <Text style={styles.homeListMeta}>{`${group.groupPrivacy} group • ${group.memberCount} members`}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
       <View style={styles.composerRow}>
         <TextInput
           value={groupName}
@@ -1152,13 +1272,7 @@ export function GroupsScreen() {
           renderItem={({ item }) => (
             <View style={styles.groupCard}>
               <View style={styles.groupIdentityRow}>
-                {item.photoUrl ? (
-                  <Image source={{ uri: item.photoUrl }} style={styles.groupPhoto} />
-                ) : (
-                  <View style={styles.groupPhotoPlaceholder}>
-                    <Text style={styles.groupPhotoPlaceholderText}>{item.name.slice(0, 1).toUpperCase()}</Text>
-                  </View>
-                )}
+                {renderGroupAvatar(item)}
                 <View style={styles.groupIdentityTextColumn}>
                   <Text style={styles.groupTitle}>{item.name}</Text>
                   <Text style={styles.groupMetaSecondary}>{`${item.groupPrivacy} • ${item.groupType}`}</Text>
@@ -1420,13 +1534,7 @@ export function GroupsScreen() {
           renderItem={({ item }) => (
             <View style={styles.groupCard}>
               <View style={styles.groupIdentityRow}>
-                {item.photoUrl ? (
-                  <Image source={{ uri: item.photoUrl }} style={styles.groupPhoto} />
-                ) : (
-                  <View style={styles.groupPhotoPlaceholder}>
-                    <Text style={styles.groupPhotoPlaceholderText}>{item.name.slice(0, 1).toUpperCase()}</Text>
-                  </View>
-                )}
+                {renderGroupAvatar(item)}
                 <View style={styles.groupIdentityTextColumn}>
                   <Text style={styles.groupTitle}>{item.name}</Text>
                   <Text style={styles.groupMetaSecondary}>{`${item.groupPrivacy} • ${item.groupType}`}</Text>
@@ -1713,6 +1821,59 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
   },
+  homeSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 10,
+  },
+  homeSectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  homeSectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  homeFilterPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  homeFilterPillText: {
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  homeListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 12,
+  },
+  homeListTextColumn: {
+    flex: 1,
+  },
+  homeListName: {
+    color: '#111827',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  homeListMeta: {
+    marginTop: 2,
+    color: '#6B7280',
+    fontSize: 12,
+  },
   title: {
     fontSize: 20,
     fontWeight: '800',
@@ -1963,15 +2124,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   groupPhoto: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#E2E8F0',
   },
   groupPhotoPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',

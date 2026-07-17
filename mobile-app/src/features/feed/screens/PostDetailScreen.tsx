@@ -288,7 +288,7 @@ export function PostDetailScreen({ route, navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.postCard}>
         <Text style={styles.authorName}>{postState.author.displayName}</Text>
         <Text style={styles.timestamp}>

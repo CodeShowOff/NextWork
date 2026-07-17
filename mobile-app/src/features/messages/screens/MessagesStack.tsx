@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ConversationDetailScreen } from './ConversationDetailScreen';
 import { ConversationsScreen } from './ConversationsScreen';
+import { SharedTopBarBrand, SharedTopBarSearchAction, sharedHeaderBaseOptions } from '../../../shared/ui/SharedTopBar';
 
 export type MessagesStackParamList = {
   Conversations: undefined;
@@ -18,8 +19,24 @@ export function MessagesStack() {
   const { t } = useTranslation();
 
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Conversations" component={ConversationsScreen} options={{ title: t('app.tabs.messages') }} />
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        ...sharedHeaderBaseOptions,
+        headerRight: () => (
+          <SharedTopBarSearchAction
+            onPress={() => navigation.getParent()?.navigate('Search' as never)}
+            accessibilityLabel={t('app.tabs.search')}
+          />
+        ),
+      })}
+    >
+      <Stack.Screen
+        name="Conversations"
+        component={ConversationsScreen}
+        options={{
+          headerTitle: () => <SharedTopBarBrand />,
+        }}
+      />
       <Stack.Screen
         name="ConversationDetail"
         component={ConversationDetailScreen}

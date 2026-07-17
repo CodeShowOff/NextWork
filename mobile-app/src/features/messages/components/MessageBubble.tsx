@@ -33,6 +33,11 @@ function MessageBubbleView({ message, status, onLongPress }: Props) {
 
   return (
     <View style={[styles.row, isMine ? styles.mineRow : styles.theirRow]}>
+      {!isMine ? (
+        <View style={styles.theirAvatarCircle}>
+          <Text style={styles.theirAvatarText}>{message.sender.displayName.slice(0, 1).toUpperCase()}</Text>
+        </View>
+      ) : null}
       <Pressable
         style={[styles.bubble, isMine ? styles.mineBubble : styles.theirBubble]}
         onLongPress={onLongPress}
@@ -123,8 +128,11 @@ export const MessageBubble = React.memo(MessageBubbleView, (previous, next) => {
 const styles = StyleSheet.create({
   row: {
     paddingHorizontal: 14,
-    marginBottom: 8,
+    marginBottom: 10,
     width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-end',
   },
   mineRow: {
     alignItems: 'flex-end',
@@ -134,15 +142,32 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: '80%',
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   mineBubble: {
-    backgroundColor: '#0B6E4F',
+    backgroundColor: '#E0ECFF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   theirBubble: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  theirAvatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#BFDBFE',
+  },
+  theirAvatarText: {
+    color: '#F8FAFC',
+    fontWeight: '800',
+    fontSize: 14,
   },
   sender: {
     color: '#334155',
@@ -151,17 +176,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   body: {
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 20,
   },
   mineBody: {
-    color: '#FFFFFF',
+    color: '#1F2937',
   },
   theirBody: {
-    color: '#0F172A',
+    color: '#1F2937',
   },
   statusText: {
     marginTop: 4,
-    color: '#D1FAE5',
+    color: '#6B7280',
     fontSize: 10,
     fontWeight: '600',
     textAlign: 'right',
@@ -190,8 +216,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   reactionChipMine: {
-    borderColor: '#0B6E4F',
-    backgroundColor: '#DCFCE7',
+    borderColor: '#3B82F6',
+    backgroundColor: '#DBEAFE',
   },
   reactionChipText: {
     color: '#334155',
@@ -223,7 +249,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   mineEditedText: {
-    color: '#A7F3D0',
+    color: '#6B7280',
     textAlign: 'right',
   },
   theirEditedText: {

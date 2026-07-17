@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Alert, Linking, View, useColorScheme } from 'react-native';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomTabNavigationOptions, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { FeedStack } from '../features/feed/screens/FeedStack';
@@ -25,6 +26,7 @@ import { useSessionStore } from '../shared/session/session.store';
 import { authSessionService } from '../shared/session/auth-session.service';
 import { i18n } from '../shared/i18n/i18n';
 import { resolveAppTheme, useThemeStore } from '../shared/theme/theme.store';
+import { SharedTopBarBrand, SharedTopBarSearchAction, sharedHeaderBaseOptions } from '../shared/ui/SharedTopBar';
 
 const Tab = createBottomTabNavigator();
 const queryClient = new QueryClient();
@@ -106,18 +108,38 @@ function AuthenticatedTabs() {
 
   return (
     <Tab.Navigator
-      initialRouteName="Groups"
-      screenOptions={{
-        tabBarActiveTintColor: appTheme.dark ? '#86EFAC' : '#0B6E4F',
-        tabBarInactiveTintColor: appTheme.dark ? '#94A3B8' : '#64748B',
+      initialRouteName="Feed"
+      screenOptions={
+        ({ navigation, route }: { navigation: any; route: { name: string } }): BottomTabNavigationOptions => ({
+        tabBarActiveTintColor: appTheme.dark ? '#3B82F6' : '#3B82F6',
+        tabBarInactiveTintColor: appTheme.dark ? '#9CA3AF' : '#9CA3AF',
         tabBarStyle: {
-          backgroundColor: appTheme.colors.card,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#D1D5DB',
+          borderTopWidth: 1,
         },
-        headerStyle: {
-          backgroundColor: appTheme.colors.card,
+        ...sharedHeaderBaseOptions,
+        headerTitle: () => <SharedTopBarBrand />,
+        headerRight: () => (
+          <SharedTopBarSearchAction
+            onPress={() => navigation.navigate('Search')}
+            accessibilityLabel={t('app.tabs.search')}
+          />
+        ),
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => {
+          const iconNameByRoute: Record<string, keyof typeof MaterialIcons.glyphMap> = {
+            Feed: 'home-filled',
+            Groups: 'groups',
+            Search: 'search',
+            Messages: 'chat-bubble-outline',
+            Notifications: 'notifications-none',
+            Profile: 'menu',
+          };
+          const iconName = iconNameByRoute[route.name] ?? 'circle';
+          return <MaterialIcons name={iconName} size={size} color={color} />;
         },
-        headerTintColor: appTheme.colors.text,
-      }}
+        })
+      }
     >
       <Tab.Screen
         name="Feed"

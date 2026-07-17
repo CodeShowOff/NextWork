@@ -203,7 +203,7 @@ export function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('notifications.title')}</Text>
         <Pressable

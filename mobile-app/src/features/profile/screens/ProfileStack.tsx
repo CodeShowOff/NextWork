@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { FollowListScreen } from './FollowListScreen';
 import { MyProfileScreen } from './MyProfileScreen';
 import { UserProfileScreen } from './UserProfileScreen';
+import { SharedTopBarBrand, SharedTopBarSearchAction, sharedHeaderBaseOptions } from '../../../shared/ui/SharedTopBar';
 
 export type ProfileStackParamList = {
   MyProfile: undefined;
@@ -24,8 +25,24 @@ export function ProfileStack() {
   const { t } = useTranslation();
 
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ title: t('app.tabs.profile') }} />
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        ...sharedHeaderBaseOptions,
+        headerRight: () => (
+          <SharedTopBarSearchAction
+            onPress={() => navigation.getParent()?.navigate('Search' as never)}
+            accessibilityLabel={t('app.tabs.search')}
+          />
+        ),
+      })}
+    >
+      <Stack.Screen
+        name="MyProfile"
+        component={MyProfileScreen}
+        options={{
+          headerTitle: () => <SharedTopBarBrand />,
+        }}
+      />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: t('app.tabs.profile') }} />
       <Stack.Screen
         name="FollowList"

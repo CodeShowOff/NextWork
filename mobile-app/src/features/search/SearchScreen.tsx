@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  ImageSourcePropType,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,12 +11,21 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { FeedPost } from '../../shared/api/feed.api';
 import { searchAll } from '../../shared/api/search.api';
+
+const groupArtworkByKeyword: { keyword: string; source: ImageSourcePropType }[] = [
+  { keyword: 'announcement', source: require('../../../assets/images/group_company_announcements.jpg') },
+  { keyword: 'marketing', source: require('../../../assets/images/group_marketing_team.jpg') },
+  { keyword: 'project', source: require('../../../assets/images/group_project_updates.jpg') },
+  { keyword: 'general', source: require('../../../assets/images/group_general.jpg') },
+  { keyword: 'social', source: require('../../../assets/images/group_company_social.jpg') },
+];
 
 export function SearchScreen() {
   const { t } = useTranslation();
@@ -149,18 +160,32 @@ export function SearchScreen() {
     return null;
   };
 
+  const resolveGroupArtwork = (groupName: string): ImageSourcePropType => {
+    const normalized = groupName.toLowerCase();
+    for (const artwork of groupArtworkByKeyword) {
+      if (normalized.includes(artwork.keyword)) {
+        return artwork.source;
+      }
+    }
+
+    return require('../../../assets/images/group_general.jpg');
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('search.title')}</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('search.placeholder')}
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.searchInputRow}>
+          <MaterialIcons name="search" size={24} color="#9CA3AF" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search.placeholder')}
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -180,8 +205,15 @@ export function SearchScreen() {
                   })
                 }
               >
-                <Text style={styles.itemTitle}>{user.displayName}</Text>
-                <Text style={styles.itemMeta}>{user.email}</Text>
+                <View style={styles.itemRow}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>{user.displayName.slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.itemTextCol}>
+                    <Text style={styles.itemTitle}>{user.displayName}</Text>
+                    <Text style={styles.itemMeta}>{user.email}</Text>
+                  </View>
+                </View>
               </Pressable>
             ))}
             {usersNextCursor ? (
@@ -216,8 +248,13 @@ export function SearchScreen() {
                   );
                 }}
               >
-                <Text style={styles.itemTitle}>{group.name}</Text>
-                {group.description ? <Text style={styles.itemMeta}>{group.description}</Text> : null}
+                <View style={styles.itemRow}>
+                  <Image source={resolveGroupArtwork(group.name)} style={styles.groupAvatarImage} />
+                  <View style={styles.itemTextCol}>
+                    <Text style={styles.itemTitle}>{group.name}</Text>
+                    {group.description ? <Text style={styles.itemMeta}>{group.description}</Text> : null}
+                  </View>
+                </View>
               </Pressable>
             ))}
             {groupsNextCursor ? (
@@ -268,10 +305,17 @@ export function SearchScreen() {
                   });
                 }}
               >
-                <Text style={styles.itemTitle}>{post.author.displayName}</Text>
-                <Text style={styles.itemMeta} numberOfLines={2}>
-                  {post.content}
-                </Text>
+                <View style={styles.itemRow}>
+                  <View style={styles.postIconAvatar}>
+                    <MaterialIcons name="article" size={18} color="#6B7280" />
+                  </View>
+                  <View style={styles.itemTextCol}>
+                    <Text style={styles.itemTitle}>{post.author.displayName}</Text>
+                    <Text style={styles.itemMeta} numberOfLines={2}>
+                      {post.content}
+                    </Text>
+                  </View>
+                </View>
               </Pressable>
             ))}
             {postsNextCursor ? (
@@ -296,56 +340,99 @@ export function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#ECECEC',
   },
   header: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    padding: 12,
-    gap: 10,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    padding: 12,
+    borderBottomColor: '#D1D5DB',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 14,
     gap: 12,
   },
-  section: {
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  searchInputRow: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
+  input: {
+    flex: 1,
+    paddingVertical: 11,
+    fontSize: 14,
+  },
+  content: {
+    padding: 14,
+    gap: 14,
+  },
+  section: {
+    gap: 10,
+  },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1F2937',
   },
   itemCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
-    padding: 10,
-    gap: 4,
+    padding: 12,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  itemTextCol: {
+    flex: 1,
+  },
+  userAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarText: {
+    color: '#F8FAFC',
+    fontWeight: '800',
+    fontSize: 20,
+  },
+  groupAvatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  postIconAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   itemTitle: {
-    color: '#0F172A',
+    color: '#1F2937',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
   },
   itemMeta: {
-    color: '#475569',
-    fontSize: 13,
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 3,
   },
   hintText: {
     color: '#64748B',
@@ -359,8 +446,8 @@ const styles = StyleSheet.create({
   },
   loadMoreButton: {
     borderWidth: 1,
-    borderColor: '#0B6E4F',
-    borderRadius: 10,
+    borderColor: '#3B82F6',
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
     alignSelf: 'flex-start',
@@ -368,7 +455,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   loadMoreText: {
-    color: '#0B6E4F',
+    color: '#2563EB',
     fontWeight: '700',
     fontSize: 12,
   },
