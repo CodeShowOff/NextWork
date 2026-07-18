@@ -11,7 +11,7 @@ export class InvitesService {
   private buildInviteUrl(token: string): string {
     const configuredBase = process.env.INVITE_LINK_BASE_URL?.trim();
     if (!configuredBase) {
-      return `workplace://invite/${token}`;
+      return `nextwork://invite/${token}`;
     }
 
     if (configuredBase.includes('{token}')) {

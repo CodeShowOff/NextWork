@@ -196,7 +196,7 @@ describe('MessagesController Integration', () => {
           fileName: 'photo.jpg',
           fileSizeBytes: 1024,
           storageKey: 'uploads/u1/photo.jpg',
-          publicUrl: 'https://cdn.workplace.local/uploads/u1/photo.jpg',
+          publicUrl: 'https://cdn.nextwork.local/uploads/u1/photo.jpg',
         },
       ],
     };
@@ -220,7 +220,7 @@ describe('MessagesController Integration', () => {
             fileName: 'archive.zip',
             fileSizeBytes: 1024,
             storageKey: 'uploads/u1/archive.zip',
-            publicUrl: 'https://cdn.workplace.local/uploads/u1/archive.zip',
+            publicUrl: 'https://cdn.nextwork.local/uploads/u1/archive.zip',
           },
         ],
       })

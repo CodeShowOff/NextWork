@@ -2,23 +2,23 @@ import { extractInviteToken } from './invite-linking';
 
 describe('extractInviteToken', () => {
   it('extracts inviteToken query parameter', () => {
-    expect(extractInviteToken('workplace://open?inviteToken=abc123')).toBe('abc123');
+    expect(extractInviteToken('nextwork://open?inviteToken=abc123')).toBe('abc123');
   });
 
   it('extracts token query parameter fallback', () => {
-    expect(extractInviteToken('https://workplace.app/invite?token=xyz789')).toBe('xyz789');
+    expect(extractInviteToken('https://nextwork.app/invite?token=xyz789')).toBe('xyz789');
   });
 
   it('extracts token from /invite/:token path', () => {
-    expect(extractInviteToken('workplace://invite/my-token')).toBe('my-token');
+    expect(extractInviteToken('nextwork://invite/my-token')).toBe('my-token');
   });
 
   it('extracts token from custom host invite URL', () => {
-    expect(extractInviteToken('workplace://invite/abc123')).toBe('abc123');
+    expect(extractInviteToken('nextwork://invite/abc123')).toBe('abc123');
   });
 
   it('extracts token from https path invite URL', () => {
-    expect(extractInviteToken('https://workplace.app/invite/abc123')).toBe('abc123');
+    expect(extractInviteToken('https://nextwork.app/invite/abc123')).toBe('abc123');
   });
 
   it('returns null for invalid URLs', () => {
@@ -26,6 +26,6 @@ describe('extractInviteToken', () => {
   });
 
   it('returns null when invite token is missing', () => {
-    expect(extractInviteToken('workplace://open')).toBeNull();
+    expect(extractInviteToken('nextwork://open')).toBeNull();
   });
 });

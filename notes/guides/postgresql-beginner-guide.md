@@ -23,7 +23,7 @@ DATABASE_URL=postgresql://username:password@host:port/database
 
 Typical local example:
 ```env
-DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/workplace
+DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/nextwork
 ```
 
 ## 3. PostgreSQL Checks You Should Know
@@ -46,7 +46,7 @@ Healthy response should include:
 
 ### Optional direct SQL access (if psql installed)
 ```bash
-psql -h localhost -U postgres -d workplace
+psql -h localhost -U postgres -d nextwork
 ```
 Use when:
 - Manual SQL checks

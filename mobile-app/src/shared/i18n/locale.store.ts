@@ -23,7 +23,7 @@ export const useLocaleStore = create<LocaleState>()(
       },
     }),
     {
-      name: 'workplace.locale-preference',
+      name: 'nextwork.locale-preference',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ locale: state.locale }),
       onRehydrateStorage: () => (state) => {

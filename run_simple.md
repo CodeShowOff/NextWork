@@ -1,4 +1,4 @@
-Listed directory Workplace
+Listed directory NextWork
 Viewed README.md:1-118
 Viewed run.md:1-110
 
@@ -71,7 +71,7 @@ If the app fails to connect or seems to remember an old URL (because it caches i
 1. Clear app data:
 
 ```bash
-adb shell pm clear com.workplace.app
+adb shell pm clear com.nextwork.app
 ```
 
 2. Re-run steps 4 and 5.

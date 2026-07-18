@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: workplace-backend-api
+    name: nextwork-backend-api
     runtime: node
     buildCommand: NPM_CONFIG_PRODUCTION=false npm ci --include=dev && npm run build --workspace backend-api
     startCommand: npm run start --workspace backend-api

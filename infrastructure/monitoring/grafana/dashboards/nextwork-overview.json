@@ -1,10 +1,10 @@
 {
-  "title": "Workplace Production Overview",
-  "uid": "workplace-overview",
+  "title": "NextWork Production Overview",
+  "uid": "nextwork-overview",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "15s",
-  "tags": ["workplace", "production"],
+  "tags": ["nextwork", "production"],
   "panels": [
     {
       "type": "timeseries",
@@ -12,7 +12,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(workplace_http_requests_total[5m]))",
+          "expr": "sum(rate(nextwork_http_requests_total[5m]))",
           "legendFormat": "requests/s",
           "refId": "A"
         }
@@ -24,7 +24,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "workplace_http_request_p95_duration_ms",
+          "expr": "nextwork_http_request_p95_duration_ms",
           "legendFormat": "{{route}}",
           "refId": "A"
         }
@@ -60,7 +60,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
       "targets": [
         {
-          "expr": "workplace_websocket_active_connections",
+          "expr": "nextwork_websocket_active_connections",
           "legendFormat": "sockets",
           "refId": "A"
         }

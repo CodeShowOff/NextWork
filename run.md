@@ -48,7 +48,7 @@ Do this exact recovery flow now
    - adb reverse tcp:4000 tcp:4000
    - adb reverse --list
 5. Clear app stored session/URLs (important):
-   - adb shell pm clear com.workplace.app
+   - adb shell pm clear com.nextwork.app
 6. Start Metro:
    - npm run dev:android --workspace mobile-app
 7. Reinstall/run app:

@@ -1,9 +1,9 @@
-import { createWorkplaceApiClient } from '@workplace/api-contracts';
+import { createNextWorkApiClient } from '@nextwork/api-contracts';
 
 import { useSessionStore } from '../session/session.store';
 import { authSessionService } from '../session/auth-session.service';
 
-export const workplaceApi = createWorkplaceApiClient({
+export const nextworkApi = createNextWorkApiClient({
   baseUrl: () => useSessionStore.getState().apiBaseUrl,
   getAccessToken: () => {
     const { accessToken } = useSessionStore.getState();

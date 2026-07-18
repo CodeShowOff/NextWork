@@ -1,4 +1,4 @@
-Here is the Workplace app user flow, based on what is implemented right now in this repo.
+Here is the NextWork app user flow, based on what is implemented right now in this repo.
 
 1. App launch and session gate  
 - On app start, it checks whether an access token exists in the local session store.  
@@ -30,7 +30,7 @@ Here is the Workplace app user flow, based on what is implemented right now in t
 - If user has no organization yet, first flow is organization onboarding (create org).  
 - If user has multiple organizations, they can switch active org using chips.  
 - User can create groups, join groups, view group members, and generate invite tokens.  
-- This tab is effectively the workspace context manager for the rest of the app.  
+- This tab is effectively the nextwork context manager for the rest of the app.  
 - Source: mobile-app/src/features/groups/GroupsScreen.tsx, backend-api/src/modules/groups/groups.controller.ts, backend-api/src/modules/organizations/organizations.controller.ts
 
 6. Feed flow (core social usage)  

@@ -279,12 +279,12 @@ export function MenuExperience({ navigation }: TabProps) {
       <Card raised>
         <ListRow
           title={meQuery.data?.email || 'Your profile'}
-          subtitle="View profile and workplace activity"
+          subtitle="View profile and nextwork activity"
           leading={<Avatar name={meQuery.data?.email || 'You'} size={54} />}
           onPress={() => navigation.navigate('Profile')}
         />
       </Card>
-      <SectionHeader title="Your Workplace" />
+      <SectionHeader title="Your NextWork" />
       <MenuItem
         title="Search"
         subtitle="People, groups, and updates"
@@ -344,7 +344,7 @@ export function MenuExperience({ navigation }: TabProps) {
       />
       <CapabilityCard
         capability="preview"
-        title="More Workplace tools"
+        title="More NextWork tools"
         body="These destinations are intentionally visible but never pretend to save or sync data before their APIs exist."
       />
     </Page>
@@ -872,7 +872,7 @@ export function SearchExperience({ route, navigation }: SearchProps) {
       />
       {query.trim().length < 2 ? (
         <EmptyState
-          title="Search your workplace"
+          title="Search your nextwork"
           body="Find teammates, groups, and important updates."
           icon="search"
         />
@@ -896,7 +896,7 @@ export function SearchExperience({ route, navigation }: SearchProps) {
             <Card key={`g-${group.id}`}>
               <ListRow
                 title={group.name}
-                subtitle={group.description || 'Workplace group'}
+                subtitle={group.description || 'NextWork group'}
                 leading={<Avatar name={group.name} />}
                 onPress={() => navigation.navigate('GroupHub', { groupId: group.id })}
               />
@@ -1084,7 +1084,7 @@ export function SettingsExperience({ navigation }: SettingsProps) {
       <ConfirmSheet
         visible={signOutOpen}
         title="Sign out?"
-        body="You’ll need to enter your credentials to return to this workplace."
+        body="You’ll need to enter your credentials to return to this nextwork."
         confirmLabel="Sign out"
         destructive
         onClose={() => setSignOutOpen(false)}

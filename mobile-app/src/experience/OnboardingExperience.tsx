@@ -69,7 +69,7 @@ export function OnboardingExperience({
       <Page>
         <CenteredContent>
           <ErrorState
-            title="We couldn’t set up your workspace"
+            title="We couldn’t set up your nextwork"
             onRetry={() => void configQuery.refetch()}
           />
         </CenteredContent>
@@ -80,7 +80,7 @@ export function OnboardingExperience({
       <Page>
         <CenteredContent>
           <EmptyState
-            title="No workspace found"
+            title="No nextwork found"
             body="Sign in again or ask your administrator for an invitation."
           />
         </CenteredContent>

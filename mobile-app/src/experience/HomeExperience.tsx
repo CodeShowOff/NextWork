@@ -157,12 +157,12 @@ export function HomeExperience({ navigation }: HomeProps) {
                 <View style={[styles.wordmarkBadge, { backgroundColor: colors.accent }]}>
                   <Text style={[styles.wordmarkLetter, { color: colors.onAccent }]}>W</Text>
                 </View>
-                <Text style={[styles.wordmarkText, { color: colors.text }]}>Workplace</Text>
+                <Text style={[styles.wordmarkText, { color: colors.text }]}>NextWork</Text>
               </View>
               <View style={styles.topActions}>
                 <IconButton
                   icon="search"
-                  label="Search Workplace"
+                  label="Search NextWork"
                   onPress={() => navigation.navigate('Search')}
                   testID="header-search"
                 />
@@ -314,7 +314,7 @@ function PostComposerSheet({
 }) {
   const colors = useAppColors();
   const { showToast } = useToast();
-  const draft = useStoredDraft('workplace.draft.post');
+  const draft = useStoredDraft('nextwork.draft.post');
   const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(defaultGroupId);
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [pollEnabled, setPollEnabled] = useState(false);

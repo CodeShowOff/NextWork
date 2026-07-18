@@ -147,8 +147,8 @@ describe('OpsController Integration', () => {
   it('GET /ops/prometheus returns Prometheus text exposition', async () => {
     const response = await request(app.getHttpServer()).get('/ops/prometheus').expect(200);
 
-    expect(response.text).toContain('workplace_http_requests_total');
-    expect(response.text).toContain('workplace_http_request_p95_duration_ms');
-    expect(response.text).toContain('workplace_websocket_active_connections');
+    expect(response.text).toContain('nextwork_http_requests_total');
+    expect(response.text).toContain('nextwork_http_request_p95_duration_ms');
+    expect(response.text).toContain('nextwork_websocket_active_connections');
   });
 });

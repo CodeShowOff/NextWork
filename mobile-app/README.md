@@ -1,4 +1,4 @@
-# Workplace Mobile App Setup
+# NextWork Mobile App Setup
 
 This app uses Expo SDK 55 and can be installed on Android directly from a local APK and on iOS via EAS cloud builds.
 
@@ -117,7 +117,7 @@ If prompted:
 
 ## Notes
 
-- `ios.bundleIdentifier` and `android.package` are both set to `com.workplace.app` in app config.
+- `ios.bundleIdentifier` and `android.package` are both set to `com.nextwork.app` in app config.
 - If Android build hangs on toolchain download, verify JDK 17 is installed and environment variables are set.
 
 ## Frontend architecture

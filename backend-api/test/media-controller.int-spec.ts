@@ -12,8 +12,8 @@ describe('MediaController Integration', () => {
   const mediaServiceMock = {
     createUploadContract: jest.fn().mockResolvedValue({
       objectKey: 'uploads/u1/object.jpg',
-      uploadUrl: 'https://uploads.workplace.local/uploads/u1/object.jpg',
-      publicUrl: 'https://cdn.workplace.local/uploads/u1/object.jpg',
+      uploadUrl: 'https://uploads.nextwork.local/uploads/u1/object.jpg',
+      publicUrl: 'https://cdn.nextwork.local/uploads/u1/object.jpg',
       method: 'PUT',
       headers: {
         'Content-Type': 'image/jpeg',

@@ -21,7 +21,7 @@ export class ClamavScannerService {
         method: 'POST',
         headers: {
           'Content-Type': params.contentType,
-          'X-Workplace-File-Name': encodeURIComponent(params.fileName),
+          'X-NextWork-File-Name': encodeURIComponent(params.fileName),
         },
         body: params.content.buffer.slice(
           params.content.byteOffset,

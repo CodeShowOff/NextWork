@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Workplace",
-    "slug": "workplace",
-    "scheme": "workplace",
+    "name": "NextWork",
+    "slug": "nextwork",
+    "scheme": "nextwork",
     "version": "0.1.0",
     "icon": "./assets/images/ic_launcher.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "bundleIdentifier": "com.workplace.app",
+      "bundleIdentifier": "com.nextwork.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Workplace uses your camera when you join a group live room.",
-        "NSMicrophoneUsageDescription": "Workplace uses your microphone when you join a group live room.",
-        "NSCalendarsAddUsageDescription": "Workplace adds a group event to your calendar when you choose to export it."
+        "NSCameraUsageDescription": "NextWork uses your camera when you join a group live room.",
+        "NSMicrophoneUsageDescription": "NextWork uses your microphone when you join a group live room.",
+        "NSCalendarsAddUsageDescription": "NextWork adds a group event to your calendar when you choose to export it."
       },
       "bitcode": false
     },
     "android": {
-      "package": "com.workplace.app",
+      "package": "com.nextwork.app",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",

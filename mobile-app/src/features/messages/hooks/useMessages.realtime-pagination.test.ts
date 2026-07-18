@@ -68,7 +68,7 @@ describe('useMessages realtime pagination helpers', () => {
           fileName: 'doc.pdf',
           fileSizeBytes: 1024,
           storageKey: 'uploads/u1/doc.pdf',
-          publicUrl: 'https://cdn.workplace.local/uploads/u1/doc.pdf',
+          publicUrl: 'https://cdn.nextwork.local/uploads/u1/doc.pdf',
           width: null,
           height: null,
           durationMs: null,

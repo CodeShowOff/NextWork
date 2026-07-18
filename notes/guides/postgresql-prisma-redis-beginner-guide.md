@@ -86,7 +86,7 @@ npm run prisma:seed
 Run these from `backend-api` unless stated otherwise.
 
 ### 3.1 Install dependencies
-From workspace root:
+From nextwork root:
 ```bash
 npm install
 ```
@@ -274,7 +274,7 @@ npm run prisma:migrate:status
 
 Manual way (if `psql` installed):
 ```bash
-psql -h localhost -U postgres -d workplace
+psql -h localhost -U postgres -d nextwork
 ```
 
 ### 6.3 Connection string format
@@ -285,7 +285,7 @@ DATABASE_URL=postgresql://username:password@host:port/database
 
 Project local default shape:
 ```env
-DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/workplace
+DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/nextwork
 ```
 
 ---
@@ -318,7 +318,7 @@ REDIS_URL=redis://localhost:6379
 
 ## 8. Full First-Time Setup Sequence (Copy/Paste)
 
-From workspace root:
+From nextwork root:
 
 ```bash
 npm install

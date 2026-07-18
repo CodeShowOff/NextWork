@@ -18,7 +18,7 @@ export const envValidationSchema = Joi.object({
   POST_SHARE_BASE_URL: Joi.string().optional(),
   S3_ENDPOINT: Joi.string().uri().optional(),
   S3_REGION: Joi.string().default('us-east-1'),
-  S3_BUCKET: Joi.string().max(63).default('workplace'),
+  S3_BUCKET: Joi.string().max(63).default('nextwork'),
   S3_ACCESS_KEY_ID: Joi.string().optional(),
   S3_SECRET_ACCESS_KEY: Joi.string().optional(),
   S3_FORCE_PATH_STYLE: Joi.string().valid('true', 'false').default('true'),

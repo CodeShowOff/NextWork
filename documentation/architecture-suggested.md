@@ -1,5 +1,5 @@
 ## 1. System Architecture Overview
-Target: New production-grade system in Workplace with clear bounded contexts, scalable real-time capabilities, and independent frontend/backend evolution.
+Target: New production-grade system in NextWork with clear bounded contexts, scalable real-time capabilities, and independent frontend/backend evolution.
 
 1. Architectural style:
 - Frontend: React Native + TypeScript, feature-sliced architecture.

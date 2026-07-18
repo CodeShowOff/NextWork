@@ -36,7 +36,7 @@ export class EmailService {
     const senderEmail = this.isMissingOrPlaceholder(rawSenderEmail, ['verified_sender@yourdomain.com'])
       ? undefined
       : rawSenderEmail?.trim();
-    const senderName = this.configService.get<string>('BREVO_SENDER_NAME') ?? 'Workplace';
+    const senderName = this.configService.get<string>('BREVO_SENDER_NAME') ?? 'NextWork';
     const apiBaseUrl =
       this.configService.get<string>('BREVO_API_BASE_URL')?.replace(/\/+$/, '') ??
       'https://api.brevo.com';

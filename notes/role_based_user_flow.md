@@ -12,7 +12,7 @@ Below is the practical flow for each role in this app, based on current implemen
 ---
 
 ## **Employee Flow**
-1. **Join workspace**
+1. **Join nextwork**
 2. Accept invite token/link from manager/admin.
 3. Automatically (or manually) switch into that organization context.
 

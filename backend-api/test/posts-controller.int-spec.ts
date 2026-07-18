@@ -52,8 +52,8 @@ describe('PostsController Integration', () => {
     deletePost: jest.fn().mockResolvedValue({ status: 'ok' }),
     getPostShareLink: jest.fn().mockResolvedValue({
       postId: 'p1',
-      shareUrl: 'https://workplace.local/posts/p1',
-      appUrl: 'workplace://posts/p1',
+      shareUrl: 'https://nextwork.local/posts/p1',
+      appUrl: 'nextwork://posts/p1',
     }),
     votePoll: jest.fn().mockResolvedValue({
       id: 'p1',
@@ -196,7 +196,7 @@ describe('PostsController Integration', () => {
   it('GET /posts/:id/share-link returns canonical links', async () => {
     const response = await request(app.getHttpServer()).get('/posts/p1/share-link').expect(200);
 
-    expect(response.body.shareUrl).toBe('https://workplace.local/posts/p1');
+    expect(response.body.shareUrl).toBe('https://nextwork.local/posts/p1');
     expect(postsServiceMock.getPostShareLink).toHaveBeenCalledWith('u1', 'p1');
   });
 

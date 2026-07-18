@@ -226,7 +226,7 @@ export const resources = {
         },
       },
       auth: {
-        title: 'Workplace',
+        title: 'NextWork',
         subtitle: 'Sign in to access feed, groups, messages, and profile.',
         modeLogin: 'Login',
         modeSignup: 'Sign Up',
@@ -394,7 +394,7 @@ export const resources = {
           groupAdmin: 'Group management',
         },
         subtitle: {
-          createOrganization: 'Start by creating a workspace for your team.',
+          createOrganization: 'Start by creating a nextwork for your team.',
           chooseStarterGroups: 'Pick the groups you want to create now. You can skip and add later.',
           groupsCount: 'Groups: {{count}}',
           membersCount: 'Members: {{count}}',
@@ -440,7 +440,7 @@ export const resources = {
         },
         firstRun: {
           title: 'Invite your teammates',
-          subtitle: 'Share an invite now so your team can join this workspace before you continue.',
+          subtitle: 'Share an invite now so your team can join this nextwork before you continue.',
           continueToApp: 'Continue to app',
         },
         labels: {
@@ -470,7 +470,7 @@ export const resources = {
           acceptInviteFailed: 'Could not accept invite',
           acceptInviteSuccessTitle: 'Invite accepted',
           acceptInviteSuccessBody: 'You have joined the organization.',
-          inviteShareMessage: 'Join {{orgName}} on Workplace: {{url}}',
+          inviteShareMessage: 'Join {{orgName}} on NextWork: {{url}}',
           defaultOrgName: 'our organization',
           updateOrganizationFailed: 'Could not update organization',
           updateOrganizationSuccessTitle: 'Organization updated',

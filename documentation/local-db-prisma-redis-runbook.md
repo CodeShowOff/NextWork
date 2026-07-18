@@ -22,12 +22,12 @@ Environment file required:
 - backend-api/.env
 
 Critical variables in backend-api/.env:
-- DATABASE_URL=postgresql://<user>:<password>@localhost:5432/workplace
+- DATABASE_URL=postgresql://<user>:<password>@localhost:5432/nextwork
 - REDIS_URL=redis://localhost:6379
 
 ## 2. Install Project Dependencies
 
-Run from workspace root:
+Run from nextwork root:
 
 ```bash
 npm install

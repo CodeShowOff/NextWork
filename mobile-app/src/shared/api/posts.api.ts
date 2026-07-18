@@ -1,14 +1,14 @@
-import type { PaginatedPostsDto } from '@workplace/api-contracts';
+import type { PaginatedPostsDto } from '@nextwork/api-contracts';
 
-import { workplaceApi } from './contracts-client';
+import { nextworkApi } from './contracts-client';
 
 export type PostItem = PaginatedPostsDto['items'][number];
 export type PaginatedPosts = PaginatedPostsDto;
 
 export function listMyPosts(params: { limit: number; before?: string }) {
-  return workplaceApi.posts.listMine(params);
+  return nextworkApi.posts.listMine(params);
 }
 
 export function listUserPosts(userId: string, params: { limit: number; before?: string }) {
-  return workplaceApi.posts.listByUser(userId, params);
+  return nextworkApi.posts.listByUser(userId, params);
 }

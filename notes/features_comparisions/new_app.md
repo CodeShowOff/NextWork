@@ -1,8 +1,8 @@
-Based on my thorough code analysis of the Workplace React Native + NestJS backend, here's the comprehensive implemented-feature inventory:
+Based on my thorough code analysis of the NextWork React Native + NestJS backend, here's the comprehensive implemented-feature inventory:
 
 ---
 
-## WORKPLACE CODEBASE AUDIT
+## NEXTWORK CODEBASE AUDIT
 
 ### 1. AUTH & ONBOARDING
 
@@ -285,7 +285,7 @@ Based on my thorough code analysis of the Workplace React Native + NestJS backen
 **Navigation Implementation**
 - React Navigation: Bottom Tab Navigator + Native Stack per feature
 - Deep Linking: Handled in App.tsx with inital URL parsing for invites
-- Link extraction: [invite-linking.ts](mobile-app/src/shared/linking/invite-linking.ts) extracts `workplace://invite/{token}` or custom scheme
+- Link extraction: [invite-linking.ts](mobile-app/src/shared/linking/invite-linking.ts) extracts `nextwork://invite/{token}` or custom scheme
 
 **Screen Structure**
 - Evidence: Feature folders (auth/, feed/, groups/, messages/, notifications/, profile/, search/) each contain screens + components/hooks
@@ -313,8 +313,8 @@ Based on my thorough code analysis of the Workplace React Native + NestJS backen
 - Typography: SystemFont (React Native default) with dynamic font weights (600, 700, 800)
 
 **Assets**
-- Images: Folder structure in [sample_app/assets/images/](sample_app/assets/images/) (separate Flutter project; Workplace has assets/ folder in workspace root, contents not listed)
-- Fonts: [sample_app/assets/fonts/](sample_app/assets/fonts/) (Flutter; Workplace fonts not explored, likely system fonts used)
+- Images: Folder structure in [sample_app/assets/images/](sample_app/assets/images/) (separate Flutter project; NextWork has assets/ folder in nextwork root, contents not listed)
+- Fonts: [sample_app/assets/fonts/](sample_app/assets/fonts/) (Flutter; NextWork fonts not explored, likely system fonts used)
 
 **Missing:**
 - ❌ Dark theme

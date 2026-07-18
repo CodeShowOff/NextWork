@@ -326,9 +326,9 @@ export class AuthService {
 
     await this.emailService.sendTransactionalEmail({
       to: email,
-      subject: 'Verify your Workplace email',
-      htmlContent: `<p>Your Workplace verification code is <strong>${token}</strong>.</p><p>This code expires at ${expiry}.</p>`,
-      textContent: `Your Workplace verification code is ${token}. It expires at ${expiry}.`,
+      subject: 'Verify your NextWork email',
+      htmlContent: `<p>Your NextWork verification code is <strong>${token}</strong>.</p><p>This code expires at ${expiry}.</p>`,
+      textContent: `Your NextWork verification code is ${token}. It expires at ${expiry}.`,
     });
   }
 
@@ -341,9 +341,9 @@ export class AuthService {
 
     await this.emailService.sendTransactionalEmail({
       to: email,
-      subject: 'Reset your Workplace password',
-      htmlContent: `<p>Your Workplace password reset code is <strong>${token}</strong>.</p><p>This code expires at ${expiry}.</p>`,
-      textContent: `Your Workplace password reset code is ${token}. It expires at ${expiry}.`,
+      subject: 'Reset your NextWork password',
+      htmlContent: `<p>Your NextWork password reset code is <strong>${token}</strong>.</p><p>This code expires at ${expiry}.</p>`,
+      textContent: `Your NextWork password reset code is ${token}. It expires at ${expiry}.`,
     });
   }
 }

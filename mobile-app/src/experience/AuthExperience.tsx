@@ -101,7 +101,7 @@ export function AuthExperience() {
             (value) => value.trim(),
           )
         ) {
-          throw new Error('Complete all fields to create your workplace.');
+          throw new Error('Complete all fields to create your nextwork.');
         }
         const result = await signUp({
           email: email.trim(),
@@ -163,7 +163,7 @@ export function AuthExperience() {
     mode === 'login'
       ? 'Welcome back'
       : mode === 'signup'
-        ? 'Create your workplace'
+        ? 'Create your nextwork'
         : mode === 'verify'
           ? 'Verify your email'
           : mode === 'forgot'
@@ -174,7 +174,7 @@ export function AuthExperience() {
       ? 'Stay close to your team, wherever work happens.'
       : mode === 'signup'
         ? 'Set up a shared home for your people and teams.'
-        : (verificationHint ?? 'We’ll help you get securely back into Workplace.');
+        : (verificationHint ?? 'We’ll help you get securely back into NextWork.');
 
   return (
     <Page scroll contentStyle={styles.page} edges={['top', 'left', 'right', 'bottom']}>
@@ -189,7 +189,7 @@ export function AuthExperience() {
             <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
               <Text style={[styles.brandMarkText, { color: colors.onAccent }]}>W</Text>
             </View>
-            <Text style={styles.brandName}>Workplace</Text>
+            <Text style={styles.brandName}>NextWork</Text>
           </View>
           <Text style={styles.heroTitle}>Work feels more connected here.</Text>
           <Text style={styles.heroText}>

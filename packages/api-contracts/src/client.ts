@@ -42,7 +42,7 @@ function toQueryString(query?: Record<string, unknown>): string {
   return serialized ? `?${serialized}` : '';
 }
 
-export interface WorkplaceApiClientOptions {
+export interface NextWorkApiClientOptions {
   baseUrl: string | (() => string);
   getAccessToken?: () => string | undefined;
   onUnauthorized?: (context: { path: string; status: number }) => Promise<string | undefined> | string | undefined;
@@ -205,7 +205,7 @@ export interface SendThanksRequestDto {
 }
 
 export async function requestJsonWithOptions<TResponse>(
-  options: WorkplaceApiClientOptions,
+  options: NextWorkApiClientOptions,
   path: string,
   init?: RequestInit,
   query?: Record<string, unknown>,
@@ -245,7 +245,7 @@ export async function requestJsonWithOptions<TResponse>(
   return unwrapEnvelope<TResponse>(await response.json());
 }
 
-export function createWorkplaceApiClient(options: WorkplaceApiClientOptions) {
+export function createNextWorkApiClient(options: NextWorkApiClientOptions) {
   async function request<TResponse>(
     path: string,
     init?: RequestInit,

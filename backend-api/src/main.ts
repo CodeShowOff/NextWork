@@ -36,8 +36,8 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const openApiConfig = new DocumentBuilder()
-    .setTitle('Workplace API')
-    .setDescription('Workplace backend API documentation')
+    .setTitle('NextWork API')
+    .setDescription('NextWork backend API documentation')
     .setVersion('0.1.0')
     .addBearerAuth(
       {

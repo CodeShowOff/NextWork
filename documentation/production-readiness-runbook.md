@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This runbook defines mandatory checks before promoting Workplace services to production.
+This runbook defines mandatory checks before promoting NextWork services to production.
 
 ## Scope
 
@@ -46,7 +46,7 @@ This runbook defines mandatory checks before promoting Workplace services to pro
 - `GET /api/v1/ops/performance-check` reports `pass` for feed/search p95 budgets.
 
 7. Observability readiness
-- Grafana dashboard `workplace-overview` imported and green.
+- Grafana dashboard `nextwork-overview` imported and green.
 - Alertmanager routes active for API/DB/Redis/socket alerts.
 - On-call roster aware of rollback criteria and incident ownership.
 

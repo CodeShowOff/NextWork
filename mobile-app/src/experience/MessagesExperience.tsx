@@ -597,7 +597,7 @@ function MessageComposer({
 }) {
   const colors = useAppColors();
   const { showToast } = useToast();
-  const draft = useStoredDraft('workplace.draft.message');
+  const draft = useStoredDraft('nextwork.draft.message');
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addAttachment = (attachment: ComposerAttachment) =>

@@ -19,7 +19,7 @@ export const useThemeStore = create<ThemeState>()(
       setPreference: (preference) => set({ preference }),
     }),
     {
-      name: 'workplace.theme-preference',
+      name: 'nextwork.theme-preference',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ preference: state.preference }),
     },

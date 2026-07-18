@@ -1,4 +1,4 @@
-# Run Workplace Mobile App on a Real Phone (Without Docker)
+# Run NextWork Mobile App on a Real Phone (Without Docker)
 
 This guide is for first-time setup on Windows and running the app on a real phone.
 
@@ -95,13 +95,13 @@ After this, restart VS Code and terminal.
 
 ## 2. Open Project and Install JS Dependencies
 
-Run from workspace root:
+Run from nextwork root:
 
 1) Command:
 - npm install
 
 What it does:
-- Installs root + workspace dependencies (mobile-app, backend-api, packages).
+- Installs root + nextwork dependencies (mobile-app, backend-api, packages).
 
 When to run:
 - First setup
@@ -118,7 +118,7 @@ Use this starter content (replace user/password):
 
 NODE_ENV=development
 PORT=4000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workplace
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nextwork
 REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=replace-with-32-plus-char-access-secret
 JWT_REFRESH_SECRET=replace-with-32-plus-char-refresh-secret
@@ -181,7 +181,7 @@ If not healthy:
 
 ## 6. Find Your PC LAN IP (Used by Phone)
 
-Open terminal B at workspace root.
+Open terminal B at nextwork root.
 
 Command:
 - Get-NetIPAddress -AddressFamily IPv4 |
@@ -219,7 +219,7 @@ Expected:
 
 ### 7.3 Build and install debug app
 
-From workspace root, run:
+From nextwork root, run:
 
 1) Command:
 - npm run dev:android --workspace mobile-app
@@ -286,7 +286,7 @@ Fix order:
 4. Re-test phone browser URL.
 
 Optional firewall command (PowerShell as Admin):
-- netsh advfirewall firewall add rule name="Workplace API 4000" dir=in action=allow protocol=TCP localport=4000
+- netsh advfirewall firewall add rule name="NextWork API 4000" dir=in action=allow protocol=TCP localport=4000
 
 ---
 
@@ -312,7 +312,7 @@ Then open app on phone and keep URLs set to your PC LAN IP.
 
 If you want an installable APK less dependent on Metro:
 
-From workspace root:
+From nextwork root:
 - npm run android:apk:release --workspace mobile-app
 
 APK output:

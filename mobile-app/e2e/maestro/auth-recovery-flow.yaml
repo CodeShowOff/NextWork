@@ -1,4 +1,4 @@
-appId: com.workplace.app
+appId: com.nextwork.app
 ---
 - launchApp
 - assertVisible: Welcome back

@@ -220,7 +220,7 @@ If no expected 429 appears:
 1. Clear old graphics stats:
 
 ```powershell
-adb shell dumpsys gfxinfo com.workplace.app reset
+adb shell dumpsys gfxinfo com.nextwork.app reset
 ```
 
 2. Launch the app and run the feed fast-scroll scenario for 30-60 seconds.
@@ -228,7 +228,7 @@ adb shell dumpsys gfxinfo com.workplace.app reset
 3. Capture frame stats:
 
 ```powershell
-adb shell dumpsys gfxinfo com.workplace.app > .\documentation\baselines\gfxinfo-current.txt
+adb shell dumpsys gfxinfo com.nextwork.app > .\documentation\baselines\gfxinfo-current.txt
 ```
 
 4. Capture TTFC and crash observations from your instrumentation/log pipeline and write the resulting values into documentation/baselines/mobile-perf-current.json.

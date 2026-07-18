@@ -4,7 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 const connectionString =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/workplace';
+  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/nextwork';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
@@ -13,7 +13,7 @@ const prisma = new PrismaClient({
 async function main() {
   const email = (process.env.SEED_USER_EMAIL ?? 'admin@gmail.com').toLowerCase();
   const password = process.env.SEED_USER_PASSWORD ?? 'Pass123@';
-  const displayName = process.env.SEED_USER_DISPLAY_NAME ?? 'Workplace Admin';
+  const displayName = process.env.SEED_USER_DISPLAY_NAME ?? 'NextWork Admin';
   const now = new Date();
 
   const passwordHash = await bcrypt.hash(password, 12);

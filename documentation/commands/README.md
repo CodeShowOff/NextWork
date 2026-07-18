@@ -3,7 +3,7 @@
 Use these references based on where you are working:
 
 1. Monorepo root scripts
-- `documentation/commands/workspace-root-scripts.md`
+- `documentation/commands/nextwork-root-scripts.md`
 
 2. Backend API scripts
 - `documentation/commands/backend-api-scripts.md`
@@ -12,7 +12,7 @@ Use these references based on where you are working:
 - `documentation/commands/mobile-app-scripts.md`
 
 Suggested reading order for new contributors:
-1. workspace-root-scripts.md
+1. nextwork-root-scripts.md
 2. backend-api-scripts.md
 3. mobile-app-scripts.md
 

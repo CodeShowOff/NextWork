@@ -1,5 +1,5 @@
 {
-  "name": "workplace",
+  "name": "nextwork",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -16,8 +16,8 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "contracts:sync-spec": "npm run prisma:generate --workspace backend-api && npm run openapi:export --workspace backend-api",
-    "contracts:generate": "npm run contracts:sync-spec && npm run generate --workspace @workplace/api-contracts",
-    "contracts:check": "npm run contracts:sync-spec && npm run check:generated --workspace @workplace/api-contracts",
+    "contracts:generate": "npm run contracts:sync-spec && npm run generate --workspace @nextwork/api-contracts",
+    "contracts:check": "npm run contracts:sync-spec && npm run check:generated --workspace @nextwork/api-contracts",
     "contracts:check-fetch": "node ./scripts/check-mobile-api-fetch.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "ci:backend": "npm run prisma:generate --workspace backend-api && npm run lint --workspace backend-api && npm run typecheck --workspace backend-api && npm run test --workspace backend-api",

@@ -13,7 +13,7 @@ describe('InvitesController Integration', () => {
     createInviteLink: jest.fn().mockResolvedValue({
       id: 'i1',
       token: 'abc123',
-      inviteUrl: 'workplace://invite/abc123',
+      inviteUrl: 'nextwork://invite/abc123',
       organization: {
         id: 'org-1',
         name: 'Team Alpha',
@@ -86,7 +86,7 @@ describe('InvitesController Integration', () => {
     expect(response.body).toEqual(
       expect.objectContaining({
         token: 'abc123',
-        inviteUrl: 'workplace://invite/abc123',
+        inviteUrl: 'nextwork://invite/abc123',
       }),
     );
   });

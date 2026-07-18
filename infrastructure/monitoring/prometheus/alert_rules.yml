@@ -1,8 +1,8 @@
 groups:
-  - name: workplace-release-alerts
+  - name: nextwork-release-alerts
     rules:
       - alert: ApiErrorRateHigh
-        expr: sum(rate(workplace_http_errors_total[5m])) / clamp_min(sum(rate(workplace_http_requests_total[5m])), 1) > 0.02
+        expr: sum(rate(nextwork_http_errors_total[5m])) / clamp_min(sum(rate(nextwork_http_requests_total[5m])), 1) > 0.02
         for: 10m
         labels:
           severity: critical
@@ -11,7 +11,7 @@ groups:
           description: Investigate backend errors and consider rollback.
 
       - alert: ApiP95LatencyHigh
-        expr: max_over_time(workplace_http_request_p95_duration_ms[5m]) > 1500
+        expr: max_over_time(nextwork_http_request_p95_duration_ms[5m]) > 1500
         for: 10m
         labels:
           severity: warning
@@ -38,7 +38,7 @@ groups:
           description: Redis is approaching capacity.
 
       - alert: SocketConnectionsSurge
-        expr: workplace_websocket_active_connections > 2000
+        expr: nextwork_websocket_active_connections > 2000
         for: 5m
         labels:
           severity: warning

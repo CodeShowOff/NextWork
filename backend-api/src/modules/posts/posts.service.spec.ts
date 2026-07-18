@@ -64,7 +64,7 @@ describe('PostsService media validation', () => {
       visibility: 'public',
       media: [
         {
-          url: 'https://cdn.workplace.local/uploads/another-user/abc.jpg',
+          url: 'https://cdn.nextwork.local/uploads/another-user/abc.jpg',
           type: 'image',
         },
       ],

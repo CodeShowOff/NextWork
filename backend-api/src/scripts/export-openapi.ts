@@ -8,7 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 function ensureEnvDefaults(): void {
   process.env.NODE_ENV ??= 'test';
   process.env.PORT ??= '4000';
-  process.env.DATABASE_URL ??= 'postgresql://user:pass@localhost:5432/workplace';
+  process.env.DATABASE_URL ??= 'postgresql://user:pass@localhost:5432/nextwork';
   process.env.REDIS_URL ??= 'redis://localhost:6379';
   process.env.JWT_ACCESS_SECRET ??= 'x'.repeat(32);
   process.env.JWT_REFRESH_SECRET ??= 'y'.repeat(32);
@@ -31,8 +31,8 @@ async function run(): Promise<void> {
   });
 
   const openApiConfig = new DocumentBuilder()
-    .setTitle('Workplace API')
-    .setDescription('Workplace backend API documentation')
+    .setTitle('NextWork API')
+    .setDescription('NextWork backend API documentation')
     .setVersion('0.1.0')
     .addBearerAuth(
       {
@@ -45,7 +45,7 @@ async function run(): Promise<void> {
     .build();
 
   const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
-  const outputPath = resolve(__dirname, '../../../packages/api-contracts/openapi/workplace.openapi.json');
+  const outputPath = resolve(__dirname, '../../../packages/api-contracts/openapi/nextwork.openapi.json');
 
   await mkdir(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(openApiDocument, null, 2)}\n`, 'utf8');

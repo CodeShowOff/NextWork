@@ -23,7 +23,7 @@ export class ObjectStorageService {
     const endpoint = this.configService.get<string>('S3_ENDPOINT') ?? 'http://127.0.0.1:9000';
     const accessKeyId = this.configService.get<string>('S3_ACCESS_KEY_ID') ?? 'minioadmin';
     const secretAccessKey = this.configService.get<string>('S3_SECRET_ACCESS_KEY') ?? 'minioadmin';
-    this.bucket = this.configService.get<string>('S3_BUCKET') ?? 'workplace';
+    this.bucket = this.configService.get<string>('S3_BUCKET') ?? 'nextwork';
     this.client = new S3Client({
       region: this.configService.get<string>('S3_REGION') ?? 'us-east-1',
       endpoint,

@@ -5,7 +5,7 @@ import type {
   NotificationPreferencesDto,
   PaginatedFeedDto,
   PaginatedNotificationsDto,
-} from '@workplace/api-contracts';
+} from '@nextwork/api-contracts';
 
 import {
   login,

@@ -4,10 +4,10 @@ const { spawnSync } = require('node:child_process');
 
 const SEVERITY_ORDER = ['info', 'low', 'moderate', 'high', 'critical'];
 
-function runAudit(workspace) {
+function runAudit(nextwork) {
   const args = ['audit', '--json'];
-  if (workspace) {
-    args.push('--workspace', workspace);
+  if (nextwork) {
+    args.push('--workspace', nextwork);
   }
 
   const result = spawnSync(`npm ${args.join(' ')}`, {
@@ -20,7 +20,7 @@ function runAudit(workspace) {
   const output = (result.stdout || '').trim();
   if (!output) {
     throw new Error(
-      `npm audit returned no JSON for workspace ${workspace || 'root'}${result.stderr ? `: ${result.stderr}` : ''}`,
+      `npm audit returned no JSON for nextwork ${nextwork || 'root'}${result.stderr ? `: ${result.stderr}` : ''}`,
     );
   }
 
@@ -29,13 +29,13 @@ function runAudit(workspace) {
     report = JSON.parse(output);
   } catch (error) {
     throw new Error(
-      `Failed to parse npm audit JSON for workspace ${workspace || 'root'}: ${error.message}\nOutput:\n${output}`,
+      `Failed to parse npm audit JSON for nextwork ${nextwork || 'root'}: ${error.message}\nOutput:\n${output}`,
     );
   }
 
   const counts = report?.metadata?.vulnerabilities;
   if (!counts) {
-    throw new Error(`Missing vulnerability metadata for workspace ${workspace || 'root'}.`);
+    throw new Error(`Missing vulnerability metadata for nextwork ${nextwork || 'root'}.`);
   }
 
   return counts;

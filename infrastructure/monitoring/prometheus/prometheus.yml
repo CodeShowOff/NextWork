@@ -6,7 +6,7 @@ rule_files:
   - /etc/prometheus/alert_rules.yml
 
 scrape_configs:
-  - job_name: workplace_backend
+  - job_name: nextwork_backend
     metrics_path: /api/v1/ops/prometheus
     static_configs:
       - targets: ['host.docker.internal:3000']

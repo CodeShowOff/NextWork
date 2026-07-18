@@ -307,9 +307,9 @@ export class GroupCollaborationService {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Workplace//Group Event//EN',
+      'PRODID:-//NextWork//Group Event//EN',
       'BEGIN:VEVENT',
-      `UID:${event.id}@workplace`,
+      `UID:${event.id}@nextwork`,
       `DTSTAMP:${this.toIcsDate(new Date())}`,
       `DTSTART:${this.toIcsDate(event.startsAt)}`,
       ...(event.endsAt ? [`DTEND:${this.toIcsDate(event.endsAt)}`] : []),

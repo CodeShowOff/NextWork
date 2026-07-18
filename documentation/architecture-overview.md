@@ -2,7 +2,7 @@
 
 ## System Context
 
-Workplace is a social-style collaboration platform with:
+NextWork is a social-style collaboration platform with:
 
 - user profiles
 - social feed

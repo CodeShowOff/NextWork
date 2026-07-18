@@ -1,4 +1,4 @@
-import { requestJsonWithOptions } from '@workplace/api-contracts';
+import { requestJsonWithOptions } from '@nextwork/api-contracts';
 
 import { useSessionStore } from '../session/session.store';
 import { authSessionService } from '../session/auth-session.service';

@@ -76,9 +76,9 @@ export interface PostShareLinkView {
 
 @Injectable()
 export class PostsService {
-  private readonly tagsMediaType = 'application/x-workplace-tags+json';
-  private readonly pollMediaType = 'application/x-workplace-poll+json';
-  private readonly pollVoteMediaType = 'application/x-workplace-poll-vote';
+  private readonly tagsMediaType = 'application/x-nextwork-tags+json';
+  private readonly pollMediaType = 'application/x-nextwork-poll+json';
+  private readonly pollVoteMediaType = 'application/x-nextwork-poll-vote';
 
   constructor(
     private readonly postsRepository: PostsRepository,
@@ -308,12 +308,12 @@ export class PostsService {
 
     await this.assertCanViewPost(viewerId, post);
 
-    const base = (process.env.POST_SHARE_BASE_URL ?? 'https://workplace.app/post').replace(/\/+$/, '');
+    const base = (process.env.POST_SHARE_BASE_URL ?? 'https://nextwork.app/post').replace(/\/+$/, '');
 
     return {
       postId,
       shareUrl: `${base}/${postId}`,
-      appUrl: `workplace://post/${postId}`,
+      appUrl: `nextwork://post/${postId}`,
     };
   }
 

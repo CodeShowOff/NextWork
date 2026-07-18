@@ -3324,8 +3324,8 @@
     }
   },
   "info": {
-    "title": "Workplace API",
-    "description": "Workplace backend API documentation",
+    "title": "NextWork API",
+    "description": "NextWork backend API documentation",
     "version": "0.1.0",
     "contact": {}
   },

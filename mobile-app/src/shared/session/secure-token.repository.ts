@@ -1,4 +1,4 @@
-const AUTH_SESSION_STORAGE_KEY = 'workplace.auth.session.v1';
+const AUTH_SESSION_STORAGE_KEY = 'nextwork.auth.session.v1';
 
 export interface StoredAuthSession {
   userId: string;

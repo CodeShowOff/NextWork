@@ -17,7 +17,7 @@ describe('GroupCollaborationService', () => {
   const mediaServiceMock = {};
   const configServiceMock = {
     get: jest.fn((key: string) => ({
-      LIVEKIT_URL: 'wss://workplace.livekit.cloud',
+      LIVEKIT_URL: 'wss://nextwork.livekit.cloud',
       LIVEKIT_API_KEY: 'api-key',
       LIVEKIT_API_SECRET: 'api-secret',
     })[key]),
@@ -99,7 +99,7 @@ describe('GroupCollaborationService', () => {
     expect(roomServiceMock.createRoom).toHaveBeenCalledWith(
       expect.objectContaining({ name: expect.stringContaining('group-group-1-') }),
     );
-    expect(result).toMatchObject({ id: 'session-1', started: true, serverUrl: 'wss://workplace.livekit.cloud', expiresInSeconds: 600 });
+    expect(result).toMatchObject({ id: 'session-1', started: true, serverUrl: 'wss://nextwork.livekit.cloud', expiresInSeconds: 600 });
     expect(result.token.split('.')).toHaveLength(3);
   });
 

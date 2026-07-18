@@ -2,7 +2,7 @@ Based on my comprehensive code analysis of the Flutter codebase, here is the com
 
 ---
 
-## FEATURE INVENTORY: WORKPLACE_CLONE (Flutter App)
+## FEATURE INVENTORY: NEXTWORK_CLONE (Flutter App)
 
 ### 1. AUTHENTICATION & ONBOARDING
 
@@ -113,7 +113,7 @@ Based on my comprehensive code analysis of the Flutter codebase, here is the com
 
 | Feature | Evidence Files | Behavior Summary | Constraints/Details |
 |---------|---|---|---|
-| **Invite People (Share)** | [lib/view/menu/pages/menu_page.dart](lib/view/menu/pages/menu_page.dart#L43-L66) | Generates Firebase Dynamic Link with format: `https://workplaceclone.page.link` → `https://liyuu8.github.io/workplace_clone/{organizationId}`. Uses `share_plus` plugin to share. Gets packageName from package_info_plus. | Deep link includes Android & iOS parameters. |
+| **Invite People (Share)** | [lib/view/menu/pages/menu_page.dart](lib/view/menu/pages/menu_page.dart#L43-L66) | Generates Firebase Dynamic Link with format: `https://nextworkclone.page.link` → `https://liyuu8.github.io/nextwork_clone/{organizationId}`. Uses `share_plus` plugin to share. Gets packageName from package_info_plus. | Deep link includes Android & iOS parameters. |
 | **Logout** | [lib/view/menu/pages/menu_page.dart](lib/view/menu/pages/menu_page.dart#L68-L78) | Firebase Auth sign out + clear local state + redirect to Welcome. |
 | **Activity Log** | [lib/view/profile/components/profile_user_actions.dart](lib/view/profile/components/profile_user_actions.dart#L31-L37) | Profile action button; "notImplement" toast. |
 | **Profile Edit** | [lib/view/profile/components/profile_user_actions.dart](lib/view/profile/components/profile_user_actions.dart#L22-L28) | Navigates to [lib/view/profile/screens/edit_profile_screen.dart](lib/view/profile/screens/edit_profile_screen.dart) (placeholder screen). |
@@ -184,7 +184,7 @@ Based on my comprehensive code analysis of the Flutter codebase, here is the com
 | **Theme** | [lib/main.dart](lib/main.dart#L40-L48) | MaterialApp with light theme, primaryColor: white, main font: NotoSansJP_Regular. |
 | **Custom Fonts** | [pubspec.yaml](pubspec.yaml)<br>[assets/fonts/](assets/fonts/) | 3 NotoSansJP variants: Bold, Medium, Regular (.otf format). |
 | **Icons** | font_awesome_flutter (thumb-up/down, eye/eye-slash), Material Icons (nav, actions). |
-| **Color Scheme** | [lib/utils/constants.dart](lib/utils/constants.dart) | `kWorkplaceMainColor` (blue accent used throughout). |
+| **Color Scheme** | [lib/utils/constants.dart](lib/utils/constants.dart) | `kNextWorkMainColor` (blue accent used throughout). |
 | **Text Styles** | [lib/utils/styles.dart](lib/utils/styles.dart) | Multiple custom TextStyles: kRegularFont, kWelcomeLabelTextStyle, kInputTextStyle, etc. |
 
 ---
@@ -227,7 +227,7 @@ Based on my comprehensive code analysis of the Flutter codebase, here is the com
 
 | Setting | File | Value | Note |
 |---|---|---|---|
-| App Name | pubspec.yaml | `workplace_clone` | Package name. |
+| App Name | pubspec.yaml | `nextwork_clone` | Package name. |
 | Version | pubspec.yaml | `1.0.0+1` | Build version+number. |
 | Dart SDK | pubspec.yaml | `>=3.0.0 <4.0.0` | Null safety required. |
 | Min Build Number | pubspec.yaml | Default (auto) | Implies built with latest Flutter stable. |

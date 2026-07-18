@@ -1,9 +1,9 @@
-# Workspace Root Scripts
+# NextWork Root Scripts
 
 Source:
-- `package.json` (workspace root)
+- `package.json` (nextwork root)
 
-Run these commands from workspace root.
+Run these commands from nextwork root.
 
 ## 1. Quality Basics
 
@@ -24,7 +24,7 @@ Command:
 npm run test --workspaces --if-present
 ```
 What it does:
-- Runs all workspace test scripts
+- Runs all nextwork test scripts
 When to run:
 - Before merge
 - After dependency upgrades
@@ -55,7 +55,7 @@ When to run:
 ### `npm run contracts:generate`
 Command:
 ```bash
-npm run contracts:sync-spec && npm run generate --workspace @workplace/api-contracts
+npm run contracts:sync-spec && npm run generate --workspace @nextwork/api-contracts
 ```
 What it does:
 - Syncs OpenAPI spec and regenerates typed API contracts
@@ -66,7 +66,7 @@ When to run:
 ### `npm run contracts:check`
 Command:
 ```bash
-npm run contracts:sync-spec && npm run check:generated --workspace @workplace/api-contracts
+npm run contracts:sync-spec && npm run check:generated --workspace @nextwork/api-contracts
 ```
 What it does:
 - Verifies generated contracts are aligned with current backend API spec
