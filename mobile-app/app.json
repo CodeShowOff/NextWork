@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.workplace.app",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -48,7 +49,8 @@
       "expo-notifications",
       "expo-calendar",
       "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "expo-image"
     ],
     "extra": {
       "eas": {

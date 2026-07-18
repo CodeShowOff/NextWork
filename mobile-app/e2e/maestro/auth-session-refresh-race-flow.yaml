@@ -2,14 +2,18 @@ appId: com.workplace.app
 ---
 - launchApp
 - tapOn:
+    id: tab-menu
+- tapOn:
     id: header-settings
 - tapOn: Sign out
-- assertVisible: Login
-- tapOn: Login
-- inputText: qa-user@example.com
+- tapOn: Sign out
+- assertVisible: Welcome back
+- tapOn: Email
+- inputText: ${QA_EMAIL}
 - tapOn: Password
-- inputText: qa-password-123
-- tapOn: Log in
-- assertVisible: Feed
-- tapOn: Notifications
+- inputText: ${QA_PASSWORD}
+- tapOn: Sign in
+- assertVisible: Your feed
+- tapOn:
+    id: tab-notifications
 - assertVisible: Mark all read

@@ -1,12 +1,19 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Feed
-- tapOn: Share an update
+- tapOn:
+    id: tab-home
+- tapOn:
+    id: home-compose
+- tapOn:
+    id: post-content
 - inputText: Release smoke post
-- tapOn: Post
+- tapOn:
+    id: post-submit
 - assertVisible: Release smoke post
-- tapOn: Messages
-- assertVisible: Messages
-- tapOn: Notifications
+- tapOn:
+    id: tab-chats
+- assertVisible: Chats
+- tapOn:
+    id: tab-notifications
 - assertVisible: Notifications

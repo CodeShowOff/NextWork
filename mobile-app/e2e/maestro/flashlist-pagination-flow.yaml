@@ -1,9 +1,10 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Feed
-- assertVisible: Feed
+- tapOn:
+    id: tab-home
+- assertVisible: Your feed
 - scroll
 - scroll
 - scroll
-- assertVisible: Share an update
+- assertVisible: Share an update with your team

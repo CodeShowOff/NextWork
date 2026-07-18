@@ -1,16 +1,22 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Feed
-- assertVisible: Feed
-- tapOn: Share an update
+- tapOn:
+    id: tab-home
+- assertVisible: Your feed
+- tapOn:
+    id: home-compose
+- tapOn:
+    id: post-content
 - inputText: Phase 5 poll regression post
-- tapOn: Poll (optional)
+- tapOn:
+    id: post-poll-toggle
 - tapOn: Option 1
 - inputText: Yes
 - tapOn: Option 2
 - inputText: No
-- tapOn: Post
+- tapOn:
+    id: post-submit
 - assertVisible: Phase 5 poll regression post
 - tapOn: Yes
 - assertVisible: 1

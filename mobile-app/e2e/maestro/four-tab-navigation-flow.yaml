@@ -1,14 +1,23 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Feed
-- assertVisible: Feed
-- tapOn: Groups
+- tapOn:
+    id: tab-home
+- assertVisible: Your feed
+- tapOn:
+    id: tab-groups
 - assertVisible: Groups
-- tapOn: Messages
-- assertVisible: Messages
-- tapOn: Notifications
+- tapOn:
+    id: tab-chats
+- assertVisible: Chats
+- tapOn:
+    id: tab-notifications
 - assertVisible: Notifications
+- tapOn:
+    id: tab-menu
+- assertVisible: Menu
+- tapOn:
+    id: tab-home
 - tapOn:
     id: header-search
 - assertVisible: Search

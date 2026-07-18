@@ -1,11 +1,11 @@
 appId: com.workplace.app
 ---
 - launchApp
-- assertVisible: Login
+- assertVisible: Welcome back
 - tapOn: Forgot password?
+- assertVisible: Reset your password
 - assertVisible: Send reset code
-- assertVisible: Reset code
-- assertVisible: New password
-- assertVisible: Confirm new password
-- tapOn: Already have a verification code?
-- assertVisible: Verify email
+- tapOn: Back to sign in
+- tapOn: Have a code?
+- assertVisible: Verify your email
+- assertVisible: Verification code

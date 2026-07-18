@@ -1,9 +1,13 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Groups
-- assertVisible: Groups
 - tapOn:
-    id: header-search
-- inputText: dev group
-- assertVisible: Search
+    id: tab-groups
+- assertVisible: Groups
+- tapOn: ${GROUP_NAME}
+- tapOn: About
+- tapOn: Members
+- tapOn: Invite
+- tapOn: Find colleagues
+- inputText: ${INVITEE_NAME}
+- assertVisible: Invite

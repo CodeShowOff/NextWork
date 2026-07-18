@@ -120,6 +120,16 @@ If prompted:
 - `ios.bundleIdentifier` and `android.package` are both set to `com.workplace.app` in app config.
 - If Android build hangs on toolchain download, verify JDK 17 is installed and environment variables are set.
 
+## Frontend architecture
+
+The presentation layer is rebuilt around `src/presentation` and `src/experience`:
+
+- `presentation/` owns the adaptive page shell, safe-area and keyboard behavior, design-system controls, feedback, offline status, local drafts, and capability-state presentation.
+- `experience/` owns the new auth, onboarding, Home, Groups, Chats, Notifications, Menu, profile, search, settings, moderation, and live-room screens.
+- `shared/` and `features/*/hooks` remain the source of truth for API contracts, session handling, React Query keys, deep-link invite handling, sockets, localization, and cache/realtime helpers.
+
+The compact shell exposes Home, Groups, Chats, Notifications, and Menu. At regular and expanded widths it automatically switches to a navigation rail and uses split panes where they improve scanning. Android uses resize-mode keyboard handling, safe-area-aware surfaces, and persistent local drafts without queuing unsupported offline mutations.
+
 ## Rollout Flags
 
 The following flags control high-risk rollout surfaces:

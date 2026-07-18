@@ -1,7 +1,8 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Notifications
+- tapOn:
+    id: tab-notifications
 - assertVisible: Notifications
 # Manual setup step: generate a follow/like/comment/message notification for this user from another account.
 - assertVisible: ${NOTIFICATION_TEXT}

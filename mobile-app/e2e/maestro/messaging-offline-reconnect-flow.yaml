@@ -1,15 +1,21 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Messages
-- assertVisible: Messages
-- tapOn: Search people
+- tapOn:
+    id: tab-chats
+- assertVisible: Chats
+- tapOn:
+    id: new-chat
+- tapOn:
+    id: new-chat-search
 - inputText: ${USER_B_NAME}
 - tapOn: Message
-- assertVisible: Type a message
+- assertVisible:
+    id: message-composer
 # Manual setup step: while User A app is backgrounded, send a message from User B to this conversation.
 - pressKey: home
 - launchApp
-- tapOn: Messages
+- tapOn:
+    id: tab-chats
 - tapOn: ${USER_B_NAME}
 - assertVisible: ${USER_B_OFFLINE_MESSAGE}

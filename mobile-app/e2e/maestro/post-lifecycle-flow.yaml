@@ -1,12 +1,18 @@
 appId: com.workplace.app
 ---
 - launchApp
-- tapOn: Feed
-- tapOn: Share an update
+- tapOn:
+    id: tab-home
+- tapOn:
+    id: home-compose
+- tapOn:
+    id: post-content
 - inputText: Phase 9 release lifecycle post
-- tapOn: Post
+- tapOn:
+    id: post-submit
 - assertVisible: Phase 9 release lifecycle post
+- tapOn: Post options
 - tapOn: Edit
 - tapOn: Save
 - tapOn: Delete
-- tapOn: Delete
+- tapOn: Delete post
