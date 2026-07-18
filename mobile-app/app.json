@@ -14,7 +14,8 @@
         "NSCameraUsageDescription": "Workplace uses your camera when you join a group live room.",
         "NSMicrophoneUsageDescription": "Workplace uses your microphone when you join a group live room.",
         "NSCalendarsAddUsageDescription": "Workplace adds a group event to your calendar when you choose to export it."
-      }
+      },
+      "bitcode": false
     },
     "android": {
       "package": "com.workplace.app",
@@ -23,7 +24,17 @@
         "RECORD_AUDIO",
         "READ_CALENDAR",
         "WRITE_CALENDAR",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/ic_launcher.png",
@@ -38,6 +49,11 @@
       "expo-calendar",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "897733ef-dbf7-454e-8a3a-b18a34e380c5"
+      }
+    }
   }
 }
