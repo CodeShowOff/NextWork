@@ -1,3 +1,11 @@
+<!-- STATUS: Project no longer in active development -->
+
+# ⚠️ THIS PROJECT IS NO LONGER IN ACTIVE DEVELOPMENT
+
+**Important:** The NextWork app and repository are no longer under active development or maintenance. Use the code and assets at your own risk — they may be outdated, unmaintained, and incompatible with recent dependencies or platforms.
+
+---
+
 # NextWork Monorepo
 
 ![NextWork](https://img.shields.io/badge/Project-NextWork-blue?style=for-the-badge)
@@ -10,7 +18,7 @@ Welcome to the **NextWork** monorepo!
 
 ## 📖 About
 
-NextWork is a modern, full-stack application built to deliver a seamless experience across mobile and web interfaces. This repository houses the entire ecosystem, containing the backend services, mobile application, shared API contracts, infrastructure configuration, and operational documentation needed to run and scale the platform.
+NextWork is a modern, full-stack application built to deliver a seamless experience across mobile and web interfaces. This repository houses the entire ecosystem, containing the backend services, [...]
 
 ## 🚀 Project Areas
 
