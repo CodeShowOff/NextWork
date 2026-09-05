@@ -1,9 +1,8 @@
 <!-- STATUS: Project no longer in active development -->
 
-# ⚠️ THIS PROJECT IS NO LONGER IN ACTIVE DEVELOPMENT
-
-**Important:** The NextWork app and repository are no longer under active development or maintenance. Use the code and assets at your own risk — they may be outdated, unmaintained, and incompatible with recent dependencies or platforms.
-
+> ⚠️ Project status: Terminated
+>
+> This project was under active development but has now been terminated as priorities shifted. The repository is kept for reference only; no further development is planned.
 ---
 
 # NextWork Monorepo
