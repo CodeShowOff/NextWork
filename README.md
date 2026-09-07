@@ -1,122 +1,165 @@
-<!-- STATUS: Project no longer in active development -->
+# NextWork
 
-> ⚠️ Project status: Terminated
->
-> This project was under active development but has now been terminated as priorities shifted. The repository is kept for reference only; no further development is planned.
----
+NextWork is a modern full-stack collaboration platform built as a TypeScript monorepo. It combines a mobile-first product experience with a backend API and shared contract packages to support social collaboration, messaging, groups, notifications, and real-time interactions.
 
-# NextWork Monorepo
+> **Project status:** This repository is retained for reference and learning. Active product development is currently paused.
 
-![NextWork](https://img.shields.io/badge/Project-NextWork-blue?style=for-the-badge)
-![NestJS](https://img.shields.io/badge/Backend-NestJS-e0234e?style=for-the-badge&logo=nestjs)
-![React Native](https://img.shields.io/badge/Mobile-React_Native-61dafb?style=for-the-badge&logo=react)
-![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql)
-![Prisma](https://img.shields.io/badge/ORM-Prisma-2d3748?style=for-the-badge&logo=prisma)
+## Project Overview
 
-Welcome to the **NextWork** monorepo! 
+The repository contains:
 
-## 📖 About
+- A cross-platform **Expo/React Native** mobile app
+- A **NestJS** backend API with Prisma and PostgreSQL
+- Shared **OpenAPI-driven contracts** used across services
+- Supporting infrastructure, deployment runbooks, and release validation scripts
 
-NextWork is a modern, full-stack application built to deliver a seamless experience across mobile and web interfaces. This repository houses the entire ecosystem, containing the backend services, [...]
+## Key Features
 
-## 🚀 Project Areas
+Current and core platform capabilities include:
 
-1. **Backend API** (`/backend-api`)
-   - **Stack:** NestJS + Prisma + PostgreSQL + Redis
-   - Serves all primary REST endpoints, WebSockets, and data access logic.
+- Authentication and session flows
+- Profile and organization-aware social feed
+- Posts, comments, reactions, and poll voting
+- Group collaboration spaces (files, albums, events entry points)
+- Real-time chat with reconnect and reaction flows
+- Notifications with cross-device read-state validation
+- API contract synchronization between backend and mobile
 
-2. **Mobile App** (`/mobile-app`)
-   - **Stack:** React Native (Expo) + Zustand + React Query + LiveKit
-   - A full-featured mobile client targeting both iOS and Android.
+## Tech Stack
 
-3. **Shared API Contracts** (`/packages/api-contracts`)
-   - Holds shared types, OpenAPI specs, and generated clients to ensure type safety across the stack.
+- **Monorepo:** npm workspaces
+- **Mobile:** Expo, React Native, TypeScript, React Navigation, TanStack Query, Zustand, LiveKit
+- **Backend:** NestJS, TypeScript, Prisma ORM
+- **Data & Realtime:** PostgreSQL, Redis, Socket.IO (+ Redis adapter)
+- **Tooling:** ESLint, Jest, Prettier, OpenAPI, Maestro (mobile E2E smoke flows)
 
-4. **Infrastructure and Monitoring** (`/infrastructure`)
-   - Docker configurations, Prometheus, and Grafana dashboards for local and production deployments.
+## Repository Structure
 
-5. **Documentation** (`/documentation`)
-   - Detailed guides, command references, and rollout runbooks.
+```text
+.
+├── mobile-app/           # Expo React Native app (TypeScript)
+├── backend-api/          # NestJS API + Prisma
+├── packages/
+│   └── api-contracts/    # Shared OpenAPI spec + generated types
+├── infrastructure/       # Docker and environment infrastructure assets
+├── documentation/        # Architecture, scripts, deployment, release docs
+├── notes/                # Product/feature planning notes
+└── scripts/              # Cross-workspace verification and gate scripts
+```
 
----
+## Getting Started
 
-## 🛠️ Quick Start (Local Development)
+### Prerequisites
 
-### 1. Root Setup
-First, install all monorepo dependencies from the root directory:
+- Node.js **20+**
+- npm **10+**
+- PostgreSQL and Redis (for backend runtime)
+- Android Studio / Xcode tooling as needed for mobile development
+
+### Install dependencies
+
 ```bash
 npm install
 ```
 
-### 2. Start the Backend
-The backend requires a database and cache. It uses a migration-first Prisma flow.
+### Environment setup
+
+- Backend: configure `backend-api/.env` (and `.env.production` for deployments)
+- Mobile: configure `mobile-app/.env` from `mobile-app/.env.example`
+
+For full environment and production variables, see `documentation/deployment-runbook.md`.
+
+## Development Scripts
+
+Run from repository root unless noted.
+
+### Monorepo quality and contracts
+
 ```bash
-cd backend-api
-npm run bootstrap  # Sets up the DB, applies migrations, and seeds data
-npm run dev        # Starts the NestJS development server
+npm run lint
+npm run typecheck
+npm run test
+npm run contracts:generate
+npm run contracts:check
+npm run release:gates
 ```
-*Health Check: Verify it is running at [http://localhost:4000/api/v1/health](http://localhost:4000/api/v1/health)*
 
-### 3. Start the Mobile App
-In a new terminal window, start the Expo bundler:
+### Backend
+
 ```bash
-cd mobile-app
-npm run dev        # Starts the Expo development server
+npm run bootstrap --workspace backend-api
+npm run dev --workspace backend-api
+npm run test:integration --workspace backend-api
 ```
-*You can press `a` to open in an Android emulator, or `i` for iOS simulator.*
 
-*(Optional) If testing on a physical Android device, you may need to reverse the ports so the app can reach your local backend:*
+### Mobile
+
 ```bash
-cd mobile-app
-npm run android:connect:all
+npm run dev --workspace mobile-app
+npm run dev:android --workspace mobile-app
+npm run android:debug --workspace mobile-app
+npm run android:connect:all --workspace mobile-app
 ```
 
----
+## Testing
 
-## 📚 Documentation Map
+The repo includes layered validation for release confidence:
 
-### Start Here (Data Stack Onboarding)
-If you're new to the data stack, check out our beginner guides:
-- [Prisma Beginner Guide](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/prisma-beginner-guide.md)
-- [PostgreSQL Beginner Guide](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/postgresql-beginner-guide.md)
-- [Redis Beginner Guide](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/redis-beginner-guide.md)
-- [Combined Beginner Context](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/postgresql-prisma-redis-beginner-guide.md)
+- Workspace linting, type checks, and Jest tests
+- Backend integration tests (`backend-api`)
+- OpenAPI contract generation and drift checks
+- Security/load/abuse/performance scripts under `scripts/`
 
-### Command References
-- [Command Docs Index](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/commands/README.md)
-- [NextWork Root Scripts](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/commands/nextwork-root-scripts.md)
-- [Backend Scripts](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/commands/backend-api-scripts.md)
-- [Mobile Scripts](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/commands/mobile-app-scripts.md)
+Common gate commands:
 
-### Release and Production Docs
-- [Deployment Runbook](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/deployment-runbook.md)
-- [Production Readiness Runbook](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/production-readiness-runbook.md)
-- [Release Rollout Plan](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/release-rollout-plan.md)
-- [Go-Live Signoff](file:///c:/Users/shukr/Desktop/Projects/Workplace/documentation/go-live-signoff.md)
+```bash
+npm run release:gates
+npm run test:security
+npm run test:e2e:verify
+npm run release:check
+```
 
----
+## Mobile E2E
 
-## ✅ Common Root Commands
+Mobile E2E smoke flows are in `mobile-app/e2e/maestro/` and cover auth recovery, feed/post lifecycle, messaging resilience, invite/group journeys, poll regression, navigation, and notifications synchronization.
 
-You can run these utility commands from the monorepo root:
+- Inventory check used by release gates:
 
-1. **Lint all workspaces:**
-   ```bash
-   npm run lint
-   ```
-2. **Typecheck all workspaces:**
-   ```bash
-   npm run typecheck
-   ```
-3. **Test all workspaces:**
-   ```bash
-   npm run test
-   ```
-4. **Run release gates (Full CI Validation):**
-   ```bash
-   npm run release:gates
-   ```
+```bash
+npm run test:e2e:verify
+```
 
-## 📝 Notes
-- Docker is optional for local development but supported via `/infrastructure`.
-- The `mobile-app` workspace uses React Native WebRTC and LiveKit for real-time media.
+- Manual Maestro execution docs:
+  - `mobile-app/e2e/README.md`
+
+## Deployment Notes
+
+- Backend deployment and environment checklist: `documentation/deployment-runbook.md`
+- Render monorepo deployment config: `render.yaml`
+- Mobile release builds:
+  - Android preview APK: `npm run android:apk --workspace mobile-app`
+  - iOS preview build (EAS cloud): `npm run ios:ipa --workspace mobile-app`
+
+Recommended pre-deploy checks:
+
+```bash
+npm ci
+npm run release:gates
+npm run test:security
+npm run test:e2e:verify
+```
+
+## Documentation
+
+- Architecture: `documentation/architecture-overview.md`
+- Command references: `documentation/commands/README.md`
+- Local DB/Prisma/Redis setup: `documentation/local-db-prisma-redis-runbook.md`
+- Deployment and rollout:
+  - `documentation/deployment-runbook.md`
+  - `documentation/production-readiness-runbook.md`
+  - `documentation/release-rollout-plan.md`
+  - `documentation/go-live-signoff.md`
+
+## Project Status
+
+NextWork is currently **not in active development**. The codebase is preserved as a full-stack reference implementation of the platform architecture, workflows, and release practices.
